@@ -1,0 +1,32 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Model;
+
+#[Fillable(['email_account_id', 'name', 'password', 'social_network', 'status', 'created_by'])]
+class Profile extends Model
+{
+    protected function casts(): array
+    {
+        return [
+            'password' => 'encrypted',
+        ];
+    }
+
+    public function emailAccount()
+    {
+        return $this->belongsTo(EmailAccount::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function users()
+    {
+        return $this->belongsToMany(User::class);
+    }
+}

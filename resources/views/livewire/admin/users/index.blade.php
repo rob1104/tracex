@@ -50,6 +50,8 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if($user->role === 'admin')
                                         <span class="px-2 py-1 text-xs font-bold rounded bg-purple-100 text-purple-700">Administrador</span>
+                                    @elseif($user->role === 'cuentas')
+                                        <span class="px-2 py-1 text-xs font-bold rounded bg-blue-100 text-blue-700">Cuentas</span>
                                     @else
                                         <span class="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-600">Usuario Regular</span>
                                     @endif
@@ -128,6 +130,7 @@
                                 <x-input-label for="role" value="Rol" />
                                 <select wire:model="role" id="role" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                     <option value="user">Usuario Regular</option>
+                                    <option value="cuentas">Gestor de Cuentas</option>
                                     <option value="admin">Administrador</option>
                                 </select>
                                 <x-input-error :messages="$errors->get('role')" class="mt-2" />

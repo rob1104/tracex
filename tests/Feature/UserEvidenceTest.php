@@ -2,13 +2,15 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
-use App\Models\EvidenceType;
+use App\Livewire\User\EvidenceCreate;
+use App\Livewire\User\EvidenceList;
 use App\Models\Evidence;
-use Livewire\Livewire;
+use App\Models\EvidenceType;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class UserEvidenceTest extends TestCase
@@ -16,6 +18,7 @@ class UserEvidenceTest extends TestCase
     use RefreshDatabase;
 
     protected $user;
+
     protected $type;
 
     protected function setUp(): void
@@ -28,8 +31,8 @@ class UserEvidenceTest extends TestCase
     public function test_user_can_view_evidence_create_page()
     {
         $this->actingAs($this->user)
-             ->get('/evidencias/registrar')
-             ->assertStatus(200);
+            ->get('/evidencias/registrar')
+            ->assertStatus(200);
     }
 
     public function test_user_can_submit_evidence_with_multiple_images()
@@ -40,13 +43,13 @@ class UserEvidenceTest extends TestCase
         $file2 = UploadedFile::fake()->image('photo2.jpg')->size(100);
 
         Livewire::actingAs($this->user)
-            ->test(\App\Livewire\User\EvidenceCreate::class)
+            ->test(EvidenceCreate::class)
             ->set('evidence_type_id', $this->type->id)
             ->set('social_network', 'Facebook')
             ->set('comment', 'Test comment')
             ->set('images', [$file1, $file2])
             ->call('save')
-            ->assertRedirect('/dashboard');
+            ->assertRedirect('/evidencias/historial');
 
         $evidence = Evidence::where('user_id', $this->user->id)->first();
         $this->assertNotNull($evidence);
@@ -62,8 +65,7 @@ class UserEvidenceTest extends TestCase
         ]);
 
         Livewire::actingAs($this->user)
-            ->test(\App\Livewire\User\EvidenceList::class)
+            ->test(EvidenceList::class)
             ->assertSee('Facebook');
     }
 }
-

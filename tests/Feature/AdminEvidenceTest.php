@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
-use App\Models\User;
+use App\Livewire\Admin\Evidences\Index;
 use App\Models\Evidence;
-use Livewire\Livewire;
+use App\Models\EvidenceType;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AdminEvidenceTest extends TestCase
@@ -13,6 +15,7 @@ class AdminEvidenceTest extends TestCase
     use RefreshDatabase;
 
     protected $admin;
+
     protected $user;
 
     protected function setUp(): void
@@ -25,27 +28,27 @@ class AdminEvidenceTest extends TestCase
     public function test_non_admins_cannot_access_admin_routes()
     {
         $this->actingAs($this->user)
-             ->get('/admin/evidencias')
-             ->assertStatus(403);
+            ->get('/admin/evidencias')
+            ->assertStatus(403);
     }
 
     public function test_admins_can_access_admin_routes()
     {
         $this->actingAs($this->admin)
-             ->get('/admin/evidencias')
-             ->assertStatus(200);
+            ->get('/admin/evidencias')
+            ->assertStatus(200);
     }
 
     public function test_admins_can_delete_evidence()
     {
         $evidence = Evidence::create([
             'user_id' => $this->user->id,
-            'evidence_type_id' => \App\Models\EvidenceType::create(['name' => 'T', 'is_active' => true])->id,
+            'evidence_type_id' => EvidenceType::create(['name' => 'T', 'is_active' => true])->id,
             'social_network' => 'Facebook',
         ]);
 
         Livewire::actingAs($this->admin)
-            ->test(\App\Livewire\Admin\Evidences\Index::class)
+            ->test(Index::class)
             ->call('delete', $evidence->id);
 
         $this->assertDatabaseMissing('evidence', ['id' => $evidence->id]);

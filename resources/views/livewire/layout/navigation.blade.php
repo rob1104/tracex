@@ -60,6 +60,15 @@ new class extends Component
                             Catálogo
                         </x-nav-link>
                     @endif
+
+                    @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                        <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                            Cuentas de Correo
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                            Perfiles
+                        </x-nav-link>
+                    @endif
                 </div>
             </div>
 
@@ -73,6 +82,10 @@ new class extends Component
                             @if(auth()->user()->isAdmin())
                                 <span class="ms-2 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
                                     Admin
+                                </span>
+                            @elseif(auth()->user()->isCuentas())
+                                <span class="ms-2 px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
+                                    Cuentas
                                 </span>
                             @else
                                 <span class="ms-2 px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/30">
@@ -142,6 +155,15 @@ new class extends Component
                     Catálogo
                 </x-responsive-nav-link>
             @endif
+
+            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                    Cuentas de Correo
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                    Perfiles
+                </x-responsive-nav-link>
+            @endif
         </div>
 
         <!-- Responsive Settings Options -->
@@ -152,6 +174,10 @@ new class extends Component
                     @if(auth()->user()->isAdmin())
                         <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
                             Admin
+                        </span>
+                    @elseif(auth()->user()->isCuentas())
+                        <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
+                            Cuentas
                         </span>
                     @else
                         <span class="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-400 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/30">

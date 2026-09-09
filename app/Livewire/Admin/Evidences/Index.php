@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Evidences;
 
 use App\Models\Evidence;
 use App\Models\EvidenceType;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -20,7 +21,7 @@ class Index extends Component
     public $filterDateTo = '';
 
     public $filterSuspect = false;
-    
+
     public $previewImage = null;
 
     public function showImage($url)
@@ -49,7 +50,7 @@ class Index extends Component
 
     private function buildQuery()
     {
-        $query = Evidence::with(['user', 'evidenceType', 'images'])->latest();
+        $query = Evidence::with(['user', 'evidenceType', 'images', 'profile'])->latest();
 
         if ($this->searchUser) {
             $query->whereHas('user', function ($q) {
@@ -85,9 +86,9 @@ class Index extends Component
 
         return response()->streamDownload(function () use ($evidences) {
             $file = fopen('php://output', 'w');
-            fputs($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
             fputcsv($file, ['ID', 'Usuario', 'Correo', 'Red Social', 'Tipo de Evidencia', 'Comentario', 'Fecha']);
-            
+
             foreach ($evidences as $e) {
                 fputcsv($file, [
                     $e->id,
@@ -100,13 +101,13 @@ class Index extends Component
                 ]);
             }
             fclose($file);
-        }, 'reporte_evidencias_' . date('Y-m-d') . '.csv');
+        }, 'reporte_evidencias_'.date('Y-m-d').'.csv');
     }
 
     public function exportPdf()
     {
         $evidences = $this->buildQuery()->get();
-        
+
         $filters = [
             'searchUser' => $this->searchUser,
             'filterType' => $this->filterType ? EvidenceType::find($this->filterType)?->name : null,
@@ -114,16 +115,16 @@ class Index extends Component
             'filterDateTo' => $this->filterDateTo,
             'filterSuspect' => $this->filterSuspect,
         ];
-        
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.evidences', [
+
+        $pdf = Pdf::loadView('pdf.evidences', [
             'evidences' => $evidences,
             'filters' => $filters,
-            'generator' => auth()->user()
+            'generator' => auth()->user(),
         ])->setPaper('letter', 'portrait');
 
         return response()->streamDownload(function () use ($pdf) {
             echo $pdf->stream();
-        }, 'reporte_evidencias_' . date('Y-m-d') . '.pdf');
+        }, 'reporte_evidencias_'.date('Y-m-d').'.pdf');
     }
 
     public function render()

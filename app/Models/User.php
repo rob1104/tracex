@@ -45,4 +45,14 @@ class User extends Authenticatable
     {
         return $this->role === 'user';
     }
+
+    public function isCuentas(): bool
+    {
+        return $this->role === 'cuentas';
+    }
+
+    public function assignedProfiles()
+    {
+        return $this->belongsToMany(Profile::class);
+    }
 }

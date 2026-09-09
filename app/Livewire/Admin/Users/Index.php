@@ -52,7 +52,7 @@ class Index extends Component
         $rules = [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,'.$this->userId,
-            'role' => 'required|in:admin,user',
+            'role' => 'required|in:admin,user,cuentas',
         ];
 
         if (! $this->userId || $this->password) {

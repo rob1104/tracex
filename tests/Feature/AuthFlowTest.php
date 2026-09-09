@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use Tests\TestCase;
 
 class AuthFlowTest extends TestCase
@@ -20,7 +21,7 @@ class AuthFlowTest extends TestCase
     {
         $user = User::factory()->create(['is_active' => true]);
 
-        \Livewire\Livewire::test('pages.auth.login')
+        Livewire::test('pages.auth.login')
             ->set('form.email', $user->email)
             ->set('form.password', 'password')
             ->call('login')
@@ -34,7 +35,7 @@ class AuthFlowTest extends TestCase
     {
         $user = User::factory()->create(['is_active' => false]);
 
-        \Livewire\Livewire::test('pages.auth.login')
+        Livewire::test('pages.auth.login')
             ->set('form.email', $user->email)
             ->set('form.password', 'password')
             ->call('login')

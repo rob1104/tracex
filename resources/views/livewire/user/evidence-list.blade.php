@@ -60,7 +60,7 @@
                             @foreach($evidences as $evidence)
                                 @php
                                     $net = strtolower($evidence->social_network);
-                                    if(str_contains($net, 'facebook')) $netColor = 'bg-blue-100 text-blue-700 border-blue-200';
+                                    if(str_contains($net, 'facebook')) $netColor = 'bg-blue-600 text-white border-blue-700';
                                     elseif(str_contains($net, 'instagram')) $netColor = 'bg-pink-100 text-pink-700 border-pink-200';
                                     elseif(str_contains($net, 'tiktok')) $netColor = 'bg-slate-800 text-white border-slate-700';
                                     elseif(str_contains($net, 'x ') || str_contains($net, 'twitter') || $net === 'x') $netColor = 'bg-sky-100 text-sky-700 border-sky-200';
@@ -87,9 +87,14 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                        <span class="px-2.5 py-1 text-xs font-semibold rounded-full border {{ $netColor }}">
-                                            {{ $evidence->social_network }}
-                                        </span>
+                                        <div class="flex flex-col gap-1">
+                                            @if($evidence->profile)
+                                                <span class="font-medium text-gray-700">{{ $evidence->profile->name }}</span>
+                                            @endif
+                                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full border {{ $netColor }} w-fit">
+                                                {{ $evidence->social_network }}
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                                         <span class="px-2.5 py-1 text-xs font-semibold rounded-full border {{ $typeColor }}">

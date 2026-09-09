@@ -6,7 +6,7 @@
 
 <div class="py-12">
     <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-        
+
         <div class="bg-white p-4 shadow-sm sm:rounded-lg mb-6">
             <!-- Filters -->
             <div class="flex flex-col sm:flex-row gap-4 items-end mb-4">
@@ -14,7 +14,7 @@
                     <x-input-label value="Buscar Usuario" />
                     <x-text-input wire:model.live.debounce.500ms="searchUser" type="text" class="block w-full mt-1" placeholder="Nombre o correo..." />
                 </div>
-                
+
                 <div class="w-full sm:w-1/4">
                     <x-input-label value="Tipo de Evidencia" />
                     <select wire:model.live="filterType" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
@@ -67,7 +67,7 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-indigo-50 border-b border-indigo-100">
                         <tr>
-                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Usuario</th>
+                            <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Creada Por</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Detalles</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Capturas</th>
                             <th scope="col" class="px-6 py-4 text-left text-xs font-bold text-indigo-700 uppercase tracking-wider">Fecha</th>
@@ -78,16 +78,16 @@
                         @forelse($evidences as $evidence)
                             @php
                                 $isSuspectRow = $evidence->images->contains('is_suspect', true);
-                                
+
                                 $net = strtolower($evidence->social_network);
-                                if(str_contains($net, 'facebook')) $netColor = 'bg-blue-100 text-blue-700 border-blue-200';
+                                if(str_contains($net, 'facebook')) $netColor = 'bg-blue-600 text-white border-blue-700';
                                 elseif(str_contains($net, 'instagram')) $netColor = 'bg-pink-100 text-pink-700 border-pink-200';
                                 elseif(str_contains($net, 'tiktok')) $netColor = 'bg-slate-800 text-white border-slate-700';
                                 elseif(str_contains($net, 'x ') || str_contains($net, 'twitter') || $net === 'x') $netColor = 'bg-sky-100 text-sky-700 border-sky-200';
                                 elseif(str_contains($net, 'youtube')) $netColor = 'bg-red-100 text-red-700 border-red-200';
                                 elseif(str_contains($net, 'linkedin')) $netColor = 'bg-blue-800 text-white border-blue-900';
                                 else $netColor = 'bg-gray-100 text-gray-700 border-gray-200';
-                                
+
                                 $typeId = $evidence->evidence_type_id ?? 0;
                                 $typeColors = [
                                     'bg-purple-100 text-purple-700 border-purple-200',
@@ -105,18 +105,23 @@
                                     <div class="text-sm text-gray-500">{{ $evidence->user->email }}</div>
                                 </td>
                                 <td class="px-6 py-4">
-                                    <div class="mb-1">
-                                        <span class="px-2 py-1 text-xs font-semibold rounded-full border {{ $netColor }}">
-                                            {{ $evidence->social_network }}
-                                        </span>
-                                        <span class="ml-1 px-2 py-1 text-xs font-semibold rounded-full border {{ $typeColor }}">
-                                            {{ optional($evidence->evidenceType)->name }}
-                                        </span>
-                                        @if($isSuspectRow)
-                                            <span class="ml-1 px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
-                                                Sospechosa
-                                            </span>
+                                    <div class="mb-1 flex flex-col items-start gap-1">
+                                        @if($evidence->profile)
+                                            <span class="font-medium text-gray-700 text-sm">{{ $evidence->profile->name }}</span>
                                         @endif
+                                        <div class="flex flex-wrap gap-1">
+                                            <span class="px-2 py-1 text-xs font-semibold rounded-full border {{ $netColor }}">
+                                                {{ $evidence->social_network }}
+                                            </span>
+                                            <span class="ml-1 px-2 py-1 text-xs font-semibold rounded-full border {{ $typeColor }}">
+                                                {{ optional($evidence->evidenceType)->name }}
+                                            </span>
+                                            @if($isSuspectRow)
+                                                <span class="ml-1 px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
+                                                    Sospechosa
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
                                     <div class="text-sm text-gray-500 mt-2">{{ Str::limit($evidence->comment, 50) }}</div>
                                 </td>

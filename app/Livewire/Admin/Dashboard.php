@@ -3,24 +3,33 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Evidence;
+use App\Models\EvidenceType;
 use App\Models\User;
+use Carbon\Carbon;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
     public $todayCount = 0;
+
     public $weekCount = 0;
+
     public $monthCount = 0;
+
     public $usersCount = 0;
 
     // Filters
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
 
     // Charts Data
     public $evidencesByUser = [];
+
     public $evidencesByDate = [];
+
     public $evidencesByType = [];
+
     public $evidencesByNetwork = [];
 
     public function mount()
@@ -43,7 +52,7 @@ class Dashboard extends Component
     {
         if (in_array($property, ['filterDateFrom', 'filterDateTo'])) {
             $this->loadChartData();
-            $this->dispatch('update-charts', 
+            $this->dispatch('update-charts',
                 dataDate: $this->evidencesByDate,
                 dataUser: $this->evidencesByUser,
                 dataType: $this->evidencesByType,
@@ -55,7 +64,7 @@ class Dashboard extends Component
     public function loadChartData()
     {
         $queryBase = Evidence::query();
-        
+
         if ($this->filterDateFrom) {
             $queryBase->whereDate('created_at', '>=', $this->filterDateFrom);
         }
@@ -68,13 +77,17 @@ class Dashboard extends Component
         // So we use whereHas/withCount with constraints, or a join.
         $this->evidencesByUser = User::where('role', 'user')
             ->withCount(['evidences' => function ($query) {
-                if ($this->filterDateFrom) $query->whereDate('created_at', '>=', $this->filterDateFrom);
-                if ($this->filterDateTo) $query->whereDate('created_at', '<=', $this->filterDateTo);
+                if ($this->filterDateFrom) {
+                    $query->whereDate('created_at', '>=', $this->filterDateFrom);
+                }
+                if ($this->filterDateTo) {
+                    $query->whereDate('created_at', '<=', $this->filterDateTo);
+                }
             }])
             ->orderBy('evidences_count', 'desc')
             ->limit(5)
             ->get()
-            ->map(fn($u) => ['name' => $u->name, 'count' => $u->evidences_count])
+            ->map(fn ($u) => ['name' => $u->name, 'count' => $u->evidences_count])
             ->toArray();
 
         // 2. Evidences Growth
@@ -83,18 +96,18 @@ class Dashboard extends Component
             ->groupBy('date')
             ->orderBy('date', 'asc')
             ->pluck('count', 'date');
-        
+
         // Build a continuous date range for the chart if dates are valid, else just use the found dates
         $this->evidencesByDate = [];
         if ($this->filterDateFrom && $this->filterDateTo) {
-            $start = \Carbon\Carbon::parse($this->filterDateFrom);
-            $end = \Carbon\Carbon::parse($this->filterDateTo);
-            
+            $start = Carbon::parse($this->filterDateFrom);
+            $end = Carbon::parse($this->filterDateTo);
+
             // Limit to max 60 days to prevent massive charts
             if ($start->diffInDays($end) > 60) {
                 $start = $end->copy()->subDays(60);
             }
-            
+
             while ($start->lte($end)) {
                 $dateStr = $start->format('Y-m-d');
                 $this->evidencesByDate[] = ['date' => $dateStr, 'count' => $countsByDate->get($dateStr, 0)];
@@ -107,12 +120,16 @@ class Dashboard extends Component
         }
 
         // 3. Evidences by Type
-        $this->evidencesByType = \App\Models\EvidenceType::withCount(['evidences' => function ($query) {
-                if ($this->filterDateFrom) $query->whereDate('created_at', '>=', $this->filterDateFrom);
-                if ($this->filterDateTo) $query->whereDate('created_at', '<=', $this->filterDateTo);
-            }])
+        $this->evidencesByType = EvidenceType::withCount(['evidences' => function ($query) {
+            if ($this->filterDateFrom) {
+                $query->whereDate('created_at', '>=', $this->filterDateFrom);
+            }
+            if ($this->filterDateTo) {
+                $query->whereDate('created_at', '<=', $this->filterDateTo);
+            }
+        }])
             ->get()
-            ->map(fn($t) => ['name' => $t->name, 'count' => $t->evidences_count])
+            ->map(fn ($t) => ['name' => $t->name, 'count' => $t->evidences_count])
             ->toArray();
 
         // 4. Evidences by Social Network

@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'evidence_type_id', 'social_network', 'comment', 'ip_address', 'user_agent'])]
+#[Fillable(['user_id', 'evidence_type_id', 'profile_id', 'social_network', 'comment', 'ip_address', 'user_agent'])]
 class Evidence extends Model
 {
     public function user()
@@ -21,5 +21,10 @@ class Evidence extends Model
     public function images()
     {
         return $this->hasMany(EvidenceImage::class);
+    }
+
+    public function profile()
+    {
+        return $this->belongsTo(Profile::class);
     }
 }
