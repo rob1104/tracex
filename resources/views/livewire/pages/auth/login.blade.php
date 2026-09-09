@@ -58,7 +58,7 @@ new #[Layout('layouts.guest')] class extends Component
 
         <div class="mt-6">
             <x-primary-button class="w-full justify-center py-3 text-sm">
-                Ingresar al Sistema
+                Entrar al Sistema
             </x-primary-button>
         </div>
 
