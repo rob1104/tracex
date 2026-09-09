@@ -28,7 +28,7 @@ new class extends Component
                         <div class="flex items-baseline gap-2">
                             <span class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-teal-300">TraceX</span>
                             <span class="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold tracking-wider">
-                                {{ config('app.version', 'v1.0.0') }}
+                                {{ config('app.version', 'v1.0.1') }}
                             </span>
                         </div>
                     </a>
@@ -78,7 +78,7 @@ new class extends Component
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-slate-300 bg-slate-800 hover:text-white hover:bg-slate-700 focus:outline-none transition ease-in-out duration-150">
                             <div x-data="{{ json_encode(['name' => auth()->user()->name]) }}" x-text="name" x-on:profile-updated.window="name = $event.detail.name"></div>
-                            
+
                             @if(auth()->user()->isAdmin())
                                 <span class="ms-2 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
                                     Admin
