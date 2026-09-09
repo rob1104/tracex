@@ -9,6 +9,8 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             @if(auth()->user()->isAdmin())
                 <livewire:admin.dashboard />
+            @elseif(auth()->user()->isCuentas())
+                <livewire:cuentas.dashboard />
             @else
                 <livewire:user.dashboard />
             @endif

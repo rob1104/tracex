@@ -30,6 +30,9 @@
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
+                                    @if(auth()->user()->isAdmin())
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor Asignado</th>
+                                    @endif
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                     <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
@@ -38,8 +41,11 @@
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($accounts as $account)
                                     <tr class="hover:bg-gray-50 transition-colors">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $account->alias ?? '-' }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $account->alias ?: '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $account->email }}</td>
+                                        @if(auth()->user()->isAdmin())
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $account->creator->name ?? 'N/A' }}</td>
+                                        @endif
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             <button wire:click="revealPassword({{ $account->id }})" class="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-xs font-semibold bg-indigo-50 px-2 py-1 rounded transition-colors">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -125,6 +131,18 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
+                            @if(auth()->user()->isAdmin())
+                            <div>
+                                <x-input-label for="created_by" value="Gestor Asignado" />
+                                <select wire:model="created_by" id="created_by" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                    <option value="">Seleccione un usuario...</option>
+                                    @foreach($cuentasUsers as $cUser)
+                                        <option value="{{ $cUser->id }}">{{ $cUser->name }} ({{ $cUser->email }})</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('created_by')" class="mt-2" />
+                            </div>
+                            @endif
                         </div>
                         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                             <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar</x-primary-button>

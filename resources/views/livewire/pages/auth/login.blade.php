@@ -63,7 +63,7 @@ new #[Layout('layouts.guest')] class extends Component
         </div>
 
         <div class="mt-8 text-center text-xs font-medium text-gray-400">
-            TraceX - Versión {{ config('app.version', '1.0.1') }}
+            TraceX - Versión {{ config('app.version', '1.0.2') }}
         </div>
     </form>
 </div>

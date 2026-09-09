@@ -9,9 +9,15 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="flex-1 w-full sm:w-1/3 mr-4">
-                            <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil o red social..." class="w-full" />
+                    <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
+                        <div class="flex-1 w-full sm:w-1/2 flex space-x-4">
+                            <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil o red social..." class="w-full sm:w-1/2" />
+                            <select wire:model.live="filter_email_account_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full sm:w-1/2">
+                                <option value="">Todas las cuentas de correo</option>
+                                @foreach($emails as $email)
+                                    <option value="{{ $email->id }}">{{ $email->email }} {{ $email->alias ? '('.$email->alias.')' : '' }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <x-primary-button wire:click="create">
                             Nuevo Perfil
@@ -30,6 +36,9 @@
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta Asociada</th>
+                                    @if(auth()->user()->isAdmin())
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor</th>
+                                    @endif
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaboradores</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
@@ -66,6 +75,9 @@
                                             <div class="text-sm text-gray-900">{{ $profile->emailAccount->email ?? 'Sin cuenta' }}</div>
                                             <div class="text-xs text-gray-500">{{ $profile->emailAccount->alias ?? '' }}</div>
                                         </td>
+                                        @if(auth()->user()->isAdmin())
+                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $profile->creator->name ?? 'N/A' }}</td>
+                                        @endif
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             @if($profile->password)
                                                 <button wire:click="revealPassword({{ $profile->id }})" class="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-xs font-semibold bg-indigo-50 px-2 py-1 rounded transition-colors">
@@ -243,6 +255,18 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
+                            @if(auth()->user()->isAdmin())
+                            <div>
+                                <x-input-label for="created_by" value="Gestor Asignado" />
+                                <select wire:model="created_by" id="created_by" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                    <option value="">Seleccione un usuario...</option>
+                                    @foreach($cuentasUsers as $cUser)
+                                        <option value="{{ $cUser->id }}">{{ $cUser->name }} ({{ $cUser->email }})</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('created_by')" class="mt-2" />
+                            </div>
+                            @endif
                         </div>
                         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                             <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar</x-primary-button>

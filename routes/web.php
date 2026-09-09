@@ -15,7 +15,7 @@ Route::view('profile', 'profile')
     ->middleware(['auth'])
     ->name('profile');
 
-Route::middleware(['auth', 'verified'])->group(function () {
+Route::middleware(['auth', 'verified', 'role:user,admin'])->group(function () {
     Route::get('/evidencias/registrar', EvidenceCreate::class)->name('evidences.create');
     Route::get('/evidencias/historial', EvidenceList::class)->name('evidences.list');
 });

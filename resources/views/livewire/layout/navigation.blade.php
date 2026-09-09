@@ -28,7 +28,7 @@ new class extends Component
                         <div class="flex items-baseline gap-2">
                             <span class="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-indigo-300 to-teal-300">TraceX</span>
                             <span class="px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold tracking-wider">
-                                {{ config('app.version', 'v1.0.1') }}
+                                {{ config('app.version', 'v1.0.2') }}
                             </span>
                         </div>
                     </a>
