@@ -39,12 +39,17 @@ class UserEvidenceTest extends TestCase
     {
         Storage::fake('public');
 
+        $emailAccount = \App\Models\EmailAccount::create(['email' => 'test@test.com', 'password' => 'secret', 'status' => 'active', 'created_by' => $this->user->id]);
+        $profile = \App\Models\Profile::create(['name' => 'Test Profile', 'social_network' => 'Facebook', 'status' => 'active', 'created_by' => $this->user->id, 'email_account_id' => $emailAccount->id]);
+        $this->user->assignedProfiles()->attach($profile->id);
+
         $file1 = UploadedFile::fake()->image('photo1.jpg')->size(100);
         $file2 = UploadedFile::fake()->image('photo2.jpg')->size(100);
 
         Livewire::actingAs($this->user)
             ->test(EvidenceCreate::class)
             ->set('evidence_type_id', $this->type->id)
+            ->set('profile_id', $profile->id)
             ->set('social_network', 'Facebook')
             ->set('comment', 'Test comment')
             ->set('images', [$file1, $file2])
