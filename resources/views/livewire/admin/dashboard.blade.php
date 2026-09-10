@@ -61,6 +61,24 @@
             <div class="text-sm font-bold text-slate-700 uppercase tracking-wide">Gestores de Cuentas</div>
             <div class="mt-2 text-5xl font-black text-slate-600">{{ $cuentasUsersCount }}</div>
         </div>
+
+        <!-- Perfiles Hoy -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-emerald-700 uppercase tracking-wide">Perfiles Hoy</div>
+            <div class="mt-2 text-5xl font-black text-emerald-600">{{ $profilesToday }}</div>
+        </div>
+        
+        <!-- Perfiles Semana -->
+        <div class="bg-gradient-to-br from-teal-50 to-cyan-50 p-6 rounded-2xl border border-teal-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-teal-700 uppercase tracking-wide">Perfiles Semana</div>
+            <div class="mt-2 text-5xl font-black text-teal-600">{{ $profilesWeek }}</div>
+        </div>
+        
+        <!-- Perfiles Mes -->
+        <div class="bg-gradient-to-br from-cyan-50 to-sky-50 p-6 rounded-2xl border border-cyan-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-cyan-700 uppercase tracking-wide">Perfiles Mes</div>
+            <div class="mt-2 text-5xl font-black text-cyan-600">{{ $profilesMonth }}</div>
+        </div>
     </div>
 
     <!-- Charts Section -->
