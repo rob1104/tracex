@@ -32,7 +32,7 @@
     </div>
 
     <div class="flex justify-between items-center mt-10">
-        <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-100">
+        <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
             Resumen de Gestión de Cuentas
         </h3>
     </div>
