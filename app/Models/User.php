@@ -55,4 +55,14 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Profile::class);
     }
+
+    public function emailAccounts()
+    {
+        return $this->hasMany(EmailAccount::class, 'created_by');
+    }
+
+    public function createdProfiles()
+    {
+        return $this->hasMany(Profile::class, 'created_by');
+    }
 }
