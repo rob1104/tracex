@@ -34,21 +34,21 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta Asociada</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta Asociada</th>
                                     @if(auth()->user()->isAdmin())
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor</th>
+                                        <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor</th>
                                     @endif
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaboradores</th>
-                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
-                                    <th scope="col" class="relative px-6 py-3"><span class="sr-only">Acciones</span></th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaboradores</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                                    <th scope="col" class="relative px-4 py-2"><span class="sr-only">Acciones</span></th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($profiles as $profile)
                                     <tr class="hover:bg-gray-50 transition-colors">
-                                        <td class="px-6 py-4 whitespace-nowrap">
+                                        <td class="px-4 py-3 whitespace-normal break-words">
                                             <div class="flex items-center">
                                                 <div class="ml-4">
                                                     <div class="text-sm font-medium text-gray-900">{{ $profile->name }}</div>
@@ -71,14 +71,14 @@
                                                 </div>
                                             </div>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap">
+                                        <td class="px-4 py-3 whitespace-normal break-words">
                                             <div class="text-sm text-gray-900">{{ $profile->emailAccount->email ?? 'Sin cuenta' }}</div>
                                             <div class="text-xs text-gray-500">{{ $profile->emailAccount->alias ?? '' }}</div>
                                         </td>
                                         @if(auth()->user()->isAdmin())
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $profile->creator->name ?? 'N/A' }}</td>
+                                            <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">{{ $profile->creator->name ?? 'N/A' }}</td>
                                         @endif
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
                                             @if($profile->password)
                                                 <button wire:click="revealPassword({{ $profile->id }})" class="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-xs font-semibold bg-indigo-50 px-2 py-1 rounded transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -91,7 +91,7 @@
                                                 <span class="text-xs text-gray-400">Sin contraseña</span>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
                                             <button wire:click="openAssignModal({{ $profile->id }})" class="flex items-center gap-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-indigo-200">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
@@ -99,14 +99,14 @@
                                                 {{ $profile->users->count() }} Asignados
                                             </button>
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
                                             @if($profile->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
                                             @else
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-red-50 text-red-700 border-red-200">Suspendido</span>
                                             @endif
                                         </td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <td class="px-4 py-3 whitespace-normal break-words text-right text-sm font-medium">
                                             <div class="flex items-center justify-end space-x-2">
                                                 <button wire:click="edit({{ $profile->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
@@ -124,7 +124,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">
+                                        <td colspan="6" class="px-4 py-3 text-center text-sm text-gray-500">
                                             No hay perfiles sociales registrados.
                                         </td>
                                     </tr>
