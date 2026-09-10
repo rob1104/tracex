@@ -30,6 +30,7 @@
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias</th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfiles</th>
                                     @if(auth()->user()->isAdmin())
                                         <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor Asignado</th>
                                     @endif
@@ -43,6 +44,11 @@
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{{ $account->alias ?: '-' }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $account->email }}</td>
+                                        <td class="px-6 py-4 whitespace-nowrap">
+                                            <button wire:click="viewProfiles({{ $account->id }})" class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-colors">
+                                                {{ $account->profiles->count() }} Perfiles
+                                            </button>
+                                        </td>
                                         @if(auth()->user()->isAdmin())
                                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ $account->creator->name ?? 'N/A' }}</td>
                                         @endif
@@ -174,6 +180,55 @@
                     </div>
                     <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-center">
                         <x-primary-button type="button" wire:click="$set('showPasswordModal', false)" class="w-full justify-center">Cerrar</x-primary-button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Profiles List Modal -->
+    @if($showProfilesModal && $selectedAccountForProfiles)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showProfilesModal', false)"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex justify-between items-center border-b pb-3 mb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Perfiles de: <span class="text-indigo-600">{{ $selectedAccountForProfiles->email }}</span>
+                            </h3>
+                            <button wire:click="$set('showProfilesModal', false)" class="text-gray-400 hover:text-gray-500">
+                                <span class="sr-only">Cerrar</span>
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="max-h-96 overflow-y-auto">
+                            @if($selectedAccountForProfiles->profiles->count() > 0)
+                                <ul class="divide-y divide-gray-200">
+                                    @foreach($selectedAccountForProfiles->profiles as $p)
+                                        <li class="py-4 flex justify-between items-center">
+                                            <div>
+                                                <p class="text-sm font-medium text-gray-900">{{ $p->name }}</p>
+                                                <p class="text-sm text-gray-500">{{ $p->social_network }}</p>
+                                            </div>
+                                            <div>
+                                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $p->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                                    {{ $p->status === 'active' ? 'Activo' : 'Suspendido' }}
+                                                </span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="text-gray-500 text-center py-4">No hay perfiles asociados a esta cuenta.</p>
+                            @endif
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end">
+                        <x-primary-button type="button" wire:click="$set('showProfilesModal', false)">Cerrar</x-primary-button>
                     </div>
                 </div>
             </div>

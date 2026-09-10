@@ -123,9 +123,21 @@ class Index extends Component
         $this->showPasswordModal = true;
     }
 
+    public $showProfilesModal = false;
+
+    public $selectedAccountForProfiles = null;
+
+    public function viewProfiles($id)
+    {
+        $account = EmailAccount::with('profiles')->findOrFail($id);
+        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) abort(403);
+        $this->selectedAccountForProfiles = $account;
+        $this->showProfilesModal = true;
+    }
+
     public function render()
     {
-        $query = EmailAccount::with('creator');
+        $query = EmailAccount::with(['creator', 'profiles']);
 
         if (auth()->user()->isCuentas()) {
             $query->where('created_by', auth()->id());
