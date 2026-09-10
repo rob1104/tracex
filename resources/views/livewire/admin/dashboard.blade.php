@@ -14,13 +14,13 @@
         
         <!-- Semana -->
         <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100 shadow-sm transition-transform hover:scale-[1.02]">
-            <div class="text-sm font-bold text-emerald-700 uppercase tracking-wide">Esta Semana</div>
+            <div class="text-sm font-bold text-emerald-700 uppercase tracking-wide">Evidencias Semana</div>
             <div class="mt-2 text-5xl font-black text-emerald-600">{{ $weekCount }}</div>
         </div>
         
         <!-- Mes -->
         <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-2xl border border-amber-100 shadow-sm transition-transform hover:scale-[1.02]">
-            <div class="text-sm font-bold text-amber-700 uppercase tracking-wide">Este Mes</div>
+            <div class="text-sm font-bold text-amber-700 uppercase tracking-wide">Evidencias Mes</div>
             <div class="mt-2 text-5xl font-black text-amber-600">{{ $monthCount }}</div>
         </div>
 
@@ -31,10 +31,42 @@
         </div>
     </div>
 
+    <div class="flex justify-between items-center mt-10">
+        <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+            Resumen de Gestión de Cuentas
+        </h3>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <!-- Cuentas Hoy -->
+        <div class="bg-gradient-to-br from-blue-50 to-cyan-50 p-6 rounded-2xl border border-blue-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-blue-700 uppercase tracking-wide">Cuentas Hoy</div>
+            <div class="mt-2 text-5xl font-black text-blue-600">{{ $accountsToday }}</div>
+        </div>
+        
+        <!-- Cuentas Semana -->
+        <div class="bg-gradient-to-br from-cyan-50 to-sky-50 p-6 rounded-2xl border border-cyan-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-cyan-700 uppercase tracking-wide">Cuentas Semana</div>
+            <div class="mt-2 text-5xl font-black text-cyan-600">{{ $accountsWeek }}</div>
+        </div>
+        
+        <!-- Cuentas Mes -->
+        <div class="bg-gradient-to-br from-sky-50 to-blue-50 p-6 rounded-2xl border border-sky-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-sky-700 uppercase tracking-wide">Cuentas Mes</div>
+            <div class="mt-2 text-5xl font-black text-sky-600">{{ $accountsMonth }}</div>
+        </div>
+
+        <!-- Gestores Activos -->
+        <div class="bg-gradient-to-br from-slate-50 to-gray-50 p-6 rounded-2xl border border-slate-100 shadow-sm transition-transform hover:scale-[1.02]">
+            <div class="text-sm font-bold text-slate-700 uppercase tracking-wide">Gestores de Cuentas</div>
+            <div class="mt-2 text-5xl font-black text-slate-600">{{ $cuentasUsersCount }}</div>
+        </div>
+    </div>
+
     <!-- Charts Section -->
-    <div class="mt-8">
-        <div class="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
-            <h3 class="text-xl font-bold text-slate-800">Análisis de Productividad</h3>
+    <div class="mt-12">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h3 class="text-xl font-bold text-slate-800">Análisis Global (Evidencias y Cuentas)</h3>
             
             <div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                 <span class="text-sm font-medium text-gray-500">Filtrar por fecha:</span>
@@ -48,35 +80,54 @@
              x-data="dashboardCharts()" 
              @update-charts.window="updateCharts($event.detail)">
             
-            <!-- Chart 1: Growth -->
+            <!-- EVIDENCES CHARTS -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-gray-500 uppercase mb-4">Crecimiento (Línea de Tiempo)</h4>
+                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Crecimiento de Evidencias (Línea)</h4>
                 <div class="relative h-64 w-full" wire:ignore>
                     <canvas id="chartGrowth"></canvas>
                 </div>
             </div>
 
-            <!-- Chart 2: Top Users -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-gray-500 uppercase mb-4">Top 5 Colaboradores</h4>
+                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Top 5 Creadores de Evidencias</h4>
                 <div class="relative h-64 w-full" wire:ignore>
                     <canvas id="chartUsers"></canvas>
                 </div>
             </div>
 
-            <!-- Chart 3: By Type -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-gray-500 uppercase mb-4">Distribución por Tipo</h4>
+                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Distribución por Tipo de Evidencia</h4>
                 <div class="relative h-64 w-full flex justify-center" wire:ignore>
                     <canvas id="chartTypes"></canvas>
                 </div>
             </div>
 
-            <!-- Chart 4: By Network -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-gray-500 uppercase mb-4">Evidencias por Red Social</h4>
+                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Evidencias por Red Social</h4>
                 <div class="relative h-64 w-full flex justify-center" wire:ignore>
                     <canvas id="chartNetworks"></canvas>
+                </div>
+            </div>
+
+            <!-- ACCOUNTS CHARTS -->
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <h4 class="text-sm font-bold text-cyan-600 uppercase mb-4">Crecimiento de Cuentas (Línea)</h4>
+                <div class="relative h-64 w-full" wire:ignore>
+                    <canvas id="chartAccountGrowth"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <h4 class="text-sm font-bold text-cyan-600 uppercase mb-4">Top 5 Creadores de Cuentas</h4>
+                <div class="relative h-64 w-full" wire:ignore>
+                    <canvas id="chartTopAccountCreators"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm lg:col-span-2">
+                <h4 class="text-sm font-bold text-cyan-600 uppercase mb-4">Total Cuentas por Gestor Asignado</h4>
+                <div class="relative h-64 w-full" wire:ignore>
+                    <canvas id="chartAccountsByGestor"></canvas>
                 </div>
             </div>
             
@@ -100,6 +151,10 @@
                         const dUser = Object.values(this.$wire.evidencesByUser || {});
                         const dType = Object.values(this.$wire.evidencesByType || {});
                         const dNet = Object.values(this.$wire.evidencesByNetwork || {});
+                        
+                        const dAccDate = Object.values(this.$wire.accountsByDate || {});
+                        const dAccGestor = Object.values(this.$wire.accountsByGestor || {});
+                        const dTopCreators = Object.values(this.$wire.topAccountCreators || {});
 
                         // Chart 1: Growth (Line)
                         charts.growth = new Chart(document.getElementById('chartGrowth'), {
@@ -127,7 +182,7 @@
                                 datasets: [{
                                     label: 'Total',
                                     data: dUser.map(d => d.count),
-                                    backgroundColor: '#0ea5e9',
+                                    backgroundColor: '#8b5cf6',
                                     borderRadius: 4
                                 }]
                             },
@@ -159,6 +214,54 @@
                             },
                             options: { maintainAspectRatio: false }
                         });
+
+                        // Chart 5: Account Growth (Line)
+                        charts.accountGrowth = new Chart(document.getElementById('chartAccountGrowth'), {
+                            type: 'line',
+                            data: {
+                                labels: dAccDate.map(d => d.date),
+                                datasets: [{
+                                    label: 'Cuentas Creadas',
+                                    data: dAccDate.map(d => d.count),
+                                    borderColor: '#0891b2',
+                                    backgroundColor: 'rgba(8, 145, 178, 0.1)',
+                                    borderWidth: 3,
+                                    fill: true,
+                                    tension: 0.4
+                                }]
+                            },
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                        });
+
+                        // Chart 6: Top Account Creators (Bar)
+                        charts.topCreators = new Chart(document.getElementById('chartTopAccountCreators'), {
+                            type: 'bar',
+                            data: {
+                                labels: dTopCreators.map(d => d.name),
+                                datasets: [{
+                                    label: 'Total Creadas',
+                                    data: dTopCreators.map(d => d.count),
+                                    backgroundColor: '#0ea5e9',
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                        });
+
+                        // Chart 7: Accounts by Gestor (Bar)
+                        charts.accByGestor = new Chart(document.getElementById('chartAccountsByGestor'), {
+                            type: 'bar',
+                            data: {
+                                labels: dAccGestor.map(d => d.name),
+                                datasets: [{
+                                    label: 'Cuentas Asignadas',
+                                    data: dAccGestor.map(d => d.count),
+                                    backgroundColor: '#0284c7',
+                                    borderRadius: 4
+                                }]
+                            },
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                        });
                     };
                     
                     renderCharts();
@@ -168,26 +271,38 @@
                     const dUser = Object.values(newData.dataUser || {});
                     const dType = Object.values(newData.dataType || {});
                     const dNet = Object.values(newData.dataNet || {});
+                    
+                    const dAccDate = Object.values(newData.dataAccountDate || {});
+                    const dAccGestor = Object.values(newData.dataAccountGestor || {});
+                    const dTopCreators = Object.values(newData.dataTopCreators || {});
 
-                    // Update Growth
                     charts.growth.data.labels = dDate.map(d => d.date);
                     charts.growth.data.datasets[0].data = dDate.map(d => d.count);
                     charts.growth.update();
 
-                    // Update Users
                     charts.users.data.labels = dUser.map(d => d.name);
                     charts.users.data.datasets[0].data = dUser.map(d => d.count);
                     charts.users.update();
 
-                    // Update Types
                     charts.types.data.labels = dType.map(d => d.name);
                     charts.types.data.datasets[0].data = dType.map(d => d.count);
                     charts.types.update();
 
-                    // Update Networks
                     charts.networks.data.labels = dNet.map(d => d.name);
                     charts.networks.data.datasets[0].data = dNet.map(d => d.count);
                     charts.networks.update();
+
+                    charts.accountGrowth.data.labels = dAccDate.map(d => d.date);
+                    charts.accountGrowth.data.datasets[0].data = dAccDate.map(d => d.count);
+                    charts.accountGrowth.update();
+
+                    charts.topCreators.data.labels = dTopCreators.map(d => d.name);
+                    charts.topCreators.data.datasets[0].data = dTopCreators.map(d => d.count);
+                    charts.topCreators.update();
+
+                    charts.accByGestor.data.labels = dAccGestor.map(d => d.name);
+                    charts.accByGestor.data.datasets[0].data = dAccGestor.map(d => d.count);
+                    charts.accByGestor.update();
                 }
             };
         });
