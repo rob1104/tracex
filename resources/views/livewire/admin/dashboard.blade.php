@@ -11,13 +11,13 @@
             <div class="text-sm font-bold text-indigo-700 uppercase tracking-wide">Evidencias Hoy</div>
             <div class="mt-2 text-5xl font-black text-indigo-600">{{ $todayCount }}</div>
         </div>
-        
+
         <!-- Semana -->
         <div class="bg-gradient-to-br from-emerald-50 to-teal-50 p-6 rounded-2xl border border-emerald-100 shadow-sm transition-transform hover:scale-[1.02]">
             <div class="text-sm font-bold text-emerald-700 uppercase tracking-wide">Evidencias Semana</div>
             <div class="mt-2 text-5xl font-black text-emerald-600">{{ $weekCount }}</div>
         </div>
-        
+
         <!-- Mes -->
         <div class="bg-gradient-to-br from-amber-50 to-orange-50 p-6 rounded-2xl border border-amber-100 shadow-sm transition-transform hover:scale-[1.02]">
             <div class="text-sm font-bold text-amber-700 uppercase tracking-wide">Evidencias Mes</div>
@@ -32,7 +32,7 @@
     </div>
 
     <div class="flex justify-between items-center mt-10">
-        <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-600">
+        <h3 class="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-cyan-100">
             Resumen de Gestión de Cuentas
         </h3>
     </div>
@@ -43,13 +43,13 @@
             <div class="text-sm font-bold text-blue-700 uppercase tracking-wide">Cuentas Hoy</div>
             <div class="mt-2 text-5xl font-black text-blue-600">{{ $accountsToday }}</div>
         </div>
-        
+
         <!-- Cuentas Semana -->
         <div class="bg-gradient-to-br from-cyan-50 to-sky-50 p-6 rounded-2xl border border-cyan-100 shadow-sm transition-transform hover:scale-[1.02]">
             <div class="text-sm font-bold text-cyan-700 uppercase tracking-wide">Cuentas Semana</div>
             <div class="mt-2 text-5xl font-black text-cyan-600">{{ $accountsWeek }}</div>
         </div>
-        
+
         <!-- Cuentas Mes -->
         <div class="bg-gradient-to-br from-sky-50 to-blue-50 p-6 rounded-2xl border border-sky-100 shadow-sm transition-transform hover:scale-[1.02]">
             <div class="text-sm font-bold text-sky-700 uppercase tracking-wide">Cuentas Mes</div>
@@ -67,7 +67,7 @@
     <div class="mt-12">
         <div class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
             <h3 class="text-xl font-bold text-slate-800">Análisis Global (Evidencias y Cuentas)</h3>
-            
+
             <div class="flex items-center gap-2 bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
                 <span class="text-sm font-medium text-gray-500">Filtrar por fecha:</span>
                 <input type="date" wire:model.live="filterDateFrom" value="{{ $filterDateFrom }}" class="text-sm border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md">
@@ -76,10 +76,10 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6" 
-             x-data="dashboardCharts()" 
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6"
+             x-data="dashboardCharts()"
              @update-charts.window="updateCharts($event.detail)">
-            
+
             <!-- EVIDENCES CHARTS -->
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
                 <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Crecimiento de Evidencias (Línea)</h4>
@@ -130,7 +130,7 @@
                     <canvas id="chartAccountsByGestor"></canvas>
                 </div>
             </div>
-            
+
         </div>
     </div>
 
@@ -151,7 +151,7 @@
                         const dUser = Object.values(this.$wire.evidencesByUser || {});
                         const dType = Object.values(this.$wire.evidencesByType || {});
                         const dNet = Object.values(this.$wire.evidencesByNetwork || {});
-                        
+
                         const dAccDate = Object.values(this.$wire.accountsByDate || {});
                         const dAccGestor = Object.values(this.$wire.accountsByGestor || {});
                         const dTopCreators = Object.values(this.$wire.topAccountCreators || {});
@@ -263,7 +263,7 @@
                             options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
                     };
-                    
+
                     renderCharts();
                 },
                 updateCharts(newData) {
@@ -271,7 +271,7 @@
                     const dUser = Object.values(newData.dataUser || {});
                     const dType = Object.values(newData.dataType || {});
                     const dNet = Object.values(newData.dataNet || {});
-                    
+
                     const dAccDate = Object.values(newData.dataAccountDate || {});
                     const dAccGestor = Object.values(newData.dataAccountGestor || {});
                     const dTopCreators = Object.values(newData.dataTopCreators || {});

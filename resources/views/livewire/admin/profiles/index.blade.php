@@ -220,7 +220,7 @@
                                                 <div class="flex items-center">
                                                     <span class="font-normal block truncate">{{ $email->email }}</span>
                                                     @if($email->alias)
-                                                        <span class="ml-2 text-xs text-indigo-200 bg-indigo-100 rounded px-1">{{ $email->alias }}</span>
+                                                        <span class="ml-2 text-xs text-white bg-indigo-600 rounded px-1">{{ $email->alias }}</span>
                                                     @endif
                                                 </div>
                                             </li>
