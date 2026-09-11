@@ -43,6 +43,15 @@ class Dashboard extends Component
 
     public function mount()
     {
+        // Default to current month only on first load
+        $this->filterDateFrom = now()->startOfMonth()->format('Y-m-d');
+        $this->filterDateTo = now()->endOfMonth()->format('Y-m-d');
+
+        $this->refreshDashboard(false);
+    }
+
+    public function refreshDashboard($dispatch = true)
+    {
         $now = now();
 
         $this->todayCount = Evidence::whereDate('created_at', $now->toDateString())->count();
@@ -60,11 +69,19 @@ class Dashboard extends Component
 
         $this->cuentasUsersCount = User::where('is_active', true)->where('role', 'cuentas')->count();
 
-        // Default to current month
-        $this->filterDateFrom = now()->startOfMonth()->format('Y-m-d');
-        $this->filterDateTo = now()->endOfMonth()->format('Y-m-d');
-
         $this->loadChartData();
+
+        if ($dispatch) {
+            $this->dispatch('update-charts',
+                dataDate: $this->evidencesByDate,
+                dataUser: $this->evidencesByUser,
+                dataType: $this->evidencesByType,
+                dataNet: $this->evidencesByNetwork,
+                dataAccountDate: $this->accountsByDate,
+                dataAccountGestor: $this->accountsByGestor,
+                dataTopCreators: $this->topAccountCreators
+            );
+        }
     }
 
     public function updated($property)
