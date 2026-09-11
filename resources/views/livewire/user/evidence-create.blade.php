@@ -52,9 +52,6 @@
                                 <input type="text" x-model="search" placeholder="Escribe para buscar..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
                             </div>
                             <ul class="max-h-48 overflow-y-auto">
-                                <li @click="$wire.set('profile_id', ''); selectedName = 'Sin perfil asignado (Manual)'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
-                                    <span class="block font-normal truncate">Sin perfil asignado (Registro Manual)</span>
-                                </li>
                                 @foreach($profiles as $profile)
                                     <li x-show="'{{ strtolower($profile->name) }}'.includes(search.toLowerCase())"
                                         @click="selectProfile('{{ $profile->id }}', '{{ addslashes($profile->name) }}', '{{ addslashes($profile->social_network) }}')"
@@ -67,21 +64,7 @@
                                 @endforeach
                             </ul>
                         </div>
-                    </div>
-
-                    <!-- Social Network (Manual - Hidden if profile selected) -->
-                    <div x-data x-show="!$wire.profile_id">
-                        <x-input-label for="social_network" value="Red Social (Manual)" />
-                        <select wire:model="social_network" id="social_network" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" :required="!$wire.profile_id">
-                            <option value="Facebook">Facebook</option>
-                            <option value="Instagram">Instagram</option>
-                            <option value="X">X</option>
-                            <option value="TikTok">TikTok</option>
-                            <option value="LinkedIn">LinkedIn</option>
-                            <option value="YouTube">YouTube</option>
-                            <option value="Otro">Otro</option>
-                        </select>
-                        <x-input-error :messages="$errors->get('social_network')" class="mt-2" />
+                        <x-input-error :messages="$errors->get('profile_id')" class="mt-2" />
                     </div>
 
                     <!-- Images -->

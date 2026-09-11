@@ -55,12 +55,13 @@ class EvidenceCreate extends Component
 
         $this->validate([
             'evidence_type_id' => 'required|exists:evidence_types,id',
-            'profile_id' => 'nullable|exists:profiles,id',
+            'profile_id' => 'required|exists:profiles,id',
             'social_network' => 'required|string|max:255',
             'images' => 'required|array|min:1',
             'comment' => 'nullable|string',
         ], [
             'evidence_type_id.required' => 'Selecciona un tipo de evidencia.',
+            'profile_id.required' => 'Debes seleccionar un perfil asignado.',
             'social_network.required' => 'Selecciona la red social.',
             'images.required' => 'La captura de pantalla es obligatoria.',
             'images.*.image' => 'El archivo seleccionado no es una imagen válida.',
