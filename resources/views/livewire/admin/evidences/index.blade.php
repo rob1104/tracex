@@ -117,9 +117,12 @@
                                                 {{ optional($evidence->evidenceType)->name }}
                                             </span>
                                             @if($isSuspectRow)
-                                                <span class="ml-1 px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200">
+                                                <button wire:click="viewSuspectDetails({{ $evidence->id }})" class="ml-1 px-2 py-1 text-xs font-bold rounded-full bg-red-100 text-red-700 border border-red-200 hover:bg-red-200 hover:shadow transition-colors flex items-center gap-1 cursor-pointer focus:outline-none">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3 h-3">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                    </svg>
                                                     Sospechosa
-                                                </span>
+                                                </button>
                                             @endif
                                         </div>
                                     </div>
@@ -187,6 +190,114 @@
                     </div>
                     <div class="bg-gray-100 flex justify-center items-center min-h-[50vh] p-4">
                         <img src="{{ $previewImage }}" alt="Vista previa de evidencia" class="max-h-[85vh] object-contain rounded shadow-lg" />
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Suspect Details Modal -->
+    @if($suspectModalData)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-900 bg-opacity-75 backdrop-blur-sm transition-opacity" wire:click="closeSuspectModal"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+                    <div class="bg-red-600 px-6 py-4 flex justify-between items-center">
+                        <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            Análisis de Evidencia Sospechosa (Posible Duplicado)
+                        </h3>
+                        <button type="button" wire:click="closeSuspectModal" class="text-red-100 hover:text-white focus:outline-none">
+                            <span class="sr-only">Cerrar</span>
+                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <div class="bg-gray-50 px-6 py-6">
+                        <p class="text-gray-600 mb-6 text-sm text-center">
+                            El sistema ha detectado que la captura de pantalla de esta evidencia es una copia idéntica (mismo archivo o recorte exacto) de una evidencia registrada previamente en la plataforma.
+                        </p>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <!-- Current Evidence (The duplicate) -->
+                            <div class="bg-white rounded-xl border border-red-200 shadow-sm overflow-hidden flex flex-col relative">
+                                <div class="absolute top-0 right-0 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
+                                    Copia (Sospechosa)
+                                </div>
+                                <div class="p-5 border-b border-gray-100">
+                                    <h4 class="text-lg font-bold text-gray-900 mb-1">Evidencia Seleccionada</h4>
+                                    <div class="text-sm text-gray-500 mb-4">
+                                        Registrada el: <span class="font-medium text-gray-900">{{ $suspectModalData['current']->created_at->format('d M, Y h:i A') }}</span>
+                                    </div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Colaborador:</span>
+                                            <span class="font-medium text-gray-900">{{ $suspectModalData['current']->user->name }}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Perfil Asociado:</span>
+                                            <span class="font-medium text-gray-900">{{ optional($suspectModalData['current']->profile)->name ?? 'Manual' }} ({{ $suspectModalData['current']->social_network }})</span>
+                                        </div>
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Tipo:</span>
+                                            <span class="font-medium text-gray-900">{{ optional($suspectModalData['current']->evidenceType)->name }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 block mb-1">Comentario:</span>
+                                            <p class="text-gray-800 bg-gray-50 p-2 rounded italic">{{ $suspectModalData['current']->comment ?: 'Sin comentarios.' }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-5 bg-gray-50 flex-grow flex items-center justify-center">
+                                    <img src="{{ url('storage/'.$suspectModalData['currentImage']->screenshot_path) }}" class="max-h-64 object-contain rounded border border-gray-300 shadow-sm" alt="Imagen Sospechosa" />
+                                </div>
+                            </div>
+
+                            <!-- Original Evidence -->
+                            <div class="bg-white rounded-xl border border-green-200 shadow-sm overflow-hidden flex flex-col relative">
+                                <div class="absolute top-0 right-0 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
+                                    Original
+                                </div>
+                                <div class="p-5 border-b border-gray-100">
+                                    <h4 class="text-lg font-bold text-gray-900 mb-1">Evidencia Original</h4>
+                                    <div class="text-sm text-gray-500 mb-4">
+                                        Registrada el: <span class="font-medium text-gray-900">{{ $suspectModalData['original']->created_at->format('d M, Y h:i A') }}</span>
+                                    </div>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Colaborador:</span>
+                                            <span class="font-medium text-gray-900">{{ $suspectModalData['original']->user->name }}</span>
+                                        </div>
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Perfil Asociado:</span>
+                                            <span class="font-medium text-gray-900">{{ optional($suspectModalData['original']->profile)->name ?? 'Manual' }} ({{ $suspectModalData['original']->social_network }})</span>
+                                        </div>
+                                        <div class="flex justify-between border-b pb-1">
+                                            <span class="text-gray-500">Tipo:</span>
+                                            <span class="font-medium text-gray-900">{{ optional($suspectModalData['original']->evidenceType)->name }}</span>
+                                        </div>
+                                        <div>
+                                            <span class="text-gray-500 block mb-1">Comentario:</span>
+                                            <p class="text-gray-800 bg-gray-50 p-2 rounded italic">{{ $suspectModalData['original']->comment ?: 'Sin comentarios.' }}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="p-5 bg-gray-50 flex-grow flex items-center justify-center">
+                                    <img src="{{ url('storage/'.$suspectModalData['originalImage']->screenshot_path) }}" class="max-h-64 object-contain rounded border border-gray-300 shadow-sm" alt="Imagen Original" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-gray-100 px-6 py-4 flex justify-end">
+                        <button type="button" wire:click="closeSuspectModal" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors">
+                            Cerrar Panel de Análisis
+                        </button>
                     </div>
                 </div>
             </div>

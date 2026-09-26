@@ -24,6 +24,8 @@ class Index extends Component
 
     public $previewImage = null;
 
+    public $suspectModalData = null;
+
     public function showImage($url)
     {
         $this->previewImage = $url;
@@ -32,6 +34,38 @@ class Index extends Component
     public function closeImage()
     {
         $this->previewImage = null;
+    }
+
+    public function viewSuspectDetails($evidenceId)
+    {
+        $evidence = Evidence::with(['images', 'user', 'profile'])->find($evidenceId);
+        if (!$evidence) return;
+
+        $suspectImages = $evidence->images->where('is_suspect', true);
+        if ($suspectImages->isEmpty()) return;
+
+        $suspectImage = $suspectImages->first();
+
+        // Find the original image that matches this hash
+        $originalImage = \App\Models\EvidenceImage::with(['evidence.user', 'evidence.profile'])
+            ->where('screenshot_hash', $suspectImage->screenshot_hash)
+            ->where('id', '!=', $suspectImage->id)
+            ->orderBy('created_at', 'asc')
+            ->first();
+
+        if ($originalImage && $originalImage->evidence) {
+            $this->suspectModalData = [
+                'current' => $evidence,
+                'currentImage' => $suspectImage,
+                'original' => $originalImage->evidence,
+                'originalImage' => $originalImage
+            ];
+        }
+    }
+
+    public function closeSuspectModal()
+    {
+        $this->suspectModalData = null;
     }
 
     public function updating($field)
