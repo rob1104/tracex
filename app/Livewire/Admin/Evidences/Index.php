@@ -68,6 +68,16 @@ class Index extends Component
         $this->suspectModalData = null;
     }
 
+    public function markAsNotSuspect($imageId)
+    {
+        $image = \App\Models\EvidenceImage::find($imageId);
+        if ($image) {
+            $image->update(['is_suspect' => false]);
+            $this->closeSuspectModal();
+            session()->flash('status', 'La evidencia ha sido marcada como válida y se le ha retirado la etiqueta de sospechosa.');
+        }
+    }
+
     public function updating($field)
     {
         $this->resetPage();

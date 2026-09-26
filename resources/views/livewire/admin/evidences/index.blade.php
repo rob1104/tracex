@@ -293,7 +293,13 @@
                         </div>
                     </div>
                     
-                    <div class="bg-gray-100 px-6 py-4 flex justify-end">
+                    <div class="bg-gray-100 px-6 py-4 flex justify-end gap-3">
+                        <button type="button" wire:click="markAsNotSuspect({{ $suspectModalData['currentImage']->id }})" class="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:text-sm transition-colors flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Marcar como Válida (Quitar sospecha)
+                        </button>
                         <button type="button" wire:click="closeSuspectModal" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:text-sm transition-colors">
                             Cerrar Panel de Análisis
                         </button>
