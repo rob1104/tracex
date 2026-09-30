@@ -37,12 +37,12 @@ class EvidenceCreateMultiple extends Component
 
         $apiKey = config('services.google.vision_api_key');
         if (empty($apiKey)) {
-            $this->ai_error = 'Modo Inteligencia Artificial inactivo: Falta configurar GOOGLE_VISION_API_KEY en el archivo .env.';
+            $this->ai_error = 'Escáner de imágenes inactivo: Falta configurar GOOGLE_VISION_API_KEY en el archivo .env.';
             return;
         }
 
         try {
-            $image = $this->images[count($this->images) - 1]; // Toma la última subida
+            $image = $this->images[count($this->images) - 1]; // Toma la úúltima subida
             $imageContent = base64_encode(file_get_contents($image->getRealPath()));
 
             $response = \Illuminate\Support\Facades\Http::withoutVerifying()->post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
@@ -52,7 +52,7 @@ class EvidenceCreateMultiple extends Component
                             'content' => $imageContent,
                         ],
                         'features' => [
-                            ['type' => 'DOCUMENT_TEXT_DETECTION'],
+                            ['type' => 'DOCUMENT_TEXT_detectóION'],
                         ],
                     ],
                 ],
@@ -93,17 +93,17 @@ class EvidenceCreateMultiple extends Component
                     if (count($this->profile_ids) > 0 && !empty($this->evidence_type_id)) {
                         $this->save();
                     } else {
-                        $this->ai_status = 'IA Automática: ' . count($matchedIds) . ' perfiles detectados. Faltan datos para auto-guardar.';
+                        $this->ai_status = '¡Escaneo Automático: ' . count($matchedIds) . ' perfiles detectóados. Faltan datos para auto-guardar.';
                     }
                 } else {
-                    $this->ai_status = 'IA Automática: No se detectó texto legible en la imagen.';
+                    $this->ai_status = '¡Escaneo Automático: No se detectóó texto legible en la imagen.';
                 }
             } else {
                 $this->ai_error = 'Error de la API de Google: ' . $response->json('error.message', 'Error desconocido');
             }
 
         } catch (\Exception $e) {
-            $this->ai_error = 'Error en la IA: ' . $e->getMessage();
+            $this->ai_error = 'Error de ¡Escaneo: ' . $e->getMessage();
         }
     }
 
@@ -181,7 +181,7 @@ class EvidenceCreateMultiple extends Component
             $count++;
         }
 
-        session()->flash('status', '¡IA Automática! ' . $count . ' evidencias creadas y guardadas al instante. (Puedes pegar la siguiente captura)');
+        session()->flash('status', '¡¡Escaneo exitoso! ' . $count . ' evidencias creadas y guardadas al instante. (Puedes pegar la siguiente captura)');
 
         $this->reset(['evidence_type_id', 'profile_ids', 'images', 'comment', 'ai_status', 'ai_error']);
     }
