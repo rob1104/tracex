@@ -35,56 +35,68 @@ class EvidenceCreateMultiple extends Component
             return;
         }
 
-        $credentialsPath = storage_path('app/google-credentials.json');
-        if (!file_exists($credentialsPath)) {
-            $this->ai_error = 'Modo Inteligencia Artificial inactivo: Falta el archivo google-credentials.json en storage/app.';
+        $apiKey = config('services.google.vision_api_key');
+        if (empty($apiKey)) {
+            $this->ai_error = 'Modo Inteligencia Artificial inactivo: Falta configurar GOOGLE_VISION_API_KEY en el archivo .env.';
             return;
         }
 
         try {
             $image = $this->images[count($this->images) - 1]; // Toma la última subida
-            $imageClient = new \Google\Cloud\Vision\V1\ImageAnnotatorClient([
-                'credentials' => $credentialsPath
+            $imageContent = base64_encode(file_get_contents($image->getRealPath()));
+
+            $response = \Illuminate\Support\Facades\Http::post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
+                'requests' => [
+                    [
+                        'image' => [
+                            'content' => $imageContent,
+                        ],
+                        'features' => [
+                            ['type' => 'DOCUMENT_TEXT_DETECTION'],
+                        ],
+                    ],
+                ],
             ]);
 
-            $imageContent = file_get_contents($image->getRealPath());
-            $response = $imageClient->documentTextDetection($imageContent);
-            $texts = $response->getTextAnnotations();
+            if ($response->successful()) {
+                $result = $response->json();
+                $texts = $result['responses'][0]['textAnnotations'] ?? [];
 
-            if ($texts && count($texts) > 0) {
-                $rawText = $texts[0]->getDescription();
-                
-                // Cruza el texto con los nombres de los perfiles del usuario
-                $matchedIds = [];
-                $assignedProfiles = auth()->user()->assignedProfiles()->where('status', 'active')->get();
-                
-                foreach ($assignedProfiles as $profile) {
-                    if (stripos($rawText, $profile->name) !== false) {
-                        $matchedIds[] = $profile->id;
+                if (!empty($texts)) {
+                    $rawText = $texts[0]['description'];
+                    
+                    // Cruza el texto con los nombres de los perfiles del usuario
+                    $matchedIds = [];
+                    $assignedProfiles = auth()->user()->assignedProfiles()->where('status', 'active')->get();
+                    
+                    foreach ($assignedProfiles as $profile) {
+                        if (stripos($rawText, $profile->name) !== false) {
+                            $matchedIds[] = $profile->id;
+                        }
                     }
-                }
 
-                // Autocompleta el Tipo de Evidencia buscando palabras clave
-                $typeId = null;
-                if (preg_match('/\b(like|gusta|encanta|reaccion)\b/i', $rawText)) {
-                    $typeId = EvidenceType::where('name', 'like', '%like%')->orWhere('name', 'like', '%gusta%')->first()?->id;
-                } elseif (preg_match('/\b(coment|comment|respondi|escribi)\b/i', $rawText)) {
-                    $typeId = EvidenceType::where('name', 'like', '%coment%')->first()?->id;
-                } elseif (preg_match('/\b(comparti|share)\b/i', $rawText)) {
-                    $typeId = EvidenceType::where('name', 'like', '%comparti%')->first()?->id;
-                }
+                    // Autocompleta el Tipo de Evidencia buscando palabras clave
+                    $typeId = null;
+                    if (preg_match('/\b(like|gusta|encanta|reaccion)\b/i', $rawText)) {
+                        $typeId = EvidenceType::where('name', 'like', '%like%')->orWhere('name', 'like', '%gusta%')->first()?->id;
+                    } elseif (preg_match('/\b(coment|comment|respondi|escribi)\b/i', $rawText)) {
+                        $typeId = EvidenceType::where('name', 'like', '%coment%')->first()?->id;
+                    } elseif (preg_match('/\b(comparti|share)\b/i', $rawText)) {
+                        $typeId = EvidenceType::where('name', 'like', '%comparti%')->first()?->id;
+                    }
 
-                $this->profile_ids = array_unique(array_merge($this->profile_ids, $matchedIds));
-                if ($typeId && empty($this->evidence_type_id)) {
-                    $this->evidence_type_id = $typeId;
-                }
+                    $this->profile_ids = array_unique(array_merge($this->profile_ids, $matchedIds));
+                    if ($typeId && empty($this->evidence_type_id)) {
+                        $this->evidence_type_id = $typeId;
+                    }
 
-                $this->ai_status = 'IA Automática: ' . count($matchedIds) . ' perfiles detectados en la imagen.';
+                    $this->ai_status = 'IA Automática: ' . count($matchedIds) . ' perfiles detectados en la imagen.';
+                } else {
+                    $this->ai_status = 'IA Automática: No se detectó texto legible en la imagen.';
+                }
             } else {
-                $this->ai_status = 'IA Automática: No se detectó texto legible en la imagen.';
+                $this->ai_error = 'Error de la API de Google: ' . $response->json('error.message', 'Error desconocido');
             }
-
-            $imageClient->close();
 
         } catch (\Exception $e) {
             $this->ai_error = 'Error en la IA: ' . $e->getMessage();
