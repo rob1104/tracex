@@ -3,6 +3,8 @@
 namespace App\Livewire\Admin\Emails;
 
 use App\Models\EmailAccount;
+use App\Models\Profile;
+use App\Models\User;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -41,9 +43,13 @@ class Index extends Component
     }
 
     public $showMassAssignModal = false;
+
     public $sourceGestorId = '';
+
     public $destinationGestorId = '';
+
     public $sourceAccounts = [];
+
     public $selectedAccounts = [];
 
     public function updatedSourceGestorId($value)
@@ -85,7 +91,7 @@ class Index extends Component
         ]);
 
         EmailAccount::whereIn('id', $this->selectedAccounts)->update(['created_by' => $this->destinationGestorId]);
-        \App\Models\Profile::whereIn('email_account_id', $this->selectedAccounts)->update(['created_by' => $this->destinationGestorId]);
+        Profile::whereIn('email_account_id', $this->selectedAccounts)->update(['created_by' => $this->destinationGestorId]);
 
         $this->showMassAssignModal = false;
         session()->flash('status', 'Cuentas y sus perfiles asociados han sido reasignados correctamente.');
@@ -101,7 +107,7 @@ class Index extends Component
     public function edit($id)
     {
         $account = EmailAccount::findOrFail($id);
-        
+
         // Cuentas user can only edit their own
         if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
             abort(403);
@@ -147,7 +153,9 @@ class Index extends Component
         if ($this->emailId) {
             $account = EmailAccount::find($this->emailId);
             // extra check
-            if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) abort(403);
+            if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+                abort(403);
+            }
             $account->update($data);
             session()->flash('status', 'Cuenta actualizada correctamente.');
         } else {
@@ -161,7 +169,9 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $account = EmailAccount::findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+            abort(403);
+        }
         $account->status = $account->status === 'active' ? 'suspended' : 'active';
         $account->save();
     }
@@ -169,7 +179,9 @@ class Index extends Component
     public function revealPassword($id)
     {
         $account = EmailAccount::findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+            abort(403);
+        }
         $this->revealedPassword = $account->password; // Decrypted string
         $this->showPasswordModal = true;
     }
@@ -181,13 +193,17 @@ class Index extends Component
     public function viewProfiles($id)
     {
         $account = EmailAccount::with('profiles')->findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+            abort(403);
+        }
         $this->selectedAccountForProfiles = $account;
         $this->showProfilesModal = true;
     }
 
     public $statusFilter = '';
+
     public $gestorFilter = '';
+
     public $profilesFilter = '';
 
     public function updatingStatusFilter()
@@ -226,15 +242,15 @@ class Index extends Component
         }
 
         if ($this->search) {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->where('email', 'like', '%'.$this->search.'%')
-                  ->orWhere('alias', 'like', '%'.$this->search.'%');
+                    ->orWhere('alias', 'like', '%'.$this->search.'%');
             });
         }
 
         return view('livewire.admin.emails.index', [
             'accounts' => $query->latest()->paginate(15),
-            'cuentasUsers' => auth()->user()->isAdmin() ? \App\Models\User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
         ])->layout('layouts.app');
     }
 }

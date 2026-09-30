@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin\Users;
 
+use App\Models\EmailAccount;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
@@ -26,7 +27,9 @@ class Index extends Component
     public $password = '';
 
     public $showAccountsModal = false;
+
     public $viewingUserAccounts = [];
+
     public $viewingUserName = '';
 
     public function viewAccounts($id)
@@ -34,7 +37,7 @@ class Index extends Component
         $user = User::findOrFail($id);
         if ($user->role === 'cuentas') {
             $this->viewingUserName = $user->name;
-            $this->viewingUserAccounts = \App\Models\EmailAccount::withCount('profiles')->where('created_by', $user->id)->orderBy('email', 'asc')->get();
+            $this->viewingUserAccounts = EmailAccount::withCount('profiles')->where('created_by', $user->id)->orderBy('email', 'asc')->get();
             $this->showAccountsModal = true;
         }
     }

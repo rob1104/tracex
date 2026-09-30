@@ -41,32 +41,42 @@ class Index extends Component
     public $revealedPassword = '';
 
     public $created_by = '';
-    
+
     public $filter_email_account_id = '';
+
     public $filter_status = '';
+
     public $filter_gestor = '';
+
     public $filter_network = '';
 
     // For Assignment Modal
     public $assignProfile = null;
+
     public $assignedUsers = [];
 
     // For Mass Assignment Modal
     public $showMassAssignModal = false;
+
     public $sourceColabId = '';
+
     public $destinationColabId = '';
+
     public $sourceProfiles = [];
+
     public $selectedProfiles = [];
 
     // For Colab Profiles View Modal
     public $showColabProfilesModal = false;
+
     public $selectedColabViewId = '';
+
     public $viewingColabProfiles = [];
 
     public function updatedSelectedColabViewId($value)
     {
         if ($value) {
-            $query = \App\Models\Profile::whereHas('users', function($q) use ($value) {
+            $query = Profile::whereHas('users', function ($q) use ($value) {
                 $q->where('users.id', $value);
             })->with('emailAccount')->orderBy('name', 'asc');
 
@@ -89,7 +99,7 @@ class Index extends Component
     public function updatedSourceColabId($value)
     {
         if ($value) {
-            $query = \App\Models\Profile::whereHas('users', function($q) use ($value) {
+            $query = Profile::whereHas('users', function ($q) use ($value) {
                 $q->where('users.id', $value);
             })->orderBy('name', 'asc');
 
@@ -133,9 +143,11 @@ class Index extends Component
         ]);
 
         foreach ($this->selectedProfiles as $profileId) {
-            $profile = \App\Models\Profile::find($profileId);
+            $profile = Profile::find($profileId);
             if ($profile) {
-                if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) continue;
+                if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+                    continue;
+                }
                 $profile->users()->detach($this->sourceColabId);
                 $profile->users()->syncWithoutDetaching([$this->destinationColabId]);
             }
@@ -166,7 +178,9 @@ class Index extends Component
     {
         $profile = Profile::findOrFail($id);
 
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+            abort(403);
+        }
 
         $this->profileId = $profile->id;
         $this->email_account_id = $profile->email_account_id;
@@ -210,7 +224,9 @@ class Index extends Component
 
         if ($this->profileId) {
             $profile = Profile::find($this->profileId);
-            if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) abort(403);
+            if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+                abort(403);
+            }
             $profile->update($data);
             session()->flash('status', 'Perfil actualizado correctamente.');
         } else {
@@ -224,7 +240,9 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+            abort(403);
+        }
         $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
         $profile->save();
     }
@@ -232,7 +250,9 @@ class Index extends Component
     public function revealPassword($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+            abort(403);
+        }
         $this->revealedPassword = $profile->password;
         $this->showPasswordModal = true;
     }
@@ -241,7 +261,9 @@ class Index extends Component
     public function openAssignModal($id)
     {
         $this->assignProfile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) abort(403);
+        if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) {
+            abort(403);
+        }
         $this->assignedUsers = $this->assignProfile->users()->pluck('users.id')->toArray();
         $this->showAssignModal = true;
     }
@@ -249,20 +271,33 @@ class Index extends Component
     public function saveAssignments()
     {
         if ($this->assignProfile) {
-            if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) abort(403);
+            if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) {
+                abort(403);
+            }
             $this->assignProfile->users()->sync($this->assignedUsers);
             session()->flash('status', 'Asignaciones guardadas correctamente para: '.$this->assignProfile->name);
         }
         $this->showAssignModal = false;
     }
 
-    public function updatingFilterStatus() { $this->resetPage(); }
-    public function updatingFilterGestor() { $this->resetPage(); }
-    public function updatingFilterNetwork() { $this->resetPage(); }
+    public function updatingFilterStatus()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterGestor()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterNetwork()
+    {
+        $this->resetPage();
+    }
 
     public function render()
     {
-        $query = \App\Models\Profile::with(['emailAccount', 'users', 'creator']);
+        $query = Profile::with(['emailAccount', 'users', 'creator']);
 
         if (auth()->user()->isCuentas()) {
             $query->where('created_by', auth()->id());
@@ -283,19 +318,19 @@ class Index extends Component
         }
 
         if ($this->search) {
-            $query->where(function($q) {
+            $query->where(function ($q) {
                 $q->where('name', 'like', '%'.$this->search.'%')
-                  ->orWhere('social_network', 'like', '%'.$this->search.'%');
+                    ->orWhere('social_network', 'like', '%'.$this->search.'%');
             });
         }
-        
-        $emailQuery = \App\Models\EmailAccount::where('status', 'active');
+
+        $emailQuery = EmailAccount::where('status', 'active');
         if (auth()->user()->isCuentas()) {
             $emailQuery->where('created_by', auth()->id());
         }
 
         // Available networks for filter
-        $networksQuery = \App\Models\Profile::select('social_network')->distinct();
+        $networksQuery = Profile::select('social_network')->distinct();
         if (auth()->user()->isCuentas()) {
             $networksQuery->where('created_by', auth()->id());
         }
@@ -304,8 +339,8 @@ class Index extends Component
             'profiles' => $query->latest()->paginate(15),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
-            'cuentasUsers' => auth()->user()->isAdmin() ? \App\Models\User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
-            'usersList' => \App\Models\User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
+            'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'usersList' => User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }

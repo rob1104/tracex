@@ -13,32 +13,47 @@ use Livewire\Component;
 class Dashboard extends Component
 {
     public $todayCount = 0;
+
     public $weekCount = 0;
+
     public $monthCount = 0;
+
     public $usersCount = 0;
 
     // Cuentas Summary
     public $accountsToday = 0;
+
     public $accountsWeek = 0;
+
     public $accountsMonth = 0;
+
     public $profilesToday = 0;
+
     public $profilesWeek = 0;
+
     public $profilesMonth = 0;
+
     public $cuentasUsersCount = 0;
 
     // Filters
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
 
     // Charts Data (Evidences)
     public $evidencesByUser = [];
+
     public $evidencesByDate = [];
+
     public $evidencesByType = [];
+
     public $evidencesByNetwork = [];
 
     // Charts Data (Cuentas)
     public $accountsByDate = [];
+
     public $accountsByGestor = [];
+
     public $topAccountCreators = [];
 
     public function mount()
@@ -117,8 +132,12 @@ class Dashboard extends Component
         /* --- EVIDENCES --- */
         $this->evidencesByUser = User::where('role', 'user')
             ->withCount(['evidences' => function ($query) {
-                if ($this->filterDateFrom) $query->whereDate('created_at', '>=', $this->filterDateFrom);
-                if ($this->filterDateTo) $query->whereDate('created_at', '<=', $this->filterDateTo);
+                if ($this->filterDateFrom) {
+                    $query->whereDate('created_at', '>=', $this->filterDateFrom);
+                }
+                if ($this->filterDateTo) {
+                    $query->whereDate('created_at', '<=', $this->filterDateTo);
+                }
             }])
             ->orderBy('evidences_count', 'desc')
             ->limit(5)
@@ -135,8 +154,12 @@ class Dashboard extends Component
         $this->evidencesByDate = $this->fillDateGaps($countsByDate);
 
         $this->evidencesByType = EvidenceType::withCount(['evidences' => function ($query) {
-            if ($this->filterDateFrom) $query->whereDate('created_at', '>=', $this->filterDateFrom);
-            if ($this->filterDateTo) $query->whereDate('created_at', '<=', $this->filterDateTo);
+            if ($this->filterDateFrom) {
+                $query->whereDate('created_at', '>=', $this->filterDateFrom);
+            }
+            if ($this->filterDateTo) {
+                $query->whereDate('created_at', '<=', $this->filterDateTo);
+            }
         }])
             ->get()
             ->map(fn ($t) => ['name' => $t->name, 'count' => $t->evidences_count])
@@ -163,16 +186,21 @@ class Dashboard extends Component
             ->groupBy('created_by')
             ->orderBy('count', 'desc')
             ->get()
-            ->map(function($a) {
+            ->map(function ($a) {
                 $user = User::find($a->created_by);
+
                 return ['name' => $user ? $user->name : 'N/A', 'count' => $a->count];
             })
             ->toArray();
 
         $this->topAccountCreators = User::whereIn('role', ['cuentas', 'admin'])
             ->withCount(['emailAccounts' => function ($query) {
-                if ($this->filterDateFrom) $query->whereDate('created_at', '>=', $this->filterDateFrom);
-                if ($this->filterDateTo) $query->whereDate('created_at', '<=', $this->filterDateTo);
+                if ($this->filterDateFrom) {
+                    $query->whereDate('created_at', '>=', $this->filterDateFrom);
+                }
+                if ($this->filterDateTo) {
+                    $query->whereDate('created_at', '<=', $this->filterDateTo);
+                }
             }])
             ->orderBy('email_accounts_count', 'desc')
             ->limit(5)
@@ -202,6 +230,7 @@ class Dashboard extends Component
                 $filled[] = ['date' => $date, 'count' => $count];
             }
         }
+
         return $filled;
     }
 

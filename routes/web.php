@@ -2,6 +2,7 @@
 
 use App\Livewire\Admin\Evidences\Index;
 use App\Livewire\User\EvidenceCreate;
+use App\Livewire\User\EvidenceCreateMultiple;
 use App\Livewire\User\EvidenceList;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,7 @@ Route::view('profile', 'profile')
 
 Route::middleware(['auth', 'verified', 'role:user,admin'])->group(function () {
     Route::get('/evidencias/registrar', EvidenceCreate::class)->name('evidences.create');
+    Route::get('/evidencias/registrar-masivo', EvidenceCreateMultiple::class)->name('evidences.create.multiple');
     Route::get('/evidencias/historial', EvidenceList::class)->name('evidences.list');
 });
 

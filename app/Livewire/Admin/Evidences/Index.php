@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Evidences;
 
 use App\Models\Evidence;
+use App\Models\EvidenceImage;
 use App\Models\EvidenceType;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\Component;
@@ -39,15 +40,19 @@ class Index extends Component
     public function viewSuspectDetails($evidenceId)
     {
         $evidence = Evidence::with(['images', 'user', 'profile'])->find($evidenceId);
-        if (!$evidence) return;
+        if (! $evidence) {
+            return;
+        }
 
         $suspectImages = $evidence->images->where('is_suspect', true);
-        if ($suspectImages->isEmpty()) return;
+        if ($suspectImages->isEmpty()) {
+            return;
+        }
 
         $suspectImage = $suspectImages->first();
 
         // Find the original image that matches this hash
-        $originalImage = \App\Models\EvidenceImage::with(['evidence.user', 'evidence.profile'])
+        $originalImage = EvidenceImage::with(['evidence.user', 'evidence.profile'])
             ->where('screenshot_hash', $suspectImage->screenshot_hash)
             ->where('id', '!=', $suspectImage->id)
             ->orderBy('created_at', 'asc')
@@ -58,7 +63,7 @@ class Index extends Component
                 'current' => $evidence,
                 'currentImage' => $suspectImage,
                 'original' => $originalImage->evidence,
-                'originalImage' => $originalImage
+                'originalImage' => $originalImage,
             ];
         }
     }
@@ -70,7 +75,7 @@ class Index extends Component
 
     public function markAsNotSuspect($imageId)
     {
-        $image = \App\Models\EvidenceImage::find($imageId);
+        $image = EvidenceImage::find($imageId);
         if ($image) {
             $image->update(['is_suspect' => false]);
             $this->closeSuspectModal();
