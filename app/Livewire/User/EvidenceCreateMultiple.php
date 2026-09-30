@@ -45,7 +45,7 @@ class EvidenceCreateMultiple extends Component
             $image = $this->images[count($this->images) - 1]; // Toma la última subida
             $imageContent = base64_encode(file_get_contents($image->getRealPath()));
 
-            $response = \Illuminate\Support\Facades\Http::post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
+            $response = \Illuminate\Support\Facades\Http::withoutVerifying()->post("https://vision.googleapis.com/v1/images:annotate?key={$apiKey}", [
                 'requests' => [
                     [
                         'image' => [
