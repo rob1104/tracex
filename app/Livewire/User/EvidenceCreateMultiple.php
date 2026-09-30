@@ -15,10 +15,9 @@ class EvidenceCreateMultiple extends Component
     use WithFileUploads;
 
     public $evidence_type_id = '';
-
     public $profile_ids = []; // Multiple Profiles selection
-
     public $comment = '';
+    public $quantity = 1; // Number of evidences to create per profile
 
     public $ai_status = '';
     public $ai_error = '';
@@ -32,6 +31,7 @@ class EvidenceCreateMultiple extends Component
         $this->ai_status = '';
         $this->ai_error = '';
         $this->is_processed = false;
+        $this->quantity = 1;
 
         if (empty($this->images)) {
             return;
@@ -72,9 +72,18 @@ class EvidenceCreateMultiple extends Component
                     $matchedIds = [];
                     $assignedProfiles = auth()->user()->assignedProfiles()->where('status', 'active')->get();
                     
+                    $maxOccurrences = 1;
                     foreach ($assignedProfiles as $profile) {
-                        if (stripos($rawText, $profile->name) !== false) {
+                        // Buscar el nombre normalizado para evitar fallos por tildes
+                        $normalizedRaw = mb_strtolower($rawText, 'UTF-8');
+                        $normalizedProfile = mb_strtolower($profile->name, 'UTF-8');
+                        $occurrences = substr_count($normalizedRaw, $normalizedProfile);
+
+                        if ($occurrences > 0 || stripos($rawText, $profile->name) !== false) {
                             $matchedIds[] = $profile->id;
+                            if ($occurrences > $maxOccurrences) {
+                                $maxOccurrences = $occurrences;
+                            }
                         }
                     }
 
@@ -92,8 +101,11 @@ class EvidenceCreateMultiple extends Component
                     if ($typeId && empty($this->evidence_type_id)) {
                         $this->evidence_type_id = $typeId;
                     }
+                    
+                    // Si encontramos 9 veces el nombre, proponemos hacer 9 evidencias
+                    $this->quantity = $maxOccurrences > 0 ? $maxOccurrences : 1;
 
-                    $this->ai_status = 'Análisis Automático: ' . count($matchedIds) . ' perfiles detectados. Revisa las selecciones antes de guardar.';
+                    $this->ai_status = 'Análisis Automático: ' . count($matchedIds) . ' perfiles detectados con ' . $this->quantity . ' acciones. Revisa las selecciones antes de guardar.';
                 } else {
                     $this->ai_status = 'Análisis Automático: No se detectó texto legible en la imagen.';
                 }
@@ -122,12 +134,15 @@ class EvidenceCreateMultiple extends Component
             'evidence_type_id' => 'required|exists:evidence_types,id',
             'profile_ids' => 'required|array|min:1',
             'profile_ids.*' => 'exists:profiles,id',
+            'quantity' => 'required|integer|min:1|max:50',
             'images' => 'required|array|min:1',
             'comment' => 'nullable|string',
         ], [
             'evidence_type_id.required' => 'Selecciona un tipo de evidencia.',
             'profile_ids.required' => 'Debes seleccionar al menos un perfil.',
             'profile_ids.min' => 'Debes seleccionar al menos un perfil.',
+            'quantity.required' => 'La cantidad es obligatoria.',
+            'quantity.min' => 'Debes crear al menos 1 evidencia.',
             'images.required' => 'La captura de pantalla es obligatoria.',
             'images.*.image' => 'El archivo seleccionado no es una imagen válida.',
             'images.*.max' => 'La imagen seleccionada supera el tamaño máximo permitido (5MB).',
@@ -150,7 +165,7 @@ class EvidenceCreateMultiple extends Component
             ];
         }
 
-        // Now create one evidence record per selected profile
+        // Now create N evidence records per selected profile
         $count = 0;
         foreach ($this->profile_ids as $profileId) {
             $profile = Profile::find($profileId);
@@ -159,31 +174,33 @@ class EvidenceCreateMultiple extends Component
                 continue;
             }
 
-            $evidence = Evidence::create([
-                'user_id' => auth()->id(),
-                'evidence_type_id' => $this->evidence_type_id,
-                'profile_id' => $profile->id,
-                'social_network' => $profile->social_network,
-                'comment' => $this->comment,
-                'ip_address' => request()->ip(),
-                'user_agent' => request()->userAgent(),
-            ]);
-
-            foreach ($savedImagesData as $imgData) {
-                EvidenceImage::create([
-                    'evidence_id' => $evidence->id,
-                    'screenshot_path' => $imgData['path'],
-                    'screenshot_hash' => $imgData['hash'],
-                    'screenshot_mime' => $imgData['mime'],
-                    'screenshot_size' => $imgData['size'],
-                    'is_suspect' => $imgData['is_suspect'],
+            for ($i = 0; $i < $this->quantity; $i++) {
+                $evidence = Evidence::create([
+                    'user_id' => auth()->id(),
+                    'evidence_type_id' => $this->evidence_type_id,
+                    'profile_id' => $profile->id,
+                    'social_network' => $profile->social_network,
+                    'comment' => $this->comment,
+                    'ip_address' => request()->ip(),
+                    'user_agent' => request()->userAgent(),
                 ]);
+
+                foreach ($savedImagesData as $imgData) {
+                    EvidenceImage::create([
+                        'evidence_id' => $evidence->id,
+                        'screenshot_path' => $imgData['path'],
+                        'screenshot_hash' => $imgData['hash'],
+                        'screenshot_mime' => $imgData['mime'],
+                        'screenshot_size' => $imgData['size'],
+                        'is_suspect' => $imgData['is_suspect'],
+                    ]);
+                }
+                $count++;
             }
-            $count++;
         }
 
         session()->flash('status', '¡Registro Exitoso! ' . $count . ' evidencias creadas y guardadas al instante. (Puedes pegar la siguiente captura)');
 
-        $this->reset(['evidence_type_id', 'profile_ids', 'images', 'comment', 'ai_status', 'ai_error', 'is_processed']);
+        $this->reset(['evidence_type_id', 'profile_ids', 'images', 'comment', 'quantity', 'ai_status', 'ai_error', 'is_processed']);
     }
 }

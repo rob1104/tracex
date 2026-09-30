@@ -129,16 +129,26 @@
                         <hr class="my-6 border-gray-200">
                         <h3 class="text-lg font-medium text-gray-900 mb-4">2. Revisa el resumen y guarda</h3>
 
-                        <!-- Evidence Type -->
-                        <div>
-                            <x-input-label for="evidence_type_id" value="Tipo de Evidencia" />
-                            <select wire:model="evidence_type_id" id="evidence_type_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
-                                <option value="">Selecciona una opción...</option>
-                                @foreach($types as $type)
-                                    <option value="{{ $type->id }}">{{ $type->name }}</option>
-                                @endforeach
-                            </select>
-                            <x-input-error :messages="$errors->get('evidence_type_id')" class="mt-2" />
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <!-- Evidence Type -->
+                            <div>
+                                <x-input-label for="evidence_type_id" value="Tipo de Evidencia" />
+                                <select wire:model="evidence_type_id" id="evidence_type_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                    <option value="">Selecciona una opción...</option>
+                                    @foreach($types as $type)
+                                        <option value="{{ $type->id }}">{{ $type->name }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('evidence_type_id')" class="mt-2" />
+                            </div>
+
+                            <!-- Quantity -->
+                            <div>
+                                <x-input-label for="quantity" value="Cantidad de Evidencias (por perfil)" />
+                                <x-text-input id="quantity" type="number" min="1" max="50" class="block mt-1 w-full" wire:model="quantity" required />
+                                <p class="mt-1 text-xs text-gray-500">Si un perfil aparece 9 veces en la imagen, el sistema registrará 9 evidencias para ese perfil.</p>
+                                <x-input-error :messages="$errors->get('quantity')" class="mt-2" />
+                            </div>
                         </div>
 
                         <!-- Multiple Profiles Selection -->
