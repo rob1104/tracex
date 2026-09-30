@@ -52,7 +52,7 @@ class EvidenceCreateMultiple extends Component
                             'content' => $imageContent,
                         ],
                         'features' => [
-                            ['type' => 'DOCUMENT_TEXT_detectóION'],
+                            ['type' => 'DOCUMENT_TEXT_DETECTION'],
                         ],
                     ],
                 ],
