@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('name');
             $table->text('password')->nullable();
             $table->string('social_network');
-            $table->enum('status', ['active', 'suspended'])->default('active');
+            $table->enum('status', ['active', 'suspended', 'restricted'])->default('active');
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

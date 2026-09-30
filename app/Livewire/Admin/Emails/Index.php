@@ -40,6 +40,48 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public $showMassAssignModal = false;
+    public $sourceGestorId = '';
+    public $destinationGestorId = '';
+    public $sourceAccounts = [];
+    public $selectedAccounts = [];
+
+    public function updatedSourceGestorId($value)
+    {
+        if ($value) {
+            $this->sourceAccounts = EmailAccount::where('created_by', $value)->get();
+            $this->selectedAccounts = $this->sourceAccounts->pluck('id')->toArray();
+        } else {
+            $this->sourceAccounts = [];
+            $this->selectedAccounts = [];
+        }
+    }
+
+    public function openMassAssignModal()
+    {
+        $this->reset(['sourceGestorId', 'destinationGestorId', 'sourceAccounts', 'selectedAccounts']);
+        $this->showMassAssignModal = true;
+    }
+
+    public function executeMassAssignment()
+    {
+        $this->validate([
+            'sourceGestorId' => 'required|exists:users,id',
+            'destinationGestorId' => 'required|exists:users,id|different:sourceGestorId',
+            'selectedAccounts' => 'required|array|min:1',
+            'selectedAccounts.*' => 'exists:email_accounts,id',
+        ], [
+            'destinationGestorId.different' => 'El gestor destino no puede ser el mismo que el gestor origen.',
+            'selectedAccounts.required' => 'Debes seleccionar al menos una cuenta para reasignar.',
+        ]);
+
+        EmailAccount::whereIn('id', $this->selectedAccounts)->update(['created_by' => $this->destinationGestorId]);
+        \App\Models\Profile::whereIn('email_account_id', $this->selectedAccounts)->update(['created_by' => $this->destinationGestorId]);
+
+        $this->showMassAssignModal = false;
+        session()->flash('status', 'Cuentas y sus perfiles asociados han sido reasignados correctamente.');
+    }
+
     public function create()
     {
         $this->reset(['emailId', 'alias', 'email', 'password', 'status']);

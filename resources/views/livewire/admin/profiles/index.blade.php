@@ -102,6 +102,8 @@
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
                                             @if($profile->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
+                                            @elseif($profile->status === 'restricted')
+                                                <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-orange-50 text-orange-700 border-orange-200">Restringido</span>
                                             @else
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-red-50 text-red-700 border-red-200">Suspendido</span>
                                             @endif
@@ -251,6 +253,7 @@
                                 <x-input-label for="status" value="Estatus" />
                                 <select wire:model="status" id="status" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                     <option value="active">Activo</option>
+                                    <option value="restricted">Restringido</option>
                                     <option value="suspended">Suspendido</option>
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />

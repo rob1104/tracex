@@ -35,7 +35,7 @@ class Index extends Component
     #[Validate('required|string|max:255')]
     public $social_network = '';
 
-    #[Validate('required|in:active,suspended')]
+    #[Validate('required|in:active,suspended,restricted')]
     public $status = 'active';
 
     public $revealedPassword = '';
@@ -89,7 +89,7 @@ class Index extends Component
             'name' => 'required|string|max:255',
             'password' => 'nullable|string|max:255',
             'social_network' => 'required|string|max:255',
-            'status' => 'required|in:active,suspended',
+            'status' => 'required|in:active,suspended,restricted',
         ];
 
         if (auth()->user()->isAdmin()) {
