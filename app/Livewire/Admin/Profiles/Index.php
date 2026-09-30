@@ -58,6 +58,34 @@ class Index extends Component
     public $sourceProfiles = [];
     public $selectedProfiles = [];
 
+    // For Colab Profiles View Modal
+    public $showColabProfilesModal = false;
+    public $selectedColabViewId = '';
+    public $viewingColabProfiles = [];
+
+    public function updatedSelectedColabViewId($value)
+    {
+        if ($value) {
+            $query = \App\Models\Profile::whereHas('users', function($q) use ($value) {
+                $q->where('users.id', $value);
+            })->with('emailAccount')->orderBy('name', 'asc');
+
+            if (auth()->user()->isCuentas()) {
+                $query->where('created_by', auth()->id());
+            }
+
+            $this->viewingColabProfiles = $query->get();
+        } else {
+            $this->viewingColabProfiles = [];
+        }
+    }
+
+    public function openColabProfilesModal()
+    {
+        $this->reset(['selectedColabViewId', 'viewingColabProfiles']);
+        $this->showColabProfilesModal = true;
+    }
+
     public function updatedSourceColabId($value)
     {
         if ($value) {

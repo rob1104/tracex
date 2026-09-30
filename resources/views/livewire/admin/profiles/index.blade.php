@@ -13,7 +13,10 @@
                         <div class="flex-1 w-full sm:w-1/3 mr-4">
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil..." class="w-full" />
                         </div>
-                        <div class="flex gap-3">
+                        <div class="flex gap-3 flex-wrap justify-end">
+                            <button wire:click="openColabProfilesModal" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                Ver por Colaborador
+                            </button>
                             @if(auth()->user()->isAdmin())
                                 <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
@@ -487,6 +490,156 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Colab Profiles View Modal -->
+    @if($showColabProfilesModal)
+        <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showColabProfilesModal', false)"></div>
+                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-3xl w-full">
+                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                        <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                            </svg>
+                            Ver Perfiles por Colaborador
+                        </h3>
+                        <button type="button" wire:click="$set('showColabProfilesModal', false)" class="text-emerald-100 hover:text-white focus:outline-none">
+                            <span class="sr-only">Cerrar</span>
+                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 min-h-[400px]">
+                        <div class="mb-6">
+                            <x-input-label value="Seleccione o busque un colaborador" />
+                            
+                            <!-- Alpine Searchable Dropdown for Colaborador -->
+                            <div x-data="{
+                                    search: '',
+                                    open: false,
+                                    selectedText: 'Seleccione un colaborador...',
+
+                                    init() {
+                                        this.updateSelectedText();
+                                        $watch('$wire.selectedColabViewId', () => {
+                                            this.updateSelectedText();
+                                        });
+                                    },
+
+                                    updateSelectedText() {
+                                        if (!$wire.selectedColabViewId) {
+                                            this.selectedText = 'Seleccione un colaborador...';
+                                            return;
+                                        }
+                                        let item = this.$refs.colabsList.querySelector(`li[data-id='${$wire.selectedColabViewId}']`);
+                                        if (item) {
+                                            this.selectedText = item.getAttribute('data-text');
+                                        }
+                                    },
+
+                                    selectColab(id, text) {
+                                        $wire.set('selectedColabViewId', id);
+                                        this.selectedText = text;
+                                        this.open = false;
+                                        this.search = '';
+                                    }
+                                }"
+                                class="relative mt-1"
+                                @click.outside="open = false">
+                                
+                                <button type="button" @click="open = !open" class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
+                                    <span class="block truncate" x-text="selectedText"></span>
+                                    <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                            <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </span>
+                                </button>
+
+                                <div x-show="open" class="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto sm:text-sm" style="display: none;">
+                                    <div class="px-2 pb-2 sticky top-0 bg-white pt-2">
+                                        <input type="text" x-model="search" placeholder="Buscar colaborador..." class="w-full border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-md shadow-sm sm:text-sm">
+                                    </div>
+                                    <ul x-ref="colabsList" class="max-h-48 overflow-y-auto">
+                                        <li @click="$wire.set('selectedColabViewId', ''); selectedText = 'Seleccione un colaborador...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600 hover:text-white">
+                                            <span class="block font-normal truncate">-- Seleccione --</span>
+                                        </li>
+                                        @foreach($usersList as $colab)
+                                            <li data-id="{{ $colab->id }}" data-text="{{ addslashes($colab->name) }}"
+                                                x-show="'{{ strtolower(addslashes($colab->name)) }}'.includes(search.toLowerCase())"
+                                                @click="selectColab('{{ $colab->id }}', '{{ addslashes($colab->name) }}')"
+                                                class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600 hover:text-white transition-colors">
+                                                <div class="flex items-center">
+                                                    <span class="font-normal block truncate">{{ $colab->name }}</span>
+                                                </div>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        @if($selectedColabViewId)
+                            <div class="flex justify-between items-center mb-4">
+                                <p class="text-sm text-gray-500">Perfiles asignados a este colaborador.</p>
+                                <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">{{ count($viewingColabProfiles) }} Perfiles</span>
+                            </div>
+
+                            @if(count($viewingColabProfiles) > 0)
+                                <div class="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
+                                    <table class="min-w-full divide-y divide-gray-200">
+                                        <thead class="bg-gray-50 sticky top-0">
+                                            <tr>
+                                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Perfil</th>
+                                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Red Social</th>
+                                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta Asociada</th>
+                                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white divide-y divide-gray-200">
+                                            @foreach($viewingColabProfiles as $profile)
+                                                <tr class="hover:bg-gray-50">
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ $profile->name }}</td>
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $profile->social_network }}</td>
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $profile->emailAccount ? $profile->emailAccount->email : '-' }}</td>
+                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                        @if($profile->status === 'active')
+                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
+                                                        @elseif($profile->status === 'restricted')
+                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-orange-50 text-orange-700 border border-orange-200">Restringido</span>
+                                                        @else
+                                                            <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Suspendido</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">No hay perfiles</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Este colaborador no tiene perfiles sociales asignados.</p>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end border-t border-gray-200">
+                        <button type="button" wire:click="$set('showColabProfilesModal', false)" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:text-sm transition-colors">
+                            Cerrar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
