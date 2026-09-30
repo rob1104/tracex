@@ -20,7 +20,7 @@
                 </div>
                 <div class="ml-3">
                     <p class="text-sm text-indigo-700">
-                        <strong>Modo Masivo:</strong> Selecciona múltiples perfiles. Se creará un registro de evidencia individual por cada perfil seleccionado, y a todos se les adjuntará la misma captura de pantalla.
+                        <strong>Modo Masivo:</strong> Solo pega la imagen. El escáner detectará los perfiles y rellenará el formulario.
                     </p>
                 </div>
             </div>
@@ -30,44 +30,7 @@
             <div class="p-6 text-gray-900">
                 <form wire:submit="save" class="space-y-6 max-w-3xl mx-auto">
 
-                    <!-- Evidence Type -->
-                    <div>
-                        <x-input-label for="evidence_type_id" value="Tipo de Evidencia" />
-                        <select wire:model="evidence_type_id" id="evidence_type_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
-                            <option value="">Selecciona una opción...</option>
-                            @foreach($types as $type)
-                                <option value="{{ $type->id }}">{{ $type->name }}</option>
-                            @endforeach
-                        </select>
-                        <x-input-error :messages="$errors->get('evidence_type_id')" class="mt-2" />
-                    </div>
-
-                    <!-- Multiple Profiles Selection -->
-                    <div class="mb-6">
-                        <x-input-label value="Perfiles de Red Social (Selecciona todos los que apliquen)" />
-                        
-                        <div x-data="{ search: '' }" class="mt-2 border border-gray-300 rounded-md bg-gray-50">
-                            <div class="p-2 border-b border-gray-200 bg-white rounded-t-md">
-                                <input type="text" x-model="search" placeholder="Buscar perfil..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
-                            </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 max-h-60 overflow-y-auto">
-                                @foreach($profiles as $profile)
-                                    <label x-show="'{{ strtolower(addslashes($profile->name)) }}'.includes(search.toLowerCase())" class="flex items-start space-x-3 bg-white p-3 border border-gray-200 rounded shadow-sm hover:bg-indigo-50 cursor-pointer transition-colors">
-                                        <div class="flex-shrink-0 mt-0.5">
-                                            <input type="checkbox" wire:model="profile_ids" value="{{ $profile->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 w-4 h-4">
-                                        </div>
-                                        <div class="flex flex-col flex-1 min-w-0">
-                                            <span class="text-sm font-medium text-gray-900 truncate">{{ $profile->name }}</span>
-                                            <span class="text-xs text-gray-500">{{ $profile->social_network }}</span>
-                                        </div>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-                        <x-input-error :messages="$errors->get('profile_ids')" class="mt-2" />
-                    </div>
-
-                    <!-- Images -->
+                    <!-- Images Upload Area (Always Visible) -->
                     <div x-data="{
                         isUploading: false,
                         handlePaste(e) {
@@ -90,7 +53,7 @@
                             }
                         }
                     }" @paste.window="handlePaste($event)">
-                        <x-input-label value="Evidencia (Captura de pantalla)" />
+                        <x-input-label value="1. Pega tu evidencia (Captura de pantalla)" />
                         
                         <!-- Drag, Drop & Paste Area -->
                         <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md relative hover:bg-gray-50 transition-colors cursor-pointer"
@@ -107,7 +70,7 @@
                                     <p class="pl-1">o arrastra y suelta</p>
                                 </div>
                                 <p class="text-xs text-gray-500">
-                                    PNG, JPG, GIF hasta 5MB. <strong>¡Puedes presionar Ctrl+V para pegar!</strong>
+                                    PNG, JPG, GIF hasta 5MB. <strong class="text-indigo-600">¡Presiona Ctrl+V para pegar ahora!</strong>
                                 </p>
                             </div>
                         </div>
@@ -118,17 +81,17 @@
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Procesando imagen pegada...
+                            Escaneando la imagen pegada...
                         </div>
 
                         <x-input-error :messages="$errors->get('images')" class="mt-2" />
                         <x-input-error :messages="$errors->get('images.*')" class="mt-2" />
 
-                        <!-- Image Preview -->
+                        <!-- Image Preview & Status -->
                         @if ($images)
                             <div class="mt-4">
                                 @if($ai_status)
-                                    <div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm flex items-start">
+                                    <div class="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm flex items-start shadow-sm">
                                         <svg class="h-5 w-5 mr-2 mt-0.5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                                         </svg>
@@ -136,7 +99,7 @@
                                     </div>
                                 @endif
                                 @if($ai_error)
-                                    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md text-sm flex items-start">
+                                    <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 text-yellow-700 rounded-md text-sm flex items-start shadow-sm">
                                         <svg class="h-5 w-5 mr-2 mt-0.5 text-yellow-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
                                         </svg>
@@ -162,18 +125,60 @@
                         @endif
                     </div>
 
-                    <!-- Comment -->
-                    <div>
-                        <x-input-label for="comment" value="Comentario / Notas" />
-                        <textarea wire:model="comment" id="comment" rows="3" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" placeholder="Detalles adicionales sobre la evidencia..."></textarea>
-                        <x-input-error :messages="$errors->get('comment')" class="mt-2" />
-                    </div>
+                    @if($is_processed)
+                        <hr class="my-6 border-gray-200">
+                        <h3 class="text-lg font-medium text-gray-900 mb-4">2. Revisa el resumen y guarda</h3>
 
-                    <div class="flex items-center justify-end">
-                        <x-primary-button>
-                            Guardar Evidencias Múltiples
-                        </x-primary-button>
-                    </div>
+                        <!-- Evidence Type -->
+                        <div>
+                            <x-input-label for="evidence_type_id" value="Tipo de Evidencia" />
+                            <select wire:model="evidence_type_id" id="evidence_type_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                <option value="">Selecciona una opción...</option>
+                                @foreach($types as $type)
+                                    <option value="{{ $type->id }}">{{ $type->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('evidence_type_id')" class="mt-2" />
+                        </div>
+
+                        <!-- Multiple Profiles Selection -->
+                        <div class="mb-6">
+                            <x-input-label value="Perfiles de Red Social (Selecciona todos los que apliquen)" />
+                            
+                            <div x-data="{ search: '' }" class="mt-2 border border-gray-300 rounded-md bg-gray-50">
+                                <div class="p-2 border-b border-gray-200 bg-white rounded-t-md">
+                                    <input type="text" x-model="search" placeholder="Buscar perfil..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-2 max-h-60 overflow-y-auto">
+                                    @foreach($profiles as $profile)
+                                        <label x-show="'{{ strtolower(addslashes($profile->name)) }}'.includes(search.toLowerCase())" class="flex items-start space-x-3 bg-white p-3 border border-gray-200 rounded shadow-sm hover:bg-indigo-50 cursor-pointer transition-colors">
+                                            <div class="flex-shrink-0 mt-0.5">
+                                                <input type="checkbox" wire:model="profile_ids" value="{{ $profile->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 w-4 h-4">
+                                            </div>
+                                            <div class="flex flex-col flex-1 min-w-0">
+                                                <span class="text-sm font-medium text-gray-900 truncate">{{ $profile->name }}</span>
+                                                <span class="text-xs text-gray-500">{{ $profile->social_network }}</span>
+                                            </div>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <x-input-error :messages="$errors->get('profile_ids')" class="mt-2" />
+                        </div>
+
+                        <!-- Comment -->
+                        <div>
+                            <x-input-label for="comment" value="Comentario / Notas" />
+                            <textarea wire:model="comment" id="comment" rows="3" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" placeholder="Detalles adicionales sobre la evidencia..."></textarea>
+                            <x-input-error :messages="$errors->get('comment')" class="mt-2" />
+                        </div>
+
+                        <div class="flex items-center justify-end">
+                            <x-primary-button>
+                                Guardar Evidencias Múltiples
+                            </x-primary-button>
+                        </div>
+                    @endif
                 </form>
             </div>
         </div>
