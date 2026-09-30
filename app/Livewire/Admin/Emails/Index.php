@@ -186,12 +186,43 @@ class Index extends Component
         $this->showProfilesModal = true;
     }
 
+    public $statusFilter = '';
+    public $gestorFilter = '';
+    public $profilesFilter = '';
+
+    public function updatingStatusFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingGestorFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingProfilesFilter()
+    {
+        $this->resetPage();
+    }
+
     public function render()
     {
         $query = EmailAccount::with(['creator', 'profiles']);
 
         if (auth()->user()->isCuentas()) {
             $query->where('created_by', auth()->id());
+        } elseif ($this->gestorFilter) {
+            $query->where('created_by', $this->gestorFilter);
+        }
+
+        if ($this->statusFilter) {
+            $query->where('status', $this->statusFilter);
+        }
+
+        if ($this->profilesFilter === 'with') {
+            $query->has('profiles');
+        } elseif ($this->profilesFilter === 'without') {
+            $query->doesntHave('profiles');
         }
 
         if ($this->search) {
@@ -203,7 +234,7 @@ class Index extends Component
 
         return view('livewire.admin.emails.index', [
             'accounts' => $query->latest()->paginate(15),
-            'cuentasUsers' => auth()->user()->isAdmin() ? \App\Models\User::where('role', 'cuentas')->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->isAdmin() ? \App\Models\User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
         ])->layout('layouts.app');
     }
 }

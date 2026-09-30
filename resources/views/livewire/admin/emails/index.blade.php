@@ -25,6 +25,37 @@
                         </div>
                     </div>
 
+                    <!-- Filtros -->
+                    <div class="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        @if(auth()->user()->isAdmin())
+                            <div class="w-full sm:w-1/4">
+                                <x-input-label for="gestorFilter" value="Filtrar por Gestor" class="text-xs text-gray-500 mb-1" />
+                                <select wire:model.live="gestorFilter" id="gestorFilter" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                    <option value="">Todos los gestores</option>
+                                    @foreach($cuentasUsers as $gestor)
+                                        <option value="{{ $gestor->id }}">{{ $gestor->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="statusFilter" value="Filtrar por Estatus" class="text-xs text-gray-500 mb-1" />
+                            <select wire:model.live="statusFilter" id="statusFilter" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                <option value="">Todos los estatus</option>
+                                <option value="active">Activa</option>
+                                <option value="suspended">Suspendida</option>
+                            </select>
+                        </div>
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="profilesFilter" value="Filtrar por Perfiles" class="text-xs text-gray-500 mb-1" />
+                            <select wire:model.live="profilesFilter" id="profilesFilter" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                <option value="">Todas las cuentas</option>
+                                <option value="with">Con Perfiles</option>
+                                <option value="without">Sin Perfiles</option>
+                            </select>
+                        </div>
+                    </div>
+
                     @if (session('status'))
                         <div class="mb-4 font-medium text-sm text-green-600 bg-green-50 p-4 rounded-lg">
                             {{ session('status') }}
