@@ -135,11 +135,12 @@
         .text-center { text-align: center; }
         
         .col-id { width: 4%; text-align: center;}
-        .col-user { width: 22%; }
+        .col-user { width: 18%; }
         .col-net { width: 10%; }
-        .col-type { width: 14%; }
-        .col-date { width: 10%; }
-        .col-comment { width: 40%; }
+        .col-profile { width: 14%; }
+        .col-type { width: 10%; }
+        .col-date { width: 8%; }
+        .col-comment { width: 36%; }
 
         .user-name { font-weight: bold; color: #111827; }
         .user-email { color: #6b7280; font-size: 9px; }
@@ -207,6 +208,7 @@
                     <th class="col-id">#</th>
                     <th class="col-user">Colaborador</th>
                     <th class="col-net">Red Social</th>
+                    <th class="col-profile">Perfil</th>
                     <th class="col-type">Tipo</th>
                     <th class="col-date">Fecha Reg.</th>
                     <th class="col-comment">Comentario / Detalles</th>
@@ -224,10 +226,11 @@
                             <div class="user-email">{{ $evidence->user->email }}</div>
                         </td>
                         <td class="col-net">{{ $evidence->social_network }}</td>
+                        <td class="col-profile">{{ $evidence->profile ? $evidence->profile->name : 'N/A' }}</td>
                         <td class="col-type">
                             {{ optional($evidence->evidenceType)->name }}
                             @if($isSuspect)
-                                <br><span class="badge-suspect">⚠ Sospechosa</span>
+                                <br><span class="badge-suspect">⚠️ Sospechosa</span>
                             @endif
                         </td>
                         <td class="col-date">{{ $evidence->created_at->format('d/m/Y') }}</td>
@@ -237,7 +240,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="text-center" style="padding: 20px; color: #6b7280;">No hay evidencias que coincidan con los filtros aplicados.</td>
+                        <td colspan="7" class="text-center" style="padding: 20px; color: #6b7280;">No hay evidencias que coincidan con los filtros aplicados.</td>
                     </tr>
                 @endforelse
             </tbody>

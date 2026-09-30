@@ -131,7 +131,7 @@ class Index extends Component
         return response()->streamDownload(function () use ($evidences) {
             $file = fopen('php://output', 'w');
             fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
-            fputcsv($file, ['ID', 'Usuario', 'Correo', 'Red Social', 'Tipo de Evidencia', 'Comentario', 'Fecha']);
+            fputcsv($file, ['ID', 'Usuario', 'Correo', 'Red Social', 'Perfil', 'Tipo de Evidencia', 'Comentario', 'Fecha']);
 
             foreach ($evidences as $e) {
                 fputcsv($file, [
@@ -139,6 +139,7 @@ class Index extends Component
                     $e->user->name,
                     $e->user->email,
                     $e->social_network,
+                    $e->profile ? $e->profile->name : 'N/A',
                     optional($e->evidenceType)->name,
                     $e->comment,
                     $e->created_at->format('Y-m-d H:i:s'),
