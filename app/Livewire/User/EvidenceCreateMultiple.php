@@ -90,7 +90,11 @@ class EvidenceCreateMultiple extends Component
                         $this->evidence_type_id = $typeId;
                     }
 
-                    $this->ai_status = 'IA Automática: ' . count($matchedIds) . ' perfiles detectados en la imagen.';
+                    if (count($this->profile_ids) > 0 && !empty($this->evidence_type_id)) {
+                        $this->save();
+                    } else {
+                        $this->ai_status = 'IA Automática: ' . count($matchedIds) . ' perfiles detectados. Faltan datos para auto-guardar.';
+                    }
                 } else {
                     $this->ai_status = 'IA Automática: No se detectó texto legible en la imagen.';
                 }
@@ -146,6 +150,7 @@ class EvidenceCreateMultiple extends Component
         }
 
         // Now create one evidence record per selected profile
+        $count = 0;
         foreach ($this->profile_ids as $profileId) {
             $profile = Profile::find($profileId);
 
@@ -173,10 +178,11 @@ class EvidenceCreateMultiple extends Component
                     'is_suspect' => $imgData['is_suspect'],
                 ]);
             }
+            $count++;
         }
 
-        session()->flash('status', count($this->profile_ids).' evidencias registradas masivamente.');
+        session()->flash('status', '¡IA Automática! ' . $count . ' evidencias creadas y guardadas al instante. (Puedes pegar la siguiente captura)');
 
-        return $this->redirect('/evidencias/historial', navigate: true);
+        $this->reset(['evidence_type_id', 'profile_ids', 'images', 'comment', 'ai_status', 'ai_error']);
     }
 }
