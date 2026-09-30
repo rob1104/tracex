@@ -65,6 +65,13 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
+                                        @if($user->role === 'cuentas')
+                                            <button wire:click="viewAccounts({{ $user->id }})" title="Ver Cuentas Asignadas" class="p-2 text-emerald-600 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                                                </svg>
+                                            </button>
+                                        @endif
                                         <button wire:click="edit({{ $user->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
                                               <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -149,6 +156,87 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Accounts View Modal -->
+    @if($showAccountsModal)
+        <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showAccountsModal', false)"></div>
+                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-3xl w-full">
+                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                        <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                            </svg>
+                            Cuentas asignadas a {{ $viewingUserName }}
+                        </h3>
+                        <button type="button" wire:click="$set('showAccountsModal', false)" class="text-emerald-100 hover:text-white focus:outline-none">
+                            <span class="sr-only">Cerrar</span>
+                            <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <p class="text-sm text-gray-500">Listado de cuentas de correo administradas por este gestor.</p>
+                            <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">{{ count($viewingUserAccounts) }} Cuentas</span>
+                        </div>
+
+                        @if(count($viewingUserAccounts) > 0)
+                            <div class="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50 sticky top-0">
+                                        <tr>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfiles</th>
+                                            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200">
+                                        @foreach($viewingUserAccounts as $account)
+                                            <tr class="hover:bg-gray-50">
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ $account->email }}</td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $account->alias ?: '-' }}</td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                        {{ $account->profiles_count }} Perfiles
+                                                    </span>
+                                                </td>
+                                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
+                                                    @if($account->status === 'active')
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activa</span>
+                                                    @else
+                                                        <span class="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">Suspendida</span>
+                                                    @endif
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @else
+                            <div class="text-center py-8 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                                </svg>
+                                <h3 class="mt-2 text-sm font-medium text-gray-900">No hay cuentas asignadas</h3>
+                                <p class="mt-1 text-sm text-gray-500">Este gestor todavía no tiene cuentas de correo a su cargo.</p>
+                            </div>
+                        @endif
+                    </div>
+
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end border-t border-gray-200">
+                        <button type="button" wire:click="$set('showAccountsModal', false)" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:text-sm transition-colors">
+                            Cerrar
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

@@ -25,6 +25,20 @@ class Index extends Component
 
     public $password = '';
 
+    public $showAccountsModal = false;
+    public $viewingUserAccounts = [];
+    public $viewingUserName = '';
+
+    public function viewAccounts($id)
+    {
+        $user = User::findOrFail($id);
+        if ($user->role === 'cuentas') {
+            $this->viewingUserName = $user->name;
+            $this->viewingUserAccounts = \App\Models\EmailAccount::withCount('profiles')->where('created_by', $user->id)->orderBy('email', 'asc')->get();
+            $this->showAccountsModal = true;
+        }
+    }
+
     public function updatingSearch()
     {
         $this->resetPage();
