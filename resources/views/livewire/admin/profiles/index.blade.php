@@ -568,14 +568,14 @@
                                         <input type="text" x-model="search" placeholder="Buscar colaborador..." class="w-full border-gray-300 focus:border-emerald-500 focus:ring-emerald-500 rounded-md shadow-sm sm:text-sm">
                                     </div>
                                     <ul x-ref="colabsList" class="max-h-48 overflow-y-auto">
-                                        <li @click="$wire.set('selectedColabViewId', ''); selectedText = 'Seleccione un colaborador...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600 hover:text-white">
+                                        <li @click="$wire.set('selectedColabViewId', ''); selectedText = 'Seleccione un colaborador...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100">
                                             <span class="block font-normal truncate">-- Seleccione --</span>
                                         </li>
                                         @foreach($usersList as $colab)
                                             <li data-id="{{ $colab->id }}" data-text="{{ addslashes($colab->name) }}"
                                                 x-show="'{{ strtolower(addslashes($colab->name)) }}'.includes(search.toLowerCase())"
                                                 @click="selectColab('{{ $colab->id }}', '{{ addslashes($colab->name) }}')"
-                                                class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-emerald-600 hover:text-white transition-colors">
+                                                class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-gray-100 transition-colors">
                                                 <div class="flex items-center">
                                                     <span class="font-normal block truncate">{{ $colab->name }}</span>
                                                 </div>
