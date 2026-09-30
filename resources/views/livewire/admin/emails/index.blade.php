@@ -305,6 +305,11 @@
                                     </h4>
                                     
                                     @if(count($sourceAccounts) > 0)
+                                        <div class="mb-2 flex justify-end">
+                                            <button type="button" wire:click="toggleSelectAll" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium focus:outline-none">
+                                                {{ count($selectedAccounts) === count($sourceAccounts) ? 'Deseleccionar todas' : 'Seleccionar todas' }}
+                                            </button>
+                                        </div>
                                         <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-2">
                                             <div class="space-y-2">
                                                 @foreach($sourceAccounts as $account)

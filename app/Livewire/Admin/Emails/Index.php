@@ -49,11 +49,20 @@ class Index extends Component
     public function updatedSourceGestorId($value)
     {
         if ($value) {
-            $this->sourceAccounts = EmailAccount::where('created_by', $value)->get();
+            $this->sourceAccounts = EmailAccount::where('created_by', $value)->orderBy('email', 'asc')->get();
             $this->selectedAccounts = $this->sourceAccounts->pluck('id')->toArray();
         } else {
             $this->sourceAccounts = [];
             $this->selectedAccounts = [];
+        }
+    }
+
+    public function toggleSelectAll()
+    {
+        if (count($this->selectedAccounts) === count($this->sourceAccounts)) {
+            $this->selectedAccounts = [];
+        } else {
+            $this->selectedAccounts = $this->sourceAccounts->pluck('id')->toArray();
         }
     }
 
