@@ -500,8 +500,8 @@
         <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showColabProfilesModal', false)"></div>
-                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-3xl w-full">
-                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                <div class="relative bg-white rounded-lg text-left overflow-visible shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center rounded-t-lg">
                         <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
@@ -516,8 +516,8 @@
                         </button>
                     </div>
 
-                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 min-h-[400px]">
-                        <div class="mb-6">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 min-h-[500px]">
+                        <div class="mb-6 relative">
                             <x-input-label value="Seleccione o busque un colaborador" />
                             
                             <!-- Alpine Searchable Dropdown for Colaborador -->
@@ -587,28 +587,26 @@
                         </div>
 
                         @if($selectedColabViewId)
-                            <div class="flex justify-between items-center mb-4">
+                            <div class="flex justify-between items-center mb-4 mt-8">
                                 <p class="text-sm text-gray-500">Perfiles asignados a este colaborador.</p>
                                 <span class="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full">{{ count($viewingColabProfiles) }} Perfiles</span>
                             </div>
 
                             @if(count($viewingColabProfiles) > 0)
-                                <div class="max-h-96 overflow-y-auto border border-gray-200 rounded-md">
+                                <div class="max-h-[60vh] overflow-y-auto border border-gray-200 rounded-md relative z-0">
                                     <table class="min-w-full divide-y divide-gray-200">
-                                        <thead class="bg-gray-50 sticky top-0">
+                                        <thead class="bg-gray-50 sticky top-0 z-10">
                                             <tr>
                                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nombre del Perfil</th>
                                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Red Social</th>
-                                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuenta Asociada</th>
                                                 <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                             </tr>
                                         </thead>
                                         <tbody class="bg-white divide-y divide-gray-200">
                                             @foreach($viewingColabProfiles as $profile)
                                                 <tr class="hover:bg-gray-50">
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{{ $profile->name }}</td>
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $profile->social_network }}</td>
-                                                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{{ $profile->emailAccount ? $profile->emailAccount->email : '-' }}</td>
+                                                    <td class="px-4 py-3 text-sm font-medium text-gray-900 break-words">{{ $profile->name }}</td>
+                                                    <td class="px-4 py-3 text-sm text-gray-500">{{ $profile->social_network }}</td>
                                                     <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                                                         @if($profile->status === 'active')
                                                             <span class="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">Activo</span>
@@ -635,7 +633,7 @@
                         @endif
                     </div>
 
-                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end border-t border-gray-200">
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end border-t border-gray-200 rounded-b-lg">
                         <button type="button" wire:click="$set('showColabProfilesModal', false)" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 sm:text-sm transition-colors">
                             Cerrar
                         </button>
