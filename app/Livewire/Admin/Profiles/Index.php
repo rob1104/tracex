@@ -231,7 +231,6 @@ class Index extends Component
     public function updatingFilterStatus() { $this->resetPage(); }
     public function updatingFilterGestor() { $this->resetPage(); }
     public function updatingFilterNetwork() { $this->resetPage(); }
-    public function updatingFilterEmailAccountId() { $this->resetPage(); }
 
     public function render()
     {
