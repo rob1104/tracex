@@ -285,7 +285,7 @@
 
                                 <div>
                                     <x-input-label for="destinationGestorId" value="Gestor Destino" />
-                                    <select wire:model="destinationGestorId" id="destinationGestorId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                    <select wire:model.live="destinationGestorId" id="destinationGestorId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                         <option value="">Seleccione destino...</option>
                                         @foreach($gestores as $gestor)
                                             @if($gestor->id != $sourceGestorId)
