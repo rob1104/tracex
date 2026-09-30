@@ -10,18 +10,61 @@
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
                     <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
-                        <div class="flex-1 w-full sm:w-1/2 flex space-x-4">
-                            <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil o red social..." class="w-full sm:w-1/2" />
-                            <select wire:model.live="filter_email_account_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full sm:w-1/2">
-                                <option value="">Todas las cuentas de correo</option>
+                        <div class="flex-1 w-full sm:w-1/3 mr-4">
+                            <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil..." class="w-full" />
+                        </div>
+                        <div class="flex gap-3">
+                            @if(auth()->user()->isAdmin())
+                                <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                    Asignación Masiva
+                                </button>
+                            @endif
+                            <x-primary-button wire:click="create">
+                                Nuevo Perfil
+                            </x-primary-button>
+                        </div>
+                    </div>
+
+                    <!-- Filtros -->
+                    <div class="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        @if(auth()->user()->isAdmin())
+                            <div class="w-full sm:w-1/4">
+                                <x-input-label for="filter_gestor" value="Gestor" class="text-xs text-gray-500 mb-1" />
+                                <select wire:model.live="filter_gestor" id="filter_gestor" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                    <option value="">Todos los gestores</option>
+                                    @foreach($cuentasUsers as $gestor)
+                                        <option value="{{ $gestor->id }}">{{ $gestor->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                        @endif
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="filter_email_account_id" value="Cuenta de Correo" class="text-xs text-gray-500 mb-1" />
+                            <select wire:model.live="filter_email_account_id" id="filter_email_account_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                <option value="">Todas las cuentas</option>
                                 @foreach($emails as $email)
                                     <option value="{{ $email->id }}">{{ $email->email }} {{ $email->alias ? '('.$email->alias.')' : '' }}</option>
                                 @endforeach
                             </select>
                         </div>
-                        <x-primary-button wire:click="create">
-                            Nuevo Perfil
-                        </x-primary-button>
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="filter_network" value="Red Social" class="text-xs text-gray-500 mb-1" />
+                            <select wire:model.live="filter_network" id="filter_network" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                <option value="">Todas las redes</option>
+                                @foreach($networks as $network)
+                                    <option value="{{ $network }}">{{ $network }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="filter_status" value="Estatus" class="text-xs text-gray-500 mb-1" />
+                            <select wire:model.live="filter_status" id="filter_status" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
+                                <option value="">Todos los estatus</option>
+                                <option value="active">Activa</option>
+                                <option value="restricted">Restringida</option>
+                                <option value="suspended">Suspendida</option>
+                            </select>
+                        </div>
                     </div>
 
                     @if (session('status'))
@@ -339,6 +382,109 @@
                         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                             <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar Asignaciones</x-primary-button>
                             <button type="button" wire:click="$set('showAssignModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Mass Assignment Modal -->
+    @if($showMassAssignModal)
+        <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showMassAssignModal', false)"></div>
+                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                    <form wire:submit.prevent="executeMassAssignment">
+                        <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
+                            <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
+                                </svg>
+                                Reasignación Masiva de Perfiles
+                            </h3>
+                            <button type="button" wire:click="$set('showMassAssignModal', false)" class="text-indigo-100 hover:text-white focus:outline-none">
+                                <span class="sr-only">Cerrar</span>
+                                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <p class="text-sm text-gray-500 mb-6">Transfiere de forma masiva los perfiles asignados a un colaborador para que sean administrados por otro.</p>
+
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                <div>
+                                    <x-input-label for="sourceColabId" value="Colaborador Origen" />
+                                    <select wire:model.live="sourceColabId" id="sourceColabId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                        <option value="">Seleccione origen...</option>
+                                        @foreach($usersList as $colab)
+                                            <option value="{{ $colab->id }}">{{ $colab->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('sourceColabId')" class="mt-2" />
+                                </div>
+
+                                <div>
+                                    <x-input-label for="destinationColabId" value="Colaborador Destino" />
+                                    <select wire:model.live="destinationColabId" id="destinationColabId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                        <option value="">Seleccione destino...</option>
+                                        @foreach($usersList as $colab)
+                                            @if($colab->id != $sourceColabId)
+                                                <option value="{{ $colab->id }}">{{ $colab->name }}</option>
+                                            @endif
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('destinationColabId')" class="mt-2" />
+                                </div>
+                            </div>
+
+                            @if($sourceColabId)
+                                <div class="mt-4 border-t border-gray-200 pt-4">
+                                    <h4 class="text-md font-semibold text-gray-800 mb-3 flex items-center justify-between">
+                                        Perfiles a Transferir
+                                        <span class="bg-indigo-100 text-indigo-800 text-xs py-1 px-2 rounded-full">{{ count($sourceProfiles) }} perfiles encontrados</span>
+                                    </h4>
+                                    
+                                    @if(count($sourceProfiles) > 0)
+                                        <div class="mb-2 flex justify-end">
+                                            <button type="button" wire:click="toggleSelectAll" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium focus:outline-none">
+                                                {{ count($selectedProfiles) === count($sourceProfiles) ? 'Deseleccionar todos' : 'Seleccionar todos' }}
+                                            </button>
+                                        </div>
+                                        <div class="max-h-60 overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-2">
+                                            <div class="space-y-2">
+                                                @foreach($sourceProfiles as $profile)
+                                                    <label class="flex items-center p-2 bg-white rounded border border-gray-100 shadow-sm cursor-pointer hover:bg-indigo-50 transition-colors">
+                                                        <input type="checkbox" wire:model="selectedProfiles" value="{{ $profile->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 mr-3 w-4 h-4">
+                                                        <div class="flex-1">
+                                                            <div class="font-medium text-gray-900 text-sm">{{ $profile->name }}</div>
+                                                            <div class="text-xs text-gray-500">{{ $profile->social_network }} | {{ $profile->emailAccount ? $profile->emailAccount->email : 'Sin cuenta' }}</div>
+                                                        </div>
+                                                    </label>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @else
+                                        <p class="text-sm text-gray-500 italic p-4 bg-gray-50 rounded-md text-center">Este colaborador no tiene perfiles asignados actualmente.</p>
+                                    @endif
+                                    <x-input-error :messages="$errors->get('selectedProfiles')" class="mt-2" />
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse border-t border-gray-200">
+                            <button type="submit" onclick="return confirm('¿Estás seguro de reasignar los perfiles seleccionados?')" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50" @if(count($sourceProfiles) === 0 || !$destinationColabId) disabled @endif>
+                                <svg wire:loading wire:target="executeMassAssignment" class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Ejecutar Transferencia
+                            </button>
+                            <button type="button" wire:click="$set('showMassAssignModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                                Cancelar
+                            </button>
                         </div>
                     </form>
                 </div>

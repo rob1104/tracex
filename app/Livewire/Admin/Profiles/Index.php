@@ -43,11 +43,79 @@ class Index extends Component
     public $created_by = '';
     
     public $filter_email_account_id = '';
+    public $filter_status = '';
+    public $filter_gestor = '';
+    public $filter_network = '';
 
     // For Assignment Modal
     public $assignProfile = null;
-
     public $assignedUsers = [];
+
+    // For Mass Assignment Modal
+    public $showMassAssignModal = false;
+    public $sourceColabId = '';
+    public $destinationColabId = '';
+    public $sourceProfiles = [];
+    public $selectedProfiles = [];
+
+    public function updatedSourceColabId($value)
+    {
+        if ($value) {
+            $query = \App\Models\Profile::whereHas('users', function($q) use ($value) {
+                $q->where('users.id', $value);
+            })->orderBy('name', 'asc');
+
+            if (auth()->user()->isCuentas()) {
+                $query->where('created_by', auth()->id());
+            }
+
+            $this->sourceProfiles = $query->get();
+            $this->selectedProfiles = $this->sourceProfiles->pluck('id')->toArray();
+        } else {
+            $this->sourceProfiles = [];
+            $this->selectedProfiles = [];
+        }
+    }
+
+    public function toggleSelectAll()
+    {
+        if (count($this->selectedProfiles) === count($this->sourceProfiles)) {
+            $this->selectedProfiles = [];
+        } else {
+            $this->selectedProfiles = $this->sourceProfiles->pluck('id')->toArray();
+        }
+    }
+
+    public function openMassAssignModal()
+    {
+        $this->reset(['sourceColabId', 'destinationColabId', 'sourceProfiles', 'selectedProfiles']);
+        $this->showMassAssignModal = true;
+    }
+
+    public function executeMassAssignment()
+    {
+        $this->validate([
+            'sourceColabId' => 'required|exists:users,id',
+            'destinationColabId' => 'required|exists:users,id|different:sourceColabId',
+            'selectedProfiles' => 'required|array|min:1',
+            'selectedProfiles.*' => 'exists:profiles,id',
+        ], [
+            'destinationColabId.different' => 'El colaborador destino no puede ser el mismo que el origen.',
+            'selectedProfiles.required' => 'Debes seleccionar al menos un perfil para reasignar.',
+        ]);
+
+        foreach ($this->selectedProfiles as $profileId) {
+            $profile = \App\Models\Profile::find($profileId);
+            if ($profile) {
+                if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) continue;
+                $profile->users()->detach($this->sourceColabId);
+                $profile->users()->syncWithoutDetaching([$this->destinationColabId]);
+            }
+        }
+
+        $this->showMassAssignModal = false;
+        session()->flash('status', 'Perfiles reasignados correctamente entre colaboradores.');
+    }
 
     public function updatingSearch()
     {
@@ -160,16 +228,31 @@ class Index extends Component
         $this->showAssignModal = false;
     }
 
+    public function updatingFilterStatus() { $this->resetPage(); }
+    public function updatingFilterGestor() { $this->resetPage(); }
+    public function updatingFilterNetwork() { $this->resetPage(); }
+    public function updatingFilterEmailAccountId() { $this->resetPage(); }
+
     public function render()
     {
-        $query = Profile::with(['emailAccount', 'users', 'creator']);
+        $query = \App\Models\Profile::with(['emailAccount', 'users', 'creator']);
 
         if (auth()->user()->isCuentas()) {
             $query->where('created_by', auth()->id());
+        } elseif ($this->filter_gestor) {
+            $query->where('created_by', $this->filter_gestor);
         }
 
         if ($this->filter_email_account_id) {
             $query->where('email_account_id', $this->filter_email_account_id);
+        }
+
+        if ($this->filter_status) {
+            $query->where('status', $this->filter_status);
+        }
+
+        if ($this->filter_network) {
+            $query->where('social_network', $this->filter_network);
         }
 
         if ($this->search) {
@@ -179,16 +262,23 @@ class Index extends Component
             });
         }
         
-        $emailQuery = EmailAccount::where('status', 'active');
+        $emailQuery = \App\Models\EmailAccount::where('status', 'active');
         if (auth()->user()->isCuentas()) {
             $emailQuery->where('created_by', auth()->id());
+        }
+
+        // Available networks for filter
+        $networksQuery = \App\Models\Profile::select('social_network')->distinct();
+        if (auth()->user()->isCuentas()) {
+            $networksQuery->where('created_by', auth()->id());
         }
 
         return view('livewire.admin.profiles.index', [
             'profiles' => $query->latest()->paginate(15),
             'emails' => $emailQuery->orderBy('email')->get(),
-            'usersList' => User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
-            'cuentasUsers' => auth()->user()->isAdmin() ? User::where('role', 'cuentas')->orderBy('name')->get() : [],
+            'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
+            'cuentasUsers' => auth()->user()->isAdmin() ? \App\Models\User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'usersList' => \App\Models\User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }
