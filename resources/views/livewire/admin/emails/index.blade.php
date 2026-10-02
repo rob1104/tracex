@@ -19,7 +19,7 @@
                                     Asignación Masiva
                                 </button>
                             @endif
-                            <x-primary-button wire:click="create">
+                            <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button> <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button> <x-primary-button wire:click="create">
                                 Nueva Cuenta
                             </x-primary-button>
                         </div>
@@ -73,7 +73,7 @@
                                         <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor Asignado</th>
                                     @endif
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th> <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                     <th scope="col" class="relative px-4 py-2"><span class="sr-only">Acciones</span></th>
                                 </tr>
                             </thead>
@@ -99,8 +99,7 @@
                                                 Ver Contraseña
                                             </button>
                                         </td>
-                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
-                                            @if($account->status === 'active')
+                                        <td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center space-x-2 text-sm"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><div class="flex flex-col"><span class="font-semibold text-gray-700">{{ $account->created_at->format('d M Y') }}</span><span class="text-xs text-gray-500">{{ $account->created_at->format('h:i A') }}</span></div></div></td> <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">@if($account->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
                                             @else
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-red-50 text-red-700 border-red-200">Suspendido</span>
@@ -382,3 +381,4 @@
         </div>
     @endif
 </div>
+

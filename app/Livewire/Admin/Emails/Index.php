@@ -221,7 +221,7 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function render()
+    public function buildQuery()
     {
         $query = EmailAccount::with(['creator', 'profiles']);
 
@@ -248,8 +248,63 @@ class Index extends Component
             });
         }
 
+        return $query->latest();
+    }
+
+    public function exportCsv()
+    {
+        $accounts = $this->buildQuery()->get();
+
+        return response()->streamDownload(function () use ($accounts) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fputcsv($file, ['ID', 'Alias', 'Email', 'Estado', 'Gestor Asignado', 'Perfiles Vinculados', 'Fecha de Creación']);
+
+            foreach ($accounts as $a) {
+                fputcsv($file, [
+                    $a->id,
+                    $a->alias ?? 'N/A',
+                    $a->email,
+                    $a->status === 'active' ? 'Activa' : 'Suspendida',
+                    $a->creator ? $a->creator->name : 'N/A',
+                    $a->profiles->count(),
+                    $a->created_at->format('Y-m-d H:i:s'),
+                ]);
+            }
+            fclose($file);
+        }, 'reporte_cuentas_correo_'.date('Y-m-d').'.csv');
+    }
+
+    public function exportPdf()
+    {
+        $accounts = $this->buildQuery()->get();
+
+        $filters = [
+            'search' => $this->search,
+            'status' => $this->statusFilter === 'active' ? 'Activas' : ($this->statusFilter === 'suspended' ? 'Suspendidas' : 'Todas'),
+            'profiles' => $this->profilesFilter === 'with' ? 'Con perfiles' : ($this->profilesFilter === 'without' ? 'Sin perfiles' : 'Todos'),
+        ];
+
+        if ($this->gestorFilter) {
+            $gestor = User::find($this->gestorFilter);
+            $filters['gestor'] = $gestor ? $gestor->name : null;
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.emails', [
+            'accounts' => $accounts,
+            'filters' => $filters,
+            'generator' => auth()->user(),
+        ])->setPaper('letter', 'landscape');
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->stream();
+        }, 'reporte_cuentas_correo_'.date('Y-m-d').'.pdf');
+    }
+
+    public function render()
+    {
         return view('livewire.admin.emails.index', [
-            'accounts' => $query->latest()->paginate(15),
+            'accounts' => $this->buildQuery()->paginate(15),
             'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
         ])->layout('layouts.app');
     }
