@@ -108,7 +108,7 @@ class Index extends Component
         }
     }
 
-    public function render()
+    public function buildQuery()
     {
         $query = User::query();
 
@@ -117,8 +117,55 @@ class Index extends Component
                 ->orWhere('email', 'like', '%'.$this->search.'%');
         }
 
+        return $query->latest();
+    }
+
+    public function exportCsv()
+    {
+        $users = $this->buildQuery()->get();
+
+        return response()->streamDownload(function () use ($users) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fputcsv($file, ['ID', 'Nombre', 'Email', 'Rol', 'Estatus', 'Fecha de Registro']);
+
+            foreach ($users as $u) {
+                fputcsv($file, [
+                    $u->id,
+                    $u->name,
+                    $u->email,
+                    $u->role,
+                    $u->is_active ? 'Activo' : 'Inactivo',
+                    $u->created_at->format('Y-m-d H:i:s'),
+                ]);
+            }
+            fclose($file);
+        }, 'reporte_usuarios_'.date('Y-m-d').'.csv');
+    }
+
+    public function exportPdf()
+    {
+        $users = $this->buildQuery()->get();
+
+        $filters = [
+            'search' => $this->search ?: 'Todos',
+        ];
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.users', [
+            'users' => $users,
+            'filters' => $filters,
+            'generator' => auth()->user(),
+        ])->setPaper('letter', 'portrait');
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->stream();
+        }, 'reporte_usuarios_'.date('Y-m-d').'.pdf');
+    }
+
+    public function render()
+    {
         return view('livewire.admin.users.index', [
-            'users' => $query->latest()->paginate(15),
+            'users' => $this->buildQuery()->paginate(15),
         ])->layout('layouts.app');
     }
 }

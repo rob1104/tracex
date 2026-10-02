@@ -295,7 +295,7 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function render()
+    public function buildQuery()
     {
         $query = Profile::with(['emailAccount', 'users', 'creator']);
 
@@ -324,6 +324,67 @@ class Index extends Component
             });
         }
 
+        return $query->latest();
+    }
+
+    public function exportCsv()
+    {
+        $profiles = $this->buildQuery()->get();
+
+        return response()->streamDownload(function () use ($profiles) {
+            $file = fopen('php://output', 'w');
+            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
+            fputcsv($file, ['ID', 'Nombre', 'Red Social', 'Cuenta de Correo', 'Gestor Asignado', 'Colaboradores Asignados', 'Estatus', 'Fecha de Creación']);
+
+            foreach ($profiles as $p) {
+                fputcsv($file, [
+                    $p->id,
+                    $p->name,
+                    $p->social_network,
+                    $p->emailAccount->email ?? 'N/A',
+                    $p->creator->name ?? 'N/A',
+                    $p->users->pluck('name')->implode(', '),
+                    $p->status,
+                    $p->created_at->format('Y-m-d H:i:s'),
+                ]);
+            }
+            fclose($file);
+        }, 'reporte_perfiles_'.date('Y-m-d').'.csv');
+    }
+
+    public function exportPdf()
+    {
+        $profiles = $this->buildQuery()->get();
+
+        $filters = [
+            'search' => $this->search,
+            'status' => $this->filter_status ?: 'Todos',
+            'network' => $this->filter_network ?: 'Todas',
+        ];
+
+        if ($this->filter_gestor) {
+            $gestor = User::find($this->filter_gestor);
+            $filters['gestor'] = $gestor ? $gestor->name : null;
+        }
+
+        if ($this->filter_email_account_id) {
+            $email = EmailAccount::find($this->filter_email_account_id);
+            $filters['email'] = $email ? $email->email : null;
+        }
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.profiles', [
+            'profiles' => $profiles,
+            'filters' => $filters,
+            'generator' => auth()->user(),
+        ])->setPaper('letter', 'landscape');
+
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->stream();
+        }, 'reporte_perfiles_'.date('Y-m-d').'.pdf');
+    }
+
+    public function render()
+    {
         $emailQuery = EmailAccount::where('status', 'active');
         if (auth()->user()->isCuentas()) {
             $emailQuery->where('created_by', auth()->id());
@@ -336,7 +397,7 @@ class Index extends Component
         }
 
         return view('livewire.admin.profiles.index', [
-            'profiles' => $query->latest()->paginate(15),
+            'profiles' => $this->buildQuery()->paginate(15),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
             'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
