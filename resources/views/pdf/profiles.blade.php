@@ -198,6 +198,8 @@
                 </div>
                 <div class="filter-item">
                     <strong>Estatus:</strong> {{ $filters['status'] }}<br>
+                    <strong>Rango Desde:</strong> {{ $filters['filterDateFrom'] ? \Carbon\Carbon::parse($filters['filterDateFrom'])->format('d/m/Y') : 'Sin límite' }}<br>
+                    <strong>Rango Hasta:</strong> {{ $filters['filterDateTo'] ? \Carbon\Carbon::parse($filters['filterDateTo'])->format('d/m/Y') : 'Sin límite' }}<br>
                     <strong>Total Registros:</strong> {{ $profiles->count() }}
                 </div>
             </div>
@@ -251,3 +253,4 @@
 
 </body>
 </html>
+

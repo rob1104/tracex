@@ -203,6 +203,8 @@ class Index extends Component
     public $gestorFilter = '';
 
     public $profilesFilter = '';
+    public $filterDateFrom = '';
+    public $filterDateTo = '';
 
     public function updatingStatusFilter()
     {
@@ -214,10 +216,9 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingProfilesFilter()
-    {
-        $this->resetPage();
-    }
+    public function updatingProfilesFilter() { $this->resetPage(); }
+    public function updatingFilterDateFrom() { $this->resetPage(); }
+    public function updatingFilterDateTo() { $this->resetPage(); }
 
     public function buildQuery()
     {
@@ -235,8 +236,13 @@ class Index extends Component
 
         if ($this->profilesFilter === 'with') {
             $query->has('profiles');
-        } elseif ($this->profilesFilter === 'without') {
-            $query->doesntHave('profiles');
+        } elseif ($this->profilesFilter === 'without') { $query->doesntHave('profiles'); }
+
+        if ($this->filterDateFrom) {
+            $query->whereDate('created_at', '>=', $this->filterDateFrom);
+        }
+        if ($this->filterDateTo) {
+            $query->whereDate('created_at', '<=', $this->filterDateTo);
         }
 
         if ($this->search) {
@@ -281,6 +287,8 @@ class Index extends Component
             'search' => $this->search,
             'status' => $this->statusFilter === 'active' ? 'Activas' : ($this->statusFilter === 'suspended' ? 'Suspendidas' : 'Todas'),
             'profiles' => $this->profilesFilter === 'with' ? 'Con perfiles' : ($this->profilesFilter === 'without' ? 'Sin perfiles' : 'Todos'),
+            'filterDateFrom' => $this->filterDateFrom,
+            'filterDateTo' => $this->filterDateTo,
         ];
 
         if ($this->gestorFilter) {
@@ -307,4 +315,6 @@ class Index extends Component
         ])->layout('layouts.app');
     }
 }
+
+
 

@@ -28,7 +28,7 @@
                     </div>
 
                     <!-- Filtros -->
-                    <div class="flex flex-col sm:flex-row gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="flex flex-col sm:flex-row flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
                         @if(auth()->user()->isAdmin())
                             <div class="w-full sm:w-1/4">
                                 <x-input-label for="filter_gestor" value="Gestor" class="text-xs text-gray-500 mb-1" />
@@ -66,6 +66,14 @@
                                 <option value="restricted">Restringida</option>
                                 <option value="suspended">Suspendida</option>
                             </select>
+                        </div>
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="filterDateFrom" value="Fecha Desde" class="text-xs text-gray-500 mb-1" />
+                            <x-text-input type="date" wire:model.live="filterDateFrom" id="filterDateFrom" class="w-full text-sm" />
+                        </div>
+                        <div class="w-full sm:w-1/4">
+                            <x-input-label for="filterDateTo" value="Fecha Hasta" class="text-xs text-gray-500 mb-1" />
+                            <x-text-input type="date" wire:model.live="filterDateTo" id="filterDateTo" class="w-full text-sm" />
                         </div>
                     </div>
 
@@ -641,5 +649,6 @@
         </div>
     @endif
 </div>
+
 
 

@@ -49,6 +49,8 @@ class Index extends Component
     public $filter_gestor = '';
 
     public $filter_network = '';
+    public $filterDateFrom = '';
+    public $filterDateTo = '';
 
     // For Assignment Modal
     public $assignProfile = null;
@@ -290,10 +292,9 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingFilterNetwork()
-    {
-        $this->resetPage();
-    }
+    public function updatingFilterNetwork() { $this->resetPage(); }
+    public function updatingFilterDateFrom() { $this->resetPage(); }
+    public function updatingFilterDateTo() { $this->resetPage(); }
 
     public function buildQuery()
     {
@@ -313,8 +314,13 @@ class Index extends Component
             $query->where('status', $this->filter_status);
         }
 
-        if ($this->filter_network) {
-            $query->where('social_network', $this->filter_network);
+        if ($this->filter_network) { $query->where('social_network', $this->filter_network); }
+
+        if ($this->filterDateFrom) {
+            $query->whereDate('created_at', '>=', $this->filterDateFrom);
+        }
+        if ($this->filterDateTo) {
+            $query->whereDate('created_at', '<=', $this->filterDateTo);
         }
 
         if ($this->search) {
@@ -360,6 +366,8 @@ class Index extends Component
             'search' => $this->search,
             'status' => $this->filter_status ?: 'Todos',
             'network' => $this->filter_network ?: 'Todas',
+            'filterDateFrom' => $this->filterDateFrom,
+            'filterDateTo' => $this->filterDateTo,
         ];
 
         if ($this->filter_gestor) {
@@ -405,3 +413,4 @@ class Index extends Component
         ])->layout('layouts.app');
     }
 }
+
