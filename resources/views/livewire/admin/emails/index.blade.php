@@ -14,8 +14,7 @@
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar por correo o alias..." class="w-full" />
                         </div>
                         <div class="flex gap-3">
-                            @if(auth()->user()->isAdmin())
-                                <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
                                 </button>
                             @endif
@@ -33,7 +32,7 @@
                                 <select wire:model.live="gestorFilter" id="gestorFilter" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
                                     <option value="">Todos los gestores</option>
                                     @foreach($cuentasUsers as $gestor)
-                                        <option value="{{ $gestor->id }}">{{ $gestor->name }}</option>
+                                        @if(auth()->user()->isAdmin() || auth()->id() == $gestor->id) <option value="{{ $gestor->id }}">{{ $gestor->name }}</option> @endif
                                     @endforeach
                                 </select>
                             </div>
@@ -306,8 +305,8 @@
                                     <x-input-label for="sourceGestorId" value="Gestor Origen" />
                                     <select wire:model.live="sourceGestorId" id="sourceGestorId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                         <option value="">Seleccione origen...</option>
-                                        @foreach($gestores as $gestor)
-                                            <option value="{{ $gestor->id }}">{{ $gestor->name }}</option>
+                                        @foreach($cuentasUsers as $gestor)
+                                            @if(auth()->user()->isAdmin() || auth()->id() == $gestor->id) <option value="{{ $gestor->id }}">{{ $gestor->name }}</option> @endif
                                         @endforeach
                                     </select>
                                     <x-input-error :messages="$errors->get('sourceGestorId')" class="mt-2" />
@@ -317,7 +316,7 @@
                                     <x-input-label for="destinationGestorId" value="Gestor Destino" />
                                     <select wire:model.live="destinationGestorId" id="destinationGestorId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                         <option value="">Seleccione destino...</option>
-                                        @foreach($gestores as $gestor)
+                                        @foreach($cuentasUsers as $gestor)
                                             @if($gestor->id != $sourceGestorId)
                                                 <option value="{{ $gestor->id }}">{{ $gestor->name }}</option>
                                             @endif
@@ -381,4 +380,6 @@
         </div>
     @endif
 </div>
+
+
 

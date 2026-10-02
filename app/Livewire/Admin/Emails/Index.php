@@ -52,8 +52,7 @@ class Index extends Component
 
     public $selectedAccounts = [];
 
-    public function updatedSourceGestorId($value)
-    {
+    public function updatedSourceGestorId($value) { if (auth()->user()->isCuentas() && $value != auth()->id()) { return; }
         if ($value) {
             $this->sourceAccounts = EmailAccount::where('created_by', $value)->orderBy('email', 'asc')->get();
             $this->selectedAccounts = $this->sourceAccounts->pluck('id')->toArray();
@@ -78,8 +77,7 @@ class Index extends Component
         $this->showMassAssignModal = true;
     }
 
-    public function executeMassAssignment()
-    {
+    public function executeMassAssignment() { if (auth()->user()->isCuentas() && $this->sourceGestorId != auth()->id()) { abort(403); }
         $this->validate([
             'sourceGestorId' => 'required|exists:users,id',
             'destinationGestorId' => 'required|exists:users,id|different:sourceGestorId',
@@ -305,7 +303,8 @@ class Index extends Component
     {
         return view('livewire.admin.emails.index', [
             'accounts' => $this->buildQuery()->paginate(15),
-            'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
         ])->layout('layouts.app');
     }
 }
+

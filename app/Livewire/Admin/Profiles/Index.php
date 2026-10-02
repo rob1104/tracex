@@ -400,7 +400,7 @@ class Index extends Component
             'profiles' => $this->buildQuery()->paginate(15),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
-            'cuentasUsers' => auth()->user()->isAdmin() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
             'usersList' => User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
