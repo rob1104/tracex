@@ -1,58 +1,134 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# TraceX
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+TraceX es un sistema interno de gestión, auditoría y control de evidencias para operaciones de Marketing Digital. Permite a los equipos administrar un catálogo de cuentas de correo, vincular perfiles sociales a dichas cuentas, y llevar un registro detallado de evidencias (capturas de pantalla y enlaces) sobre la actividad que realiza cada colaborador en esos perfiles.
 
-## About Laravel
+## 🚀 Características Principales
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Gestión de Roles y Usuarios:** Diferentes niveles de acceso (`admin`, `cuentas`, `colaborador`, `user`), cada uno con permisos y vistas específicas.
+- **Catálogo de Cuentas de Correo:** Control total del inventario de correos electrónicos.
+- **Catálogo de Perfiles Sociales:** Vinculación de perfiles (Facebook, Instagram, LinkedIn, X, TikTok, YouTube) a las cuentas de correo.
+- **Auditoría de Evidencias:** Registro de interacciones, comentarios y likes realizados por los perfiles sociales, incluyendo control de revisiones ("sospechosas", "aprobadas", etc.).
+- **Captura Masiva por OCR (Inteligencia Artificial):** Integración con Google Cloud Vision API que permite al usuario pegar un bloque de imágenes/capturas. El sistema lee el texto, identifica automáticamente de qué perfil se trata y prepara las evidencias de manera masiva.
+- **Asignaciones Masivas:** Transferencia en bloque de cuentas y perfiles entre los gestores y colaboradores de la agencia.
+- **Exportación Profesional:** Generación de reportes detallados en formatos CSV (Excel) y PDF con soporte avanzado de filtros múltiples (fechas, estatus, red social, usuario, etc.).
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+---
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## 🛠️ Stack Tecnológico
 
-## Learning Laravel
+- **Framework Backend:** Laravel 11.x
+- **Lenguaje:** PHP 8.3+
+- **Frontend:** Livewire 3 + Alpine.js
+- **Estilos:** Tailwind CSS v3 (Compilado vía Vite)
+- **Base de Datos:** MySQL / MariaDB
+- **Generación de PDFs:** `barryvdh/laravel-dompdf`
+- **Integraciones:** Google Cloud Vision API
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## ⚙️ Requisitos Previos
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+Antes de comenzar, asegúrate de tener instalado en tu entorno local:
 
-## Agentic Development
+- PHP >= 8.3
+- Composer >= 2.x
+- Node.js >= 18.x y npm
+- Servidor de base de datos MySQL o MariaDB
+- Git
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+---
 
+## 💻 Instalación y Puesta en Marcha (Entorno Local)
+
+Sigue estos pasos para levantar el proyecto en tu máquina y comenzar a desarrollar:
+
+### 1. Clonar el repositorio
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+git clone https://github.com/rob1104/tracex.git
+cd tracex
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### 2. Instalar dependencias de PHP y Node
+```bash
+composer install
+npm install
+```
 
-## Contributing
+### 3. Configurar variables de entorno
+Copia el archivo de ejemplo para crear tu propio `.env`:
+```bash
+cp .env.example .env
+```
+Genera la clave de la aplicación:
+```bash
+php artisan key:generate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Abre tu archivo `.env` y configura tus credenciales de base de datos:
+```env
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=tracex_local
+DB_USERNAME=root
+DB_PASSWORD=
+```
 
-## Code of Conduct
+Añade tu clave de Google Cloud Vision (Requerida para la función de captura masiva por OCR):
+```env
+GOOGLE_VISION_API_KEY=tu_api_key_aqui
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 4. Ejecutar migraciones y seeders
+Esto creará las tablas necesarias y poblará la base de datos con información inicial (roles, usuarios de prueba o tipos de evidencia, según esté configurado):
+```bash
+php artisan migrate --seed
+```
 
-## Security Vulnerabilities
+### 5. Compilar assets de frontend (Tailwind)
+```bash
+npm run dev
+# (Para compilar para producción usa: npm run build)
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 6. Levantar el servidor de desarrollo local
+Abre una nueva pestaña en tu terminal y ejecuta:
+```bash
+php artisan serve
+```
+El sistema estará disponible en `http://localhost:8000`.
 
-## License
+---
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 🏗️ Flujo de Trabajo y Estructura del Código
+
+- **Livewire Components:** La mayor parte de la lógica interactiva de la aplicación reside en el directorio `app/Livewire/`. Están agrupados por módulos (ej. `Admin/Emails`, `Admin/Profiles`, `User/EvidenceCreateMultiple`).
+- **Vistas (Blade):** Las vistas correspondientes a cada componente Livewire se encuentran en `resources/views/livewire/`.
+- **Plantillas de Reportes PDF:** Todo el diseño para la exportación de PDFs está aislado en `resources/views/pdf/` (ej. `evidences.blade.php`, `emails.blade.php`). Tienen estilos CSS crudos (`<style>`) compatibles con la librería DOMPDF.
+- **Modelos y Base de Datos:** Los modelos de Eloquent (`EmailAccount`, `Profile`, `Evidence`, `EvidenceType`) se encuentran en `app/Models/`. Revisa las relaciones para entender cómo fluye la data (Un Usuario -> Múltiples Correos -> Múltiples Perfiles -> Múltiples Evidencias).
+
+### 💡 Notas importantes para el equipo de desarrollo
+- **Tailwind en Producción:** Si creas nuevos botones, alertas o elementos que usen clases de colores que no se hayan usado previamente (por ejemplo, `bg-emerald-600`), recuerda que necesitas ejecutar `npm run build` para que Vite escanee las vistas y las incluya en el CSS final, de lo contrario se verán transparentes en producción.
+- **Soporte de PHP 8.3:** El servidor de producción está bloqueado en PHP 8.3. Se ha configurado el archivo `composer.json` (`config.platform.php: 8.3.0`) para prevenir la instalación accidental de dependencias incompatibles, incluso si desarrollas localmente usando PHP 8.4.
+
+---
+
+## 🚀 Despliegue a Producción (Plesk)
+
+Para subir cambios al servidor de producción, realiza los siguientes pasos vía SSH:
+
+```bash
+# 1. Traer los últimos cambios
+git pull
+
+# 2. Instalar dependencias backend de forma segura
+/opt/plesk/php/8.3/bin/php /usr/lib64/plesk-9.0/composer.phar install --no-dev --optimize-autoloader
+
+# 3. Limpiar caché del framework
+php artisan config:clear
+php artisan view:clear
+php artisan route:clear
+
+# 4. Correr migraciones nuevas si las hay
+php artisan migrate --force
+```
