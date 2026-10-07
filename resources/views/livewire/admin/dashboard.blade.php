@@ -196,12 +196,11 @@
                                     tension: 0.4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
 
                         // Chart 2: Top Users (Bar)
-                        Chart.register(ChartDataLabels);
-                        charts.users = new Chart(document.getElementById('chartUsers'), {
+                        charts.users = new Chart(document.getElementById('chartUsers'), { plugins: [ChartDataLabels],
                             type: 'bar',
                             data: {
                                 labels: dUser.map(d => d.name),
@@ -225,7 +224,7 @@
                                     backgroundColor: ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899']
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
+                            options: { maintainAspectRatio: false }
                         });
 
                         // Chart 4: By Network (Pie)
@@ -238,7 +237,7 @@
                                     backgroundColor: ['#3b5998', '#E1306C', '#1DA1F2', '#000000', '#0077b5', '#ff0000']
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
+                            options: { maintainAspectRatio: false }
                         });
 
                         // Chart 5: Account Growth (Line)
@@ -256,11 +255,11 @@
                                     tension: 0.4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
 
                         // Chart 6: Top Account Creators (Bar)
-                        charts.topCreators = new Chart(document.getElementById('chartTopAccountCreators'), {
+                        charts.topCreators = new Chart(document.getElementById('chartTopAccountCreators'), { plugins: [ChartDataLabels],
                             type: 'bar',
                             data: {
                                 labels: dTopCreators.map(d => d.name),
@@ -275,7 +274,7 @@
                         });
 
                         // Chart 7: Accounts by Gestor (Bar)
-                        charts.accByGestor = new Chart(document.getElementById('chartAccountsByGestor'), {
+                        charts.accByGestor = new Chart(document.getElementById('chartAccountsByGestor'), { plugins: [ChartDataLabels],
                             type: 'bar',
                             data: {
                                 labels: dAccGestor.map(d => d.name),
@@ -335,6 +334,9 @@
     </script>
     @endscript
 </div>
+
+
+
 
 
 
