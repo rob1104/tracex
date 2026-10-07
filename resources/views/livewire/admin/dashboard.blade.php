@@ -159,6 +159,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js" data-navigate-once></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2" data-navigate-once></script>
     @script
     <script>
         Alpine.data('dashboardCharts', () => {
@@ -195,10 +196,11 @@
                                     tension: 0.4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
                         });
 
                         // Chart 2: Top Users (Bar)
+                        Chart.register(ChartDataLabels);
                         charts.users = new Chart(document.getElementById('chartUsers'), {
                             type: 'bar',
                             data: {
@@ -210,7 +212,7 @@
                                     borderRadius: 4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } } }
                         });
 
                         // Chart 3: By Type (Doughnut)
@@ -223,7 +225,7 @@
                                     backgroundColor: ['#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#3b82f6', '#ec4899']
                                 }]
                             },
-                            options: { maintainAspectRatio: false }
+                            options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
                         });
 
                         // Chart 4: By Network (Pie)
@@ -236,7 +238,7 @@
                                     backgroundColor: ['#3b5998', '#E1306C', '#1DA1F2', '#000000', '#0077b5', '#ff0000']
                                 }]
                             },
-                            options: { maintainAspectRatio: false }
+                            options: { maintainAspectRatio: false, plugins: { datalabels: { display: false } } }
                         });
 
                         // Chart 5: Account Growth (Line)
@@ -254,7 +256,7 @@
                                     tension: 0.4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { display: false } } }
                         });
 
                         // Chart 6: Top Account Creators (Bar)
@@ -269,7 +271,7 @@
                                     borderRadius: 4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } } }
                         });
 
                         // Chart 7: Accounts by Gestor (Bar)
@@ -284,7 +286,7 @@
                                     borderRadius: 4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } } }
                         });
                     };
 
@@ -333,3 +335,7 @@
     </script>
     @endscript
 </div>
+
+
+
+
