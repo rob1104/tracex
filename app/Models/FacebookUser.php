@@ -14,13 +14,6 @@ class FacebookUser extends Model
     use HasUuids;
 
     /**
-     * The table associated with the model.
-     *
-     * @var string
-     */
-    protected $table = 'facebook_user';
-
-    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
