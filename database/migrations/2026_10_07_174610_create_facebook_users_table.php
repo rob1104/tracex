@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('facebook_user', function (Blueprint $table) {
+        Schema::create('facebook_users', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignId('profile_id')->nullable()->constrained('profiles')->nullOnDelete();
             $table->foreignId('import_log_id')->nullable()->constrained('facebook_import_logs')->nullOnDelete();
@@ -29,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('facebook_user');
+        Schema::dropIfExists('facebook_users');
     }
 };

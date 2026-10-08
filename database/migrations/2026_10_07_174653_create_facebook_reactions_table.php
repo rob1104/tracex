@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('facebook_reactions', function (Blueprint $table) {
             $table->id();
-            $table->foreignUuid('facebook_user_id')->constrained('facebook_user')->cascadeOnDelete();
+            $table->foreignUuid('facebook_user_id')->constrained('facebook_users')->cascadeOnDelete();
             $table->foreignId('import_log_id')->nullable()->constrained('facebook_import_logs')->nullOnDelete();
             $table->string('reaction_type', 50)->index();
             $table->dateTime('published_at')->index();

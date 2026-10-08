@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::create('facebook_comments', function (Blueprint $table) {
             $table->id();
-            $table->foreignUuid('facebook_user_id')->constrained('facebook_user')->cascadeOnDelete();
+            $table->foreignUuid('facebook_user_id')->constrained('facebook_users')->cascadeOnDelete();
             $table->foreignId('import_log_id')->nullable()->constrained('facebook_import_logs')->nullOnDelete();
             $table->text('content');
             $table->unsignedInteger('character_count');
