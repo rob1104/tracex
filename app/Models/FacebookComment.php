@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -41,5 +42,10 @@ class FacebookComment extends Model
     public function importLog(): BelongsTo
     {
         return $this->belongsTo(FacebookImportLog::class, 'import_log_id');
+    }
+
+    public function scopeBetweenDates(Builder $query, \DateTimeInterface|string $from, \DateTimeInterface|string $to): Builder
+    {
+        return $query->whereBetween('published_at', [$from, $to]);
     }
 }

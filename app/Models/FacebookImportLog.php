@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -20,6 +22,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class FacebookImportLog extends Model
 {
+    use MassPrunable;
+
+    /**
+     * Get the prunable model query.
+     */
+    public function prunable(): Builder
+    {
+        return static::where('status', 'completed')
+            ->where('created_at', '<=', now()->subMonths(6));
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -50,5 +63,25 @@ class FacebookImportLog extends Model
     public function reactions(): HasMany
     {
         return $this->hasMany(FacebookReaction::class, 'import_log_id');
+    }
+
+    public function scopeCompleted(Builder $query): Builder
+    {
+        return $query->where('status', 'completed');
+    }
+
+    public function scopeFailed(Builder $query): Builder
+    {
+        return $query->where('status', 'failed');
+    }
+
+    public function scopeProcessing(Builder $query): Builder
+    {
+        return $query->where('status', 'processing');
+    }
+
+    public function scopeDownloaded(Builder $query): Builder
+    {
+        return $query->where('status', 'downloaded');
     }
 }
