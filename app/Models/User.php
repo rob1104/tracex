@@ -4,16 +4,15 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
+    protected $fillable = ['name', 'email', 'password', 'role', 'is_active'];
+    protected $hidden = ['password', 'remember_token'];
+
     /** @use HasFactory<UserFactory> */
     use HasFactory, Notifiable;
 
@@ -54,6 +53,12 @@ class User extends Authenticatable
     public function assignedProfiles()
     {
         return $this->belongsToMany(Profile::class);
+    }
+
+    /** Perfiles de usuarios monitoreados por el módulo de actividad. */
+    public function usuariosMonitoreados()
+    {
+        return $this->hasMany(Perfil::class, 'user_id');
     }
 
     public function emailAccounts()

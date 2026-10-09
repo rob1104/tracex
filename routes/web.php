@@ -34,3 +34,9 @@ Route::middleware(['auth', 'verified', 'role:admin,cuentas'])->prefix('admin')->
 });
 
 require __DIR__.'/auth.php';
+
+// TraceX: Monitoreo de usuarios (módulo integrado).
+Route::middleware(['auth', 'verified'])->prefix('monitoreo')->name('monitor.')->group(function () {
+    Route::get('/usuarios', App\Livewire\Perfiles::class)->name('usuarios.index');
+    Route::get('/usuarios/{perfil}', App\Livewire\PanelPerfil::class)->name('usuarios.show');
+});
