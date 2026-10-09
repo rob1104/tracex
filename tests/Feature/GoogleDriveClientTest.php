@@ -153,4 +153,52 @@ class GoogleDriveClientTest extends TestCase
 
         $this->assertTrue($deleted);
     }
+
+    public function test_it_verifies_file_integrity_with_valid_json(): void
+    {
+        $filePath = $this->testStorageDir.'/valid.json';
+        File::makeDirectory($this->testStorageDir, 0755, true, true);
+        $payload = json_encode(['status' => 'ok', 'count' => 42]);
+        File::put($filePath, $payload);
+
+        $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token');
+
+        $this->assertTrue($client->verifyFileIntegrity($filePath));
+        $this->assertTrue($client->verifyFileIntegrity($filePath, strlen($payload)));
+    }
+
+    public function test_it_fails_file_integrity_with_invalid_json(): void
+    {
+        $filePath = $this->testStorageDir.'/invalid.json';
+        File::makeDirectory($this->testStorageDir, 0755, true, true);
+        File::put($filePath, '{"key": "incomplete_json');
+
+        $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token');
+
+        $this->assertFalse($client->verifyFileIntegrity($filePath));
+    }
+
+    public function test_it_fails_file_integrity_with_empty_or_nonexistent_file(): void
+    {
+        $filePath = $this->testStorageDir.'/empty.json';
+        File::makeDirectory($this->testStorageDir, 0755, true, true);
+        File::put($filePath, '');
+
+        $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token');
+
+        $this->assertFalse($client->verifyFileIntegrity($filePath));
+        $this->assertFalse($client->verifyFileIntegrity($this->testStorageDir.'/non_existent.json'));
+    }
+
+    public function test_it_fails_file_integrity_when_size_mismatches(): void
+    {
+        $filePath = $this->testStorageDir.'/size_test.json';
+        File::makeDirectory($this->testStorageDir, 0755, true, true);
+        $payload = json_encode(['foo' => 'bar']);
+        File::put($filePath, $payload);
+
+        $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token');
+
+        $this->assertFalse($client->verifyFileIntegrity($filePath, strlen($payload) + 10));
+    }
 }

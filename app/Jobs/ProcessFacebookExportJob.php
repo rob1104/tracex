@@ -8,6 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class ProcessFacebookExportJob implements ShouldQueue
 {
@@ -57,11 +58,7 @@ class ProcessFacebookExportJob implements ShouldQueue
             ]);
 
             // 6. Delete local temporary files/directory to maintain minimal storage footprint
-            if (File::isDirectory($this->localPath)) {
-                File::deleteDirectory($this->localPath);
-            } elseif (File::exists($this->localPath)) {
-                File::delete($this->localPath);
-            }
+            $this->cleanLocalPath();
 
             Log::info("Finished processing and cleaned local files for export [{$this->importLogId}]");
         } catch (Exception $e) {
@@ -75,6 +72,39 @@ class ProcessFacebookExportJob implements ShouldQueue
             ]);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Handle a job failure after exhausting all attempts.
+     */
+    public function failed(?Throwable $exception): void
+    {
+        Log::critical("ProcessFacebookExportJob failed definitively for [{$this->localPath}] after maximum attempts", [
+            'import_log_id' => $this->importLogId,
+            'error' => $exception?->getMessage(),
+        ]);
+
+        $this->cleanLocalPath();
+
+        $importLog = FacebookImportLog::find($this->importLogId);
+        if ($importLog) {
+            $importLog->update([
+                'status' => 'failed',
+                'error_message' => $exception ? "Parsing failed after maximum attempts: {$exception->getMessage()}" : 'Parsing failed after maximum attempts',
+            ]);
+        }
+    }
+
+    /**
+     * Clean up local temporary files or directory.
+     */
+    protected function cleanLocalPath(): void
+    {
+        if (File::isDirectory($this->localPath)) {
+            File::deleteDirectory($this->localPath);
+        } elseif (File::exists($this->localPath)) {
+            File::delete($this->localPath);
         }
     }
 }

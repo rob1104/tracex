@@ -50,4 +50,24 @@ class ProcessFacebookExportJobTest extends TestCase
         $this->assertSame('completed', $log->status);
         $this->assertDirectoryDoesNotExist($this->testDirectory);
     }
+
+    public function test_it_cleans_temporary_directory_and_marks_failed_on_definitive_failure(): void
+    {
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'folder_test_failed',
+            'file_name' => 'meta-2026-Oct-06-failed',
+            'status' => 'processing',
+        ]);
+
+        file_put_contents($this->testDirectory.'/test.json', json_encode(['foo' => 'bar']));
+        $this->assertDirectoryExists($this->testDirectory);
+
+        $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
+        $job->failed(new \Exception('Unrecoverable parsing exception'));
+
+        $log->refresh();
+        $this->assertSame('failed', $log->status);
+        $this->assertStringContainsString('Unrecoverable parsing exception', $log->error_message);
+        $this->assertDirectoryDoesNotExist($this->testDirectory);
+    }
 }

@@ -246,6 +246,7 @@ class GoogleDriveClient
 
     /**
      * Verify that the downloaded file exists, is not empty, and contains valid JSON.
+     * Uses PHP 8.3 json_validate() to avoid allocating full in-memory AST objects and prevent Out of Memory errors.
      */
     public function verifyFileIntegrity(string $filePath, ?int $expectedBytes = null): bool
     {
@@ -263,9 +264,8 @@ class GoogleDriveClient
         }
 
         $content = File::get($filePath);
-        json_decode($content);
 
-        return json_last_error() === JSON_ERROR_NONE;
+        return json_validate($content);
     }
 
     /**

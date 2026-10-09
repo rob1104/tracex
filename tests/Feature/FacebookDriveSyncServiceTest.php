@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\DeleteDriveFileJob;
+use App\Jobs\DownloadFacebookExportJob;
 use App\Jobs\ProcessFacebookExportJob;
 use App\Models\FacebookImportLog;
 use App\Services\GoogleDrive\FacebookDriveSyncService;
@@ -38,7 +39,7 @@ class FacebookDriveSyncServiceTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_successfully_syncs_and_enforces_zero_retention(): void
+    public function test_it_successfully_syncs_by_dispatching_download_jobs_to_queue(): void
     {
         Queue::fake();
 
@@ -52,6 +53,38 @@ class FacebookDriveSyncServiceTest extends TestCase
                 ],
             ]);
 
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $metrics = $service->sync();
+
+        $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(1, $metrics['dispatched']);
+        $this->assertSame(0, $metrics['downloaded']);
+        $this->assertSame(0, $metrics['failed']);
+
+        $this->assertDatabaseHas('facebook_import_logs', [
+            'drive_file_id' => 'folder_meta_1',
+            'file_name' => 'meta-2026-Oct-06-11-05-44',
+            'status' => 'downloaded',
+        ]);
+
+        $log = FacebookImportLog::where('drive_file_id', 'folder_meta_1')->first();
+
+        Queue::assertPushed(DownloadFacebookExportJob::class, function ($job) use ($log) {
+            return $job->importLogId === $log->id;
+        });
+    }
+
+    public function test_it_successfully_downloads_folder_and_enforces_zero_retention(): void
+    {
+        Queue::fake();
+
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'folder_meta_1',
+            'file_name' => 'meta-2026-Oct-06-11-05-44',
+            'status' => 'downloaded',
+        ]);
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
         $mockClient->shouldReceive('downloadExportFolder')
             ->once()
             ->with('folder_meta_1', $this->testStorageDir.'/folder_meta_1')
@@ -66,26 +99,53 @@ class FacebookDriveSyncServiceTest extends TestCase
             ->andReturn(true);
 
         $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
-        $metrics = $service->sync();
+        $downloaded = $service->downloadFolder($log, $this->testStorageDir.'/folder_meta_1');
 
-        $this->assertSame(1, $metrics['scanned']);
-        $this->assertSame(1, $metrics['downloaded']);
-        $this->assertSame(1, $metrics['deleted_from_drive']);
-        $this->assertSame(0, $metrics['failed']);
+        $this->assertCount(2, $downloaded);
 
-        $this->assertDatabaseHas('facebook_import_logs', [
-            'drive_file_id' => 'folder_meta_1',
-            'file_name' => 'meta-2026-Oct-06-11-05-44',
-            'file_size_bytes' => 3072,
-            'status' => 'downloaded',
-        ]);
-
-        $log = FacebookImportLog::where('drive_file_id', 'folder_meta_1')->first();
+        $log->refresh();
+        $this->assertSame(3072, $log->file_size_bytes);
+        $this->assertSame('downloaded', $log->status);
         $this->assertNotNull($log->drive_deleted_at);
 
         Queue::assertPushed(ProcessFacebookExportJob::class, function ($job) use ($log) {
             return $job->importLogId === $log->id;
         });
+    }
+
+    public function test_it_can_sync_synchronously_with_flag(): void
+    {
+        Queue::fake();
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
+        $mockClient->shouldReceive('listExportFolders')
+            ->once()
+            ->andReturn([
+                [
+                    'id' => 'folder_meta_sync',
+                    'name' => 'meta-2026-Oct-06-11-05-44',
+                ],
+            ]);
+
+        $mockClient->shouldReceive('downloadExportFolder')
+            ->once()
+            ->with('folder_meta_sync', $this->testStorageDir.'/folder_meta_sync')
+            ->andReturn([
+                'comments.json' => 1024,
+            ]);
+
+        $mockClient->shouldReceive('deleteFile')
+            ->once()
+            ->with('folder_meta_sync')
+            ->andReturn(true);
+
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $metrics = $service->sync(async: false);
+
+        $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(1, $metrics['downloaded']);
+        $this->assertSame(1, $metrics['deleted_from_drive']);
+        $this->assertSame(0, $metrics['failed']);
     }
 
     public function test_it_skips_already_processed_folders_idempotently(): void
@@ -115,8 +175,8 @@ class FacebookDriveSyncServiceTest extends TestCase
         $metrics = $service->sync();
 
         $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(0, $metrics['dispatched']);
         $this->assertSame(0, $metrics['downloaded']);
-        $this->assertSame(0, $metrics['deleted_from_drive']);
         $this->assertSame(0, $metrics['failed']);
 
         Queue::assertNothingPushed();
@@ -126,16 +186,13 @@ class FacebookDriveSyncServiceTest extends TestCase
     {
         Queue::fake();
 
-        $mockClient = Mockery::mock(GoogleDriveClient::class);
-        $mockClient->shouldReceive('listExportFolders')
-            ->once()
-            ->andReturn([
-                [
-                    'id' => 'folder_retry_delete',
-                    'name' => 'meta-2026-Oct-06-11-05-44',
-                ],
-            ]);
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'folder_retry_delete',
+            'file_name' => 'meta-2026-Oct-06-11-05-44',
+            'status' => 'downloaded',
+        ]);
 
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
         $mockClient->shouldReceive('downloadExportFolder')
             ->once()
             ->andReturn(['comments.json' => 500]);
@@ -146,12 +203,9 @@ class FacebookDriveSyncServiceTest extends TestCase
             ->andThrow(new Exception('Drive API rate limited'));
 
         $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
-        $metrics = $service->sync();
+        $service->downloadFolder($log);
 
-        $this->assertSame(1, $metrics['downloaded']);
-        $this->assertSame(0, $metrics['deleted_from_drive']);
-
-        $log = FacebookImportLog::where('drive_file_id', 'folder_retry_delete')->first();
+        $log->refresh();
         $this->assertNull($log->drive_deleted_at);
         $this->assertStringContainsString('Zero-retention deletion pending retry', $log->error_message);
 
