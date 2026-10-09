@@ -37,6 +37,14 @@ return [
 
     'google' => [
         'vision_api_key' => env('GOOGLE_VISION_API_KEY'),
+        'client_id' => env('GOOGLE_CLIENT_ID'),
+        'client_secret' => env('GOOGLE_CLIENT_SECRET'),
+        'refresh_token' => env('GOOGLE_REFRESH_TOKEN'),
+        'correo_destino' => env('GOOGLE_CORREO_DESTINO'),
+    ],
+
+    'facebook' => [
+        'hmac_key' => env('FB_HMAC_KEY'),
     ],
 
 ];

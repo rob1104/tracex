@@ -40,6 +40,10 @@ new class extends Component
                         Panel Principal
                     </x-nav-link>
 
+                    <x-nav-link :href="route('monitor.usuarios.index')" :active="request()->routeIs('monitor.usuarios.*')" wire:navigate>
+                        Monitoreo de Usuarios
+                    </x-nav-link>
+
                     @if(auth()->user()->isUser())
                         <x-nav-link :href="route('evidences.create')" :active="request()->routeIs('evidences.create')" wire:navigate>
                             Registrar Evidencia

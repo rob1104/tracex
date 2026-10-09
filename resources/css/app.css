@@ -1,2 +1,10 @@
-@import "tailwindcss";
-@plugin "@tailwindcss/forms";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@theme {
+    --font-sans: Figtree, ui-sans-serif, system-ui, sans-serif;
+}
+
+@source '../../resources/views/**/*.blade.php';
+@source '../../app/**/*.php';

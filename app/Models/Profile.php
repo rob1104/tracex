@@ -2,13 +2,12 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['email_account_id', 'name', 'password', 'social_network', 'status', 'created_by'])]
 class Profile extends Model
 {
+    protected $fillable = ['email_account_id', 'name', 'password', 'social_network', 'status', 'created_by'];
     protected function casts(): array
     {
         return [
