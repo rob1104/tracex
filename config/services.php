@@ -43,6 +43,7 @@ return [
             'refresh_token' => env('GOOGLE_DRIVE_REFRESH_TOKEN'),
             'redirect_uri' => env('GOOGLE_DRIVE_REDIRECT_URI', 'https://developers.google.com/oauthplayground'),
             'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID', 'root'),
+            'schedule_frequency' => env('GOOGLE_DRIVE_SCHEDULE_FREQUENCY', 'everyFifteenMinutes'),
         ],
     ],
 
