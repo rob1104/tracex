@@ -37,6 +37,13 @@ return [
 
     'google' => [
         'vision_api_key' => env('GOOGLE_VISION_API_KEY'),
+        'drive' => [
+            'client_id' => env('GOOGLE_DRIVE_CLIENT_ID'),
+            'client_secret' => env('GOOGLE_DRIVE_CLIENT_SECRET'),
+            'refresh_token' => env('GOOGLE_DRIVE_REFRESH_TOKEN'),
+            'redirect_uri' => env('GOOGLE_DRIVE_REDIRECT_URI', 'https://developers.google.com/oauthplayground'),
+            'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID', 'root'),
+        ],
     ],
 
 ];
