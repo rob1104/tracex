@@ -17,12 +17,6 @@ class GoogleDriveProfilesSeeder extends Seeder
      */
     public function run(): void
     {
-        $admin = User::firstWhere('email', 'admin@evidencias.local')
-            ?? User::firstWhere('role', 'admin')
-            ?? User::factory()->create(['role' => 'admin']);
-
-        $defaultUser = User::firstWhere('email', 'user@evidencias.local');
-
         $driveProfiles = [
             [
                 'name' => 'Alberto Del Rio',
@@ -63,30 +57,30 @@ class GoogleDriveProfilesSeeder extends Seeder
         ];
 
         foreach ($driveProfiles as $item) {
-            // 1. Create individual collaborator User for this person
-            $user = User::firstOrCreate(
+            // 1. Create or update user with 'cuentas' role
+            $user = User::updateOrCreate(
                 ['email' => $item['login_email']],
                 [
                     'name' => $item['name'],
                     'password' => Hash::make('password'),
-                    'role' => 'user',
+                    'role' => 'cuentas',
                     'is_active' => true,
                 ]
             );
 
-            // 2. Create the EmailAccount extracted from Meta profile
-            $emailAccount = EmailAccount::firstOrCreate(
+            // 2. Create or update the EmailAccount extracted from Meta profile
+            $emailAccount = EmailAccount::updateOrCreate(
                 ['email' => $item['email']],
                 [
                     'alias' => "Correo {$item['name']}",
                     'password' => 'secret123',
                     'status' => 'active',
-                    'created_by' => $admin->id,
+                    'created_by' => $user->id,
                 ]
             );
 
-            // 3. Create the monitored Profile matching Facebook name
-            $profile = Profile::firstOrCreate(
+            // 3. Create or update the monitored Profile matching Facebook name
+            $profile = Profile::updateOrCreate(
                 [
                     'name' => $item['name'],
                     'social_network' => $item['social_network'],
@@ -95,16 +89,12 @@ class GoogleDriveProfilesSeeder extends Seeder
                     'email_account_id' => $emailAccount->id,
                     'password' => 'fbpassword123',
                     'status' => 'active',
-                    'created_by' => $admin->id,
+                    'created_by' => $user->id,
                 ]
             );
 
-            // 4. Assign profile to its collaborator User and also to default test user
-            $userIdsToAssign = [$user->id];
-            if ($defaultUser) {
-                $userIdsToAssign[] = $defaultUser->id;
-            }
-            $profile->users()->syncWithoutDetaching($userIdsToAssign);
+            // 4. Assign profile exclusively to its respective manager user
+            $profile->users()->sync([$user->id]);
         }
     }
 }
