@@ -17,6 +17,10 @@ class GoogleDriveProfilesSeeder extends Seeder
      */
     public function run(): void
     {
+        $admin = User::firstWhere('email', 'admin@evidencias.local')
+            ?? User::firstWhere('role', 'admin')
+            ?? User::factory()->create(['role' => 'admin']);
+
         $driveProfiles = [
             [
                 'name' => 'Alberto Del Rio',
@@ -57,13 +61,13 @@ class GoogleDriveProfilesSeeder extends Seeder
         ];
 
         foreach ($driveProfiles as $item) {
-            // 1. Create or update user with 'cuentas' role
+            // 1. Create or update collaborator user with 'user' role
             $user = User::updateOrCreate(
                 ['email' => $item['login_email']],
                 [
                     'name' => $item['name'],
                     'password' => Hash::make('password'),
-                    'role' => 'cuentas',
+                    'role' => 'user',
                     'is_active' => true,
                 ]
             );
@@ -75,7 +79,7 @@ class GoogleDriveProfilesSeeder extends Seeder
                     'alias' => "Correo {$item['name']}",
                     'password' => 'secret123',
                     'status' => 'active',
-                    'created_by' => $user->id,
+                    'created_by' => $admin->id,
                 ]
             );
 
@@ -90,11 +94,11 @@ class GoogleDriveProfilesSeeder extends Seeder
                     'facebook_identifier' => 'id:'.$item['fb_id'],
                     'password' => 'fbpassword123',
                     'status' => 'active',
-                    'created_by' => $user->id,
+                    'created_by' => $admin->id,
                 ]
             );
 
-            // 4. Assign profile exclusively to its respective manager user
+            // 4. Assign profile exclusively to its respective collaborator user
             $profile->users()->sync([$user->id]);
         }
     }
