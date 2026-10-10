@@ -5,9 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['user_id', 'evidence_type_id', 'profile_id', 'social_network', 'comment', 'ip_address', 'user_agent'])]
+#[Fillable(['user_id', 'evidence_type_id', 'profile_id', 'facebook_import_log_id', 'origin', 'external_published_at', 'social_network', 'comment', 'ip_address', 'user_agent'])]
 class Evidence extends Model
 {
+    protected function casts(): array
+    {
+        return [
+            'external_published_at' => 'datetime',
+        ];
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -26,5 +33,10 @@ class Evidence extends Model
     public function profile()
     {
         return $this->belongsTo(Profile::class);
+    }
+
+    public function facebookImportLog()
+    {
+        return $this->belongsTo(FacebookImportLog::class);
     }
 }

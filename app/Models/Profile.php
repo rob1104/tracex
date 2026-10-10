@@ -35,4 +35,9 @@ class Profile extends Model
     {
         return $this->hasMany(FacebookUser::class);
     }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(Evidence::class);
+    }
 }

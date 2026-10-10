@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
+    'user_id',
+    'profile_id',
     'drive_file_id',
     'file_name',
     'file_size_bytes',
@@ -48,6 +51,21 @@ class FacebookImportLog extends Model
             'total_reactions_extracted' => 'integer',
             'metadata' => 'array',
         ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function profile(): BelongsTo
+    {
+        return $this->belongsTo(Profile::class);
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(Evidence::class, 'facebook_import_log_id');
     }
 
     public function facebookUsers(): HasMany
