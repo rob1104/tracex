@@ -2,12 +2,15 @@
 
 namespace App\Jobs;
 
+use App\Models\Evidence;
+use App\Models\EvidenceType;
 use App\Models\FacebookComment;
 use App\Models\FacebookImportLog;
 use App\Models\FacebookReaction;
 use App\Models\FacebookUser;
 use App\Models\Profile;
 use App\Services\FacebookExportParser;
+use App\Services\ProfileAssignmentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
@@ -63,12 +66,28 @@ class ProcessFacebookExportJob implements ShouldQueue
                 $parser = new FacebookExportParser($this->localPath);
                 $profileDetails = $parser->perfil();
 
+                // 1. Resolve Profile and Collaborator User
+                $assignmentService = app(ProfileAssignmentService::class);
+                $resolution = $assignmentService->resolve($profileDetails);
+                $matchedProfile = $resolution['profile'];
+                $assignedUser = $resolution['user'];
+
+                // 2. Fetch EvidenceType IDs for Comentario and Reaccion
+                $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
+                    ?? EvidenceType::firstOrCreate(['name' => 'Comentario'])->id;
+
+                $reactionTypeId = EvidenceType::where('name', 'Like / Reacción')->value('id')
+                    ?? EvidenceType::where('name', 'like', '%Reacci%')->value('id')
+                    ?? EvidenceType::firstOrCreate(['name' => 'Like / Reacción'])->id;
+
+                // 3. Clear previous data for idempotency
                 $importLog->comments()->delete();
                 $importLog->reactions()->delete();
                 $importLog->facebookUsers()->delete();
+                $importLog->evidences()->delete();
 
                 $facebookUser = FacebookUser::create([
-                    'profile_id' => $this->findProfileId($profileDetails['nombre'] ?? null),
+                    'profile_id' => $matchedProfile?->id ?? $this->findProfileId($profileDetails['nombre'] ?? null),
                     'import_log_id' => $importLog->id,
                     'age_range' => null,
                     'joined_at' => null,
@@ -81,10 +100,12 @@ class ProcessFacebookExportJob implements ShouldQueue
 
                 $comments = [];
                 $reactions = [];
+                $evidences = [];
                 $commentCount = 0;
                 $reactionCount = 0;
                 $timestamp = now();
 
+                // Process Comments
                 foreach ($parser->comentarios() as $comment) {
                     $content = trim((string) ($comment['texto'] ?? ''));
                     if ($content === '') {
@@ -108,11 +129,35 @@ class ProcessFacebookExportJob implements ShouldQueue
                         'created_at' => $timestamp,
                         'updated_at' => $timestamp,
                     ];
+
+                    // Option A: Ingest into evidence table if user & profile resolved
+                    if ($assignedUser && $matchedProfile) {
+                        $evidences[] = [
+                            'user_id' => $assignedUser->id,
+                            'profile_id' => $matchedProfile->id,
+                            'evidence_type_id' => $commentTypeId,
+                            'facebook_import_log_id' => $importLog->id,
+                            'origin' => 'google_drive',
+                            'social_network' => 'Facebook',
+                            'comment' => ! empty($comment['contexto']) ? "{$comment['contexto']}: {$content}" : $content,
+                            'external_published_at' => $comment['fecha'],
+                            'ip_address' => null,
+                            'user_agent' => 'Google Drive Sync',
+                            'created_at' => $comment['fecha'],
+                            'updated_at' => $timestamp,
+                        ];
+                    }
+
                     $commentCount++;
 
                     if (count($comments) === 500) {
                         FacebookComment::insert($comments);
                         $comments = [];
+                    }
+
+                    if (count($evidences) === 500) {
+                        Evidence::insert($evidences);
+                        $evidences = [];
                     }
                 }
 
@@ -120,6 +165,7 @@ class ProcessFacebookExportJob implements ShouldQueue
                     FacebookComment::insert($comments);
                 }
 
+                // Process Reactions
                 foreach ($parser->reacciones() as $reaction) {
                     $type = trim((string) ($reaction['tipo'] ?? ''));
                     if ($type === '') {
@@ -137,11 +183,35 @@ class ProcessFacebookExportJob implements ShouldQueue
                         'created_at' => $timestamp,
                         'updated_at' => $timestamp,
                     ];
+
+                    // Option A: Ingest into evidence table if user & profile resolved
+                    if ($assignedUser && $matchedProfile) {
+                        $evidences[] = [
+                            'user_id' => $assignedUser->id,
+                            'profile_id' => $matchedProfile->id,
+                            'evidence_type_id' => $reactionTypeId,
+                            'facebook_import_log_id' => $importLog->id,
+                            'origin' => 'google_drive',
+                            'social_network' => 'Facebook',
+                            'comment' => "Reacción [{$type}]".(! empty($reaction['objetivo']) ? " en: {$reaction['objetivo']}" : ''),
+                            'external_published_at' => $reaction['fecha'],
+                            'ip_address' => null,
+                            'user_agent' => 'Google Drive Sync',
+                            'created_at' => $reaction['fecha'],
+                            'updated_at' => $timestamp,
+                        ];
+                    }
+
                     $reactionCount++;
 
                     if (count($reactions) === 500) {
                         FacebookReaction::insert($reactions);
                         $reactions = [];
+                    }
+
+                    if (count($evidences) === 500) {
+                        Evidence::insert($evidences);
+                        $evidences = [];
                     }
                 }
 
@@ -149,7 +219,13 @@ class ProcessFacebookExportJob implements ShouldQueue
                     FacebookReaction::insert($reactions);
                 }
 
+                if ($evidences !== []) {
+                    Evidence::insert($evidences);
+                }
+
                 $importLog->update([
+                    'profile_id' => $matchedProfile?->id,
+                    'user_id' => $assignedUser?->id,
                     'total_comments_extracted' => $commentCount,
                     'total_reactions_extracted' => $reactionCount,
                     'status' => 'completed',
