@@ -303,11 +303,11 @@
 
     <!-- Modal Form CRUD -->
     @if($showModal)
-        <div x-data x-init="setTimeout(() => $refs.firstInput.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div x-data x-init="setTimeout(() => $refs.firstInput?.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="save">
                         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
                             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
@@ -319,28 +319,19 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <!-- Alpine Searchable Dropdown for Email Account -->
+                            @php
+                                $initialSelectedEmailText = 'Seleccione una cuenta...';
+                                if ($email_account_id) {
+                                    $selectedEmailModel = $emails->firstWhere('id', (int) $email_account_id) ?? \App\Models\EmailAccount::find($email_account_id);
+                                    if ($selectedEmailModel) {
+                                        $initialSelectedEmailText = $selectedEmailModel->email . ($selectedEmailModel->alias ? ' (' . $selectedEmailModel->alias . ')' : '');
+                                    }
+                                }
+                            @endphp
                             <div x-data="{
                                     search: '',
                                     open: false,
-                                    selectedText: 'Seleccione una cuenta...',
-
-                                    init() {
-                                        this.updateSelectedText();
-                                        $watch('$wire.email_account_id', () => {
-                                            this.updateSelectedText();
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.email_account_id) {
-                                            this.selectedText = 'Seleccione una cuenta...';
-                                            return;
-                                        }
-                                        let selectedOpt = this.$refs.accountsList.querySelector(`li[data-id='${$wire.email_account_id}']`);
-                                        if (selectedOpt) {
-                                            this.selectedText = selectedOpt.getAttribute('data-text');
-                                        }
-                                    },
+                                    selectedText: @js($initialSelectedEmailText),
 
                                     selectAccount(id, text) {
                                         $wire.set('email_account_id', id);
@@ -354,7 +345,7 @@
                                 <x-input-label value="Cuenta de Correo Asociada" />
 
                                 <button type="button" @click="open = !open" class="mt-1 relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                    <span class="block truncate" x-text="selectedText">Seleccione una cuenta...</span>
+                                    <span class="block truncate" x-text="selectedText">{{ $initialSelectedEmailText }}</span>
                                     <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                         <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -366,8 +357,8 @@
                                     <div class="px-2 pb-2 sticky top-0 bg-white pt-2">
                                         <input type="text" x-model="search" placeholder="Buscar por correo o alias..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
                                     </div>
-                                    <ul x-ref="accountsList" class="max-h-48 overflow-y-auto">
-                                        <li @click="$wire.set('email_account_id', ''); selectedText = 'Seleccione una cuenta...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
+                                    <ul class="max-h-48 overflow-y-auto">
+                                        <li @click="selectAccount('', 'Seleccione una cuenta...')" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
                                             <span class="block font-normal truncate">-- Seleccione --</span>
                                         </li>
                                         @foreach($emails as $email)
@@ -640,28 +631,19 @@
                             <x-input-label value="Seleccione o busque un colaborador" />
                             
                             <!-- Alpine Searchable Dropdown for Colaborador -->
+                            @php
+                                $initialSelectedColabText = 'Seleccione un colaborador...';
+                                if ($selectedColabViewId) {
+                                    $selectedColabModel = $usersList->firstWhere('id', (int) $selectedColabViewId) ?? \App\Models\User::find($selectedColabViewId);
+                                    if ($selectedColabModel) {
+                                        $initialSelectedColabText = $selectedColabModel->name;
+                                    }
+                                }
+                            @endphp
                             <div x-data="{
                                     search: '',
                                     open: false,
-                                    selectedText: 'Seleccione un colaborador...',
-
-                                    init() {
-                                        this.updateSelectedText();
-                                        $watch('$wire.selectedColabViewId', () => {
-                                            this.updateSelectedText();
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.selectedColabViewId) {
-                                            this.selectedText = 'Seleccione un colaborador...';
-                                            return;
-                                        }
-                                        let item = this.$refs.colabsList.querySelector(`li[data-id='${$wire.selectedColabViewId}']`);
-                                        if (item) {
-                                            this.selectedText = item.getAttribute('data-text');
-                                        }
-                                    },
+                                    selectedText: @js($initialSelectedColabText),
 
                                     selectColab(id, text) {
                                         $wire.set('selectedColabViewId', id);
@@ -674,7 +656,7 @@
                                 @click.outside="open = false">
                                 
                                 <button type="button" @click="open = !open" class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
-                                    <span class="block truncate" x-text="selectedText"></span>
+                                    <span class="block truncate" x-text="selectedText">{{ $initialSelectedColabText }}</span>
                                     <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                         <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                             <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />

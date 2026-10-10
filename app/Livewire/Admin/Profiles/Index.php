@@ -99,7 +99,12 @@ class Index extends Component
             })->with('emailAccount')->orderBy('name', 'asc');
 
             if (auth()->user()->isCuentas()) {
-                $query->where('created_by', auth()->id());
+                $query->where(function ($q) {
+                    $q->where('created_by', auth()->id())
+                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                });
             }
 
             $this->viewingColabProfiles = $query->get();
@@ -122,7 +127,12 @@ class Index extends Component
             })->orderBy('name', 'asc');
 
             if (auth()->user()->isCuentas()) {
-                $query->where('created_by', auth()->id());
+                $query->where(function ($q) {
+                    $q->where('created_by', auth()->id())
+                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                });
             }
 
             $this->sourceProfiles = $query->get();
@@ -163,7 +173,7 @@ class Index extends Component
         foreach ($this->selectedProfiles as $profileId) {
             $profile = Profile::find($profileId);
             if ($profile) {
-                if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+                if (! $this->canManageProfile($profile)) {
                     continue;
                 }
                 $profile->users()->detach($this->sourceColabId);
@@ -196,7 +206,7 @@ class Index extends Component
     {
         $profile = Profile::findOrFail($id);
 
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
 
@@ -254,19 +264,22 @@ class Index extends Component
 
         if (auth()->user()->isAdmin()) {
             $data['created_by'] = $this->created_by;
-        } else {
+        } elseif (! $this->profileId) {
             $data['created_by'] = auth()->id();
         }
 
         if ($this->profileId) {
             $profile = Profile::find($this->profileId);
-            if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+            if (! $this->canManageProfile($profile)) {
                 abort(403);
             }
             $profile->update($data);
             session()->flash('status', 'Perfil actualizado correctamente.');
         } else {
-            Profile::create($data);
+            $newProfile = Profile::create($data);
+            if (auth()->user()->isCuentas()) {
+                $newProfile->users()->syncWithoutDetaching([auth()->id()]);
+            }
             session()->flash('status', 'Perfil creado correctamente.');
         }
 
@@ -276,7 +289,7 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
         $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
@@ -286,7 +299,7 @@ class Index extends Component
     public function revealPassword($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
         $this->revealedPassword = $profile->password;
@@ -297,7 +310,7 @@ class Index extends Component
     public function openAssignModal($id)
     {
         $this->assignProfile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) {
+        if (! $this->canManageProfile($this->assignProfile)) {
             abort(403);
         }
         $this->assignedUsers = $this->assignProfile->users()->pluck('users.id')->toArray();
@@ -307,7 +320,7 @@ class Index extends Component
     public function saveAssignments()
     {
         if ($this->assignProfile) {
-            if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id()) {
+            if (! $this->canManageProfile($this->assignProfile)) {
                 abort(403);
             }
             $this->assignProfile->users()->sync($this->assignedUsers);
@@ -352,7 +365,7 @@ class Index extends Component
             : '';
         $this->claimUserId = $importLog->user_id && User::query()
             ->whereKey($importLog->user_id)
-            ->where('role', 'user')
+            ->whereIn('role', ['user', 'cuentas'])
             ->where('is_active', true)
             ->exists()
             ? (string) $importLog->user_id
@@ -374,7 +387,7 @@ class Index extends Component
         $profile = $this->facebookProfilesQuery()->findOrFail($this->claimProfileId);
         $user = User::query()
             ->whereKey($this->claimUserId)
-            ->where('role', 'user')
+            ->whereIn('role', ['user', 'cuentas'])
             ->where('is_active', true)
             ->firstOrFail();
 
@@ -383,6 +396,27 @@ class Index extends Component
         $this->reset(['showClaimImportModal', 'claimImportId', 'claimProfileId', 'claimUserId']);
         $this->resetPage('pendingImportsPage');
         session()->flash('status', "Carga asignada correctamente. Se generaron {$evidenceCount} evidencias.");
+    }
+
+    private function canManageProfile(Profile $profile): bool
+    {
+        if (! auth()->user()->isCuentas()) {
+            return true;
+        }
+
+        if ($profile->created_by === auth()->id()) {
+            return true;
+        }
+
+        if ($profile->users()->where('users.id', auth()->id())->exists()) {
+            return true;
+        }
+
+        if ($profile->created_by === null) {
+            return true;
+        }
+
+        return (bool) ($profile->creator && $profile->creator->isAdmin());
     }
 
     private function authorizeImportManagement(): void
@@ -397,7 +431,12 @@ class Index extends Component
             ->orderBy('name');
 
         if (auth()->user()->isCuentas()) {
-            $query->where('created_by', auth()->id());
+            $query->where(function ($q) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
         }
 
         return $query;
@@ -411,7 +450,12 @@ class Index extends Component
             $query->where(function ($pendingQuery) {
                 $pendingQuery->whereNull('profile_id')
                     ->orWhereHas('profile', function ($profileQuery) {
-                        $profileQuery->where('created_by', auth()->id());
+                        $profileQuery->where(function ($q) {
+                            $q->where('created_by', auth()->id())
+                                ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                                ->orWhereNull('created_by')
+                                ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                        });
                     });
             });
         }
@@ -424,7 +468,12 @@ class Index extends Component
         $query = Profile::with(['emailAccount', 'users', 'creator']);
 
         if (auth()->user()->isCuentas()) {
-            $query->where('created_by', auth()->id());
+            $query->where(function ($q) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
         } elseif ($this->filter_gestor) {
             $query->where('created_by', $this->filter_gestor);
         }
@@ -519,15 +568,41 @@ class Index extends Component
 
     public function render()
     {
-        $emailQuery = EmailAccount::where('status', 'active');
+        $emailQuery = EmailAccount::query();
+
         if (auth()->user()->isCuentas()) {
-            $emailQuery->where('created_by', auth()->id());
+            $gestorId = auth()->id();
+            $emailQuery->where(function ($q) use ($gestorId) {
+                $q->where('created_by', $gestorId)
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', function ($cq) {
+                        $cq->where('role', 'admin');
+                    });
+            });
+
+            if ((clone $emailQuery)->where('status', 'active')->count() === 0) {
+                $emailQuery = EmailAccount::query();
+            }
+        }
+
+        if ($this->email_account_id) {
+            $emailQuery->where(function ($q) {
+                $q->where('status', 'active')
+                    ->orWhere('id', $this->email_account_id);
+            });
+        } else {
+            $emailQuery->where('status', 'active');
         }
 
         // Available networks for filter
         $networksQuery = Profile::select('social_network')->distinct();
         if (auth()->user()->isCuentas()) {
-            $networksQuery->where('created_by', auth()->id());
+            $networksQuery->where(function ($q) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
         }
 
         $pendingImportsQuery = $this->pendingImportsQuery()
@@ -580,7 +655,7 @@ class Index extends Component
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
             'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
-            'usersList' => User::where('is_active', true)->where('role', 'user')->orderBy('name')->get(),
+            'usersList' => User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }

@@ -3,7 +3,10 @@
 namespace Tests\Feature;
 
 use App\Jobs\ProcessFacebookExportJob;
+use App\Models\EmailAccount;
 use App\Models\FacebookImportLog;
+use App\Models\Profile;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Tests\TestCase;
@@ -52,6 +55,52 @@ class ProcessFacebookExportJobTest extends TestCase
             ],
         ], JSON_THROW_ON_ERROR));
         $this->assertDirectoryExists($this->testDirectory);
+
+        $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
+        $job->handle();
+
+        $log->refresh();
+        $this->assertSame('pending_assignment', $log->status);
+        $this->assertDirectoryDoesNotExist($this->testDirectory);
+    }
+
+    public function test_it_completes_when_profile_and_user_match(): void
+    {
+        $user = User::factory()->create(['role' => 'user', 'name' => 'Ana Garcia']);
+        $email = EmailAccount::create([
+            'email' => 'ana@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+        $profile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Ana Garcia',
+            'social_network' => 'facebook',
+            'status' => 'active',
+        ]);
+        $profile->users()->attach($user->id);
+
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'folder_test_match',
+            'file_name' => 'meta-2026-Oct-06-11-05-44',
+            'status' => 'downloaded',
+        ]);
+
+        file_put_contents($this->testDirectory.'/profile_information.json', json_encode([
+            'profile_v2' => ['name' => ['full_name' => 'Ana Garcia']],
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/comments.json', json_encode([
+            [
+                'timestamp' => 1791500000,
+                'data' => [
+                    ['comment' => [
+                        'comment' => 'Comentario de prueba',
+                        'timestamp' => 1791500000,
+                    ]],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR));
 
         $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
         $job->handle();

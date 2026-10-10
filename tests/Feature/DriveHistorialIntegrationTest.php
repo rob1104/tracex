@@ -224,7 +224,7 @@ class DriveHistorialIntegrationTest extends TestCase
         $log = FacebookImportLog::create([
             'drive_file_id' => 'folder_unassigned_999',
             'file_name' => 'meta-sin-perfil',
-            'status' => 'completed',
+            'status' => 'pending_assignment',
             'profile_id' => null,
             'user_id' => null,
         ]);

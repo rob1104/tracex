@@ -154,7 +154,7 @@ class ProfileAssignmentServiceTest extends TestCase
         $log = FacebookImportLog::create([
             'drive_file_id' => 'folder_claim_123',
             'file_name' => 'meta-claim',
-            'status' => 'completed',
+            'status' => 'pending_assignment',
         ]);
 
         $fbUser = FacebookUser::create([

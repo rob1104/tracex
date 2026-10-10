@@ -5,6 +5,7 @@ namespace App\Livewire\Admin\Emails;
 use App\Models\EmailAccount;
 use App\Models\Profile;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -52,7 +53,11 @@ class Index extends Component
 
     public $selectedAccounts = [];
 
-    public function updatedSourceGestorId($value) { if (auth()->user()->isCuentas() && $value != auth()->id()) { return; }
+    public function updatedSourceGestorId($value)
+    {
+        if (auth()->user()->isCuentas() && $value != auth()->id()) {
+            return;
+        }
         if ($value) {
             $this->sourceAccounts = EmailAccount::where('created_by', $value)->orderBy('email', 'asc')->get();
             $this->selectedAccounts = $this->sourceAccounts->pluck('id')->toArray();
@@ -77,7 +82,11 @@ class Index extends Component
         $this->showMassAssignModal = true;
     }
 
-    public function executeMassAssignment() { if (auth()->user()->isCuentas() && $this->sourceGestorId != auth()->id()) { abort(403); }
+    public function executeMassAssignment()
+    {
+        if (auth()->user()->isCuentas() && $this->sourceGestorId != auth()->id()) {
+            abort(403);
+        }
         $this->validate([
             'sourceGestorId' => 'required|exists:users,id',
             'destinationGestorId' => 'required|exists:users,id|different:sourceGestorId',
@@ -102,12 +111,28 @@ class Index extends Component
         $this->showModal = true;
     }
 
+    private function canManageEmail(EmailAccount $account): bool
+    {
+        if (! auth()->user()->isCuentas()) {
+            return true;
+        }
+
+        if ($account->created_by === auth()->id()) {
+            return true;
+        }
+
+        if ($account->created_by === null) {
+            return true;
+        }
+
+        return (bool) ($account->creator && $account->creator->isAdmin());
+    }
+
     public function edit($id)
     {
         $account = EmailAccount::findOrFail($id);
 
-        // Cuentas user can only edit their own
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+        if (! $this->canManageEmail($account)) {
             abort(403);
         }
 
@@ -150,8 +175,7 @@ class Index extends Component
 
         if ($this->emailId) {
             $account = EmailAccount::find($this->emailId);
-            // extra check
-            if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+            if (! $this->canManageEmail($account)) {
                 abort(403);
             }
             $account->update($data);
@@ -167,7 +191,7 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $account = EmailAccount::findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+        if (! $this->canManageEmail($account)) {
             abort(403);
         }
         $account->status = $account->status === 'active' ? 'suspended' : 'active';
@@ -177,7 +201,7 @@ class Index extends Component
     public function revealPassword($id)
     {
         $account = EmailAccount::findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+        if (! $this->canManageEmail($account)) {
             abort(403);
         }
         $this->revealedPassword = $account->password; // Decrypted string
@@ -191,7 +215,7 @@ class Index extends Component
     public function viewProfiles($id)
     {
         $account = EmailAccount::with('profiles')->findOrFail($id);
-        if (auth()->user()->isCuentas() && $account->created_by !== auth()->id()) {
+        if (! $this->canManageEmail($account)) {
             abort(403);
         }
         $this->selectedAccountForProfiles = $account;
@@ -203,7 +227,9 @@ class Index extends Component
     public $gestorFilter = '';
 
     public $profilesFilter = '';
+
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
 
     public function updatingStatusFilter()
@@ -216,16 +242,31 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingProfilesFilter() { $this->resetPage(); }
-    public function updatingFilterDateFrom() { $this->resetPage(); }
-    public function updatingFilterDateTo() { $this->resetPage(); }
+    public function updatingProfilesFilter()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterDateFrom()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterDateTo()
+    {
+        $this->resetPage();
+    }
 
     public function buildQuery()
     {
         $query = EmailAccount::with(['creator', 'profiles']);
 
         if (auth()->user()->isCuentas()) {
-            $query->where('created_by', auth()->id());
+            $query->where(function ($q) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
         } elseif ($this->gestorFilter) {
             $query->where('created_by', $this->gestorFilter);
         }
@@ -236,7 +277,9 @@ class Index extends Component
 
         if ($this->profilesFilter === 'with') {
             $query->has('profiles');
-        } elseif ($this->profilesFilter === 'without') { $query->doesntHave('profiles'); }
+        } elseif ($this->profilesFilter === 'without') {
+            $query->doesntHave('profiles');
+        }
 
         if ($this->filterDateFrom) {
             $query->whereDate('created_at', '>=', $this->filterDateFrom);
@@ -296,7 +339,7 @@ class Index extends Component
             $filters['gestor'] = $gestor ? $gestor->name : null;
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.emails', [
+        $pdf = Pdf::loadView('pdf.emails', [
             'accounts' => $accounts,
             'filters' => $filters,
             'generator' => auth()->user(),
@@ -315,6 +358,3 @@ class Index extends Component
         ])->layout('layouts.app');
     }
 }
-
-
-

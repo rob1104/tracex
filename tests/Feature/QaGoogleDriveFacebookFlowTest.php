@@ -10,6 +10,7 @@ use App\Models\FacebookImportLog;
 use App\Models\FacebookReaction;
 use App\Models\FacebookUser;
 use App\Models\Profile;
+use App\Models\User;
 use App\Services\GoogleDrive\FacebookDriveSyncService;
 use App\Services\GoogleDrive\GoogleDriveClient;
 use Exception;
@@ -57,12 +58,14 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
             'status' => 'active',
         ]);
 
+        $user = User::factory()->create(['name' => 'Carlos Mendoza User', 'role' => 'user']);
         $profile = Profile::create([
             'email_account_id' => $email->id,
             'name' => 'Carlos Mendoza',
             'social_network' => 'facebook',
             'status' => 'active',
         ]);
+        $profile->users()->attach($user->id);
 
         $folderId = 'drive_meta_folder_001';
         $folderName = 'meta-2026-Oct-10-11-00-00';
@@ -383,7 +386,7 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
         $job->handle();
 
         $log->refresh();
-        $this->assertSame('completed', $log->status);
+        $this->assertSame('pending_assignment', $log->status);
         $this->assertSame(550, $log->total_comments_extracted);
         $this->assertSame(550, $log->total_reactions_extracted);
         $this->assertCount(550, FacebookComment::where('import_log_id', $log->id)->get());
