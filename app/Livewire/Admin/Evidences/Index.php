@@ -17,6 +17,8 @@ class Index extends Component
 
     public $filterType = '';
 
+    public $filterOrigin = '';
+
     public $filterDateFrom = '';
 
     public $filterDateTo = '';
@@ -110,6 +112,10 @@ class Index extends Component
 
         if ($this->filterType) {
             $query->where('evidence_type_id', $this->filterType);
+        }
+
+        if ($this->filterOrigin) {
+            $query->where('origin', $this->filterOrigin);
         }
 
         if ($this->filterDateFrom) {

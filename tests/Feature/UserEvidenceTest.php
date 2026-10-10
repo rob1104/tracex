@@ -75,4 +75,34 @@ class UserEvidenceTest extends TestCase
             ->test(EvidenceList::class)
             ->assertSee('Facebook');
     }
+
+    public function test_user_can_filter_evidences_by_origin_and_see_drive_badge()
+    {
+        Evidence::create([
+            'user_id' => $this->user->id,
+            'evidence_type_id' => $this->type->id,
+            'social_network' => 'Facebook',
+            'origin' => 'manual',
+            'comment' => 'Evidencia manual creada',
+        ]);
+
+        Evidence::create([
+            'user_id' => $this->user->id,
+            'evidence_type_id' => $this->type->id,
+            'social_network' => 'Facebook',
+            'origin' => 'google_drive',
+            'comment' => 'Evidencia sincronizada desde Google Drive',
+        ]);
+
+        Livewire::actingAs($this->user)
+            ->test(EvidenceList::class)
+            ->assertSee('Drive')
+            ->assertSee('Manual')
+            ->set('filterOrigin', 'google_drive')
+            ->assertSee('Evidencia sincronizada desde Google Drive')
+            ->assertDontSee('Evidencia manual creada')
+            ->set('filterOrigin', 'manual')
+            ->assertSee('Evidencia manual creada')
+            ->assertDontSee('Evidencia sincronizada desde Google Drive');
+    }
 }

@@ -14,6 +14,8 @@ class EvidenceList extends Component
 
     public $filterType = '';
 
+    public $filterOrigin = '';
+
     public $filterDateFrom = '';
 
     public $filterDateTo = '';
@@ -25,7 +27,7 @@ class EvidenceList extends Component
 
     public function clearFilters()
     {
-        $this->reset(['filterType', 'filterDateFrom', 'filterDateTo']);
+        $this->reset(['filterType', 'filterOrigin', 'filterDateFrom', 'filterDateTo']);
         $this->resetPage();
     }
 
@@ -45,6 +47,10 @@ class EvidenceList extends Component
 
         if ($this->filterType) {
             $query->where('evidence_type_id', $this->filterType);
+        }
+
+        if ($this->filterOrigin) {
+            $query->where('origin', $this->filterOrigin);
         }
 
         if ($this->filterDateFrom) {

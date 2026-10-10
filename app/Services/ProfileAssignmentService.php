@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\Evidence;
+use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
@@ -62,5 +64,86 @@ class ProfileAssignmentService
             'profile_id' => $profile->id,
             'user_id' => $user->id,
         ]);
+    }
+
+    /**
+     * Bind a pending import log to a profile and user, and generate Evidence rows from its comments and reactions.
+     *
+     * @return int Number of generated Evidence rows.
+     */
+    public function claimPendingImport(FacebookImportLog $importLog, Profile $profile, User $user): int
+    {
+        $this->assignImportLog($importLog, $profile, $user);
+
+        // Fetch EvidenceType IDs
+        $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
+            ?? EvidenceType::firstOrCreate(['name' => 'Comentario'])->id;
+
+        $reactionTypeId = EvidenceType::where('name', 'Like / Reacción')->value('id')
+            ?? EvidenceType::where('name', 'like', '%Reacci%')->value('id')
+            ?? EvidenceType::firstOrCreate(['name' => 'Like / Reacción'])->id;
+
+        $importLog->evidences()->delete();
+
+        $evidences = [];
+        $count = 0;
+        $timestamp = now();
+
+        foreach ($importLog->comments as $comment) {
+            $context = null;
+            if (is_array($comment->metadata) && ! empty($comment->metadata['context'])) {
+                $context = $comment->metadata['context'];
+            }
+
+            $evidences[] = [
+                'user_id' => $user->id,
+                'profile_id' => $profile->id,
+                'evidence_type_id' => $commentTypeId,
+                'facebook_import_log_id' => $importLog->id,
+                'origin' => 'google_drive',
+                'social_network' => 'Facebook',
+                'comment' => $context ? "{$context}: {$comment->content}" : $comment->content,
+                'external_published_at' => $comment->published_at,
+                'ip_address' => null,
+                'user_agent' => 'Google Drive Sync Manual Claim',
+                'created_at' => $comment->published_at ?? $timestamp,
+                'updated_at' => $timestamp,
+            ];
+            $count++;
+
+            if (count($evidences) === 500) {
+                Evidence::insert($evidences);
+                $evidences = [];
+            }
+        }
+
+        foreach ($importLog->reactions as $reaction) {
+            $evidences[] = [
+                'user_id' => $user->id,
+                'profile_id' => $profile->id,
+                'evidence_type_id' => $reactionTypeId,
+                'facebook_import_log_id' => $importLog->id,
+                'origin' => 'google_drive',
+                'social_network' => 'Facebook',
+                'comment' => "Reacción [{$reaction->reaction_type}]".($reaction->title ? " en: {$reaction->title}" : ''),
+                'external_published_at' => $reaction->published_at,
+                'ip_address' => null,
+                'user_agent' => 'Google Drive Sync Manual Claim',
+                'created_at' => $reaction->published_at ?? $timestamp,
+                'updated_at' => $timestamp,
+            ];
+            $count++;
+
+            if (count($evidences) === 500) {
+                Evidence::insert($evidences);
+                $evidences = [];
+            }
+        }
+
+        if ($evidences !== []) {
+            Evidence::insert($evidences);
+        }
+
+        return $count;
     }
 }
