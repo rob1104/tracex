@@ -257,11 +257,11 @@
 
     <!-- Modal Form CRUD -->
     @if($showModal)
-        <div x-data x-init="setTimeout(() => $refs.firstInput.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div x-data x-init="setTimeout(() => $refs.firstInput?.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="save">
                         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
                             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
@@ -287,34 +287,6 @@
                                     open: false,
                                     selectedText: @js($initialSelectedEmailText),
 
-                                    init() {
-                                        this.$nextTick(() => {
-                                            this.updateSelectedText();
-                                        });
-                                        $watch('$wire.email_account_id', () => {
-                                            this.$nextTick(() => {
-                                                this.updateSelectedText();
-                                            });
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.email_account_id) {
-                                            this.selectedText = 'Seleccione una cuenta...';
-                                            return;
-                                        }
-                                        if (!this.$refs.accountsList) {
-                                            this.$nextTick(() => {
-                                                this.updateSelectedText();
-                                            });
-                                            return;
-                                        }
-                                        let selectedOpt = this.$refs.accountsList.querySelector(`li[data-id='${$wire.email_account_id}']`);
-                                        if (selectedOpt) {
-                                            this.selectedText = selectedOpt.getAttribute('data-text');
-                                        }
-                                    },
-
                                     selectAccount(id, text) {
                                         $wire.set('email_account_id', id);
                                         this.selectedText = text;
@@ -339,8 +311,8 @@
                                     <div class="px-2 pb-2 sticky top-0 bg-white pt-2">
                                         <input type="text" x-model="search" placeholder="Buscar por correo o alias..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
                                     </div>
-                                    <ul x-ref="accountsList" class="max-h-48 overflow-y-auto">
-                                        <li @click="$wire.set('email_account_id', ''); selectedText = 'Seleccione una cuenta...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
+                                    <ul class="max-h-48 overflow-y-auto">
+                                        <li @click="selectAccount('', 'Seleccione una cuenta...')" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
                                             <span class="block font-normal truncate">-- Seleccione --</span>
                                         </li>
                                         @foreach($emails as $email)
@@ -626,34 +598,6 @@
                                     search: '',
                                     open: false,
                                     selectedText: @js($initialSelectedColabText),
-
-                                    init() {
-                                        this.$nextTick(() => {
-                                            this.updateSelectedText();
-                                        });
-                                        $watch('$wire.selectedColabViewId', () => {
-                                            this.$nextTick(() => {
-                                                this.updateSelectedText();
-                                            });
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.selectedColabViewId) {
-                                            this.selectedText = 'Seleccione un colaborador...';
-                                            return;
-                                        }
-                                        if (!this.$refs.colabsList) {
-                                            this.$nextTick(() => {
-                                                this.updateSelectedText();
-                                            });
-                                            return;
-                                        }
-                                        let item = this.$refs.colabsList.querySelector(`li[data-id='${$wire.selectedColabViewId}']`);
-                                        if (item) {
-                                            this.selectedText = item.getAttribute('data-text');
-                                        }
-                                    },
 
                                     selectColab(id, text) {
                                         $wire.set('selectedColabViewId', id);

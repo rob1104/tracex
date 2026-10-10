@@ -101,7 +101,9 @@ class Index extends Component
             if (auth()->user()->isCuentas()) {
                 $query->where(function ($q) {
                     $q->where('created_by', auth()->id())
-                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
                 });
             }
 
@@ -127,7 +129,9 @@ class Index extends Component
             if (auth()->user()->isCuentas()) {
                 $query->where(function ($q) {
                     $q->where('created_by', auth()->id())
-                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
                 });
             }
 
@@ -169,7 +173,7 @@ class Index extends Component
         foreach ($this->selectedProfiles as $profileId) {
             $profile = Profile::find($profileId);
             if ($profile) {
-                if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id() && ! $profile->users()->where('users.id', auth()->id())->exists()) {
+                if (! $this->canManageProfile($profile)) {
                     continue;
                 }
                 $profile->users()->detach($this->sourceColabId);
@@ -202,7 +206,7 @@ class Index extends Component
     {
         $profile = Profile::findOrFail($id);
 
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id() && ! $profile->users()->where('users.id', auth()->id())->exists()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
 
@@ -266,7 +270,7 @@ class Index extends Component
 
         if ($this->profileId) {
             $profile = Profile::find($this->profileId);
-            if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id() && ! $profile->users()->where('users.id', auth()->id())->exists()) {
+            if (! $this->canManageProfile($profile)) {
                 abort(403);
             }
             $profile->update($data);
@@ -285,7 +289,7 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id() && ! $profile->users()->where('users.id', auth()->id())->exists()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
         $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
@@ -295,7 +299,7 @@ class Index extends Component
     public function revealPassword($id)
     {
         $profile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $profile->created_by !== auth()->id() && ! $profile->users()->where('users.id', auth()->id())->exists()) {
+        if (! $this->canManageProfile($profile)) {
             abort(403);
         }
         $this->revealedPassword = $profile->password;
@@ -306,7 +310,7 @@ class Index extends Component
     public function openAssignModal($id)
     {
         $this->assignProfile = Profile::findOrFail($id);
-        if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id() && ! $this->assignProfile->users()->where('users.id', auth()->id())->exists()) {
+        if (! $this->canManageProfile($this->assignProfile)) {
             abort(403);
         }
         $this->assignedUsers = $this->assignProfile->users()->pluck('users.id')->toArray();
@@ -316,7 +320,7 @@ class Index extends Component
     public function saveAssignments()
     {
         if ($this->assignProfile) {
-            if (auth()->user()->isCuentas() && $this->assignProfile->created_by !== auth()->id() && ! $this->assignProfile->users()->where('users.id', auth()->id())->exists()) {
+            if (! $this->canManageProfile($this->assignProfile)) {
                 abort(403);
             }
             $this->assignProfile->users()->sync($this->assignedUsers);
@@ -394,6 +398,27 @@ class Index extends Component
         session()->flash('status', "Carga asignada correctamente. Se generaron {$evidenceCount} evidencias.");
     }
 
+    private function canManageProfile(Profile $profile): bool
+    {
+        if (! auth()->user()->isCuentas()) {
+            return true;
+        }
+
+        if ($profile->created_by === auth()->id()) {
+            return true;
+        }
+
+        if ($profile->users()->where('users.id', auth()->id())->exists()) {
+            return true;
+        }
+
+        if ($profile->created_by === null) {
+            return true;
+        }
+
+        return (bool) ($profile->creator && $profile->creator->isAdmin());
+    }
+
     private function authorizeImportManagement(): void
     {
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
@@ -408,7 +433,9 @@ class Index extends Component
         if (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
                 $q->where('created_by', auth()->id())
-                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
         }
 
@@ -423,7 +450,9 @@ class Index extends Component
             $query->whereHas('profile', function ($profileQuery) {
                 $profileQuery->where(function ($q) {
                     $q->where('created_by', auth()->id())
-                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
                 });
             });
         }
@@ -438,7 +467,9 @@ class Index extends Component
         if (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
                 $q->where('created_by', auth()->id())
-                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
         } elseif ($this->filter_gestor) {
             $query->where('created_by', $this->filter_gestor);
@@ -565,7 +596,9 @@ class Index extends Component
         if (auth()->user()->isCuentas()) {
             $networksQuery->where(function ($q) {
                 $q->where('created_by', auth()->id())
-                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()));
+                    ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
         }
 

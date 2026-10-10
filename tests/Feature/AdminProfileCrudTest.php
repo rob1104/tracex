@@ -220,4 +220,69 @@ class AdminProfileCrudTest extends TestCase
             ->set('selectedColabViewId', (string) $collaborator->id)
             ->assertCount('viewingColabProfiles', 1);
     }
+
+    public function test_gestor_can_view_and_edit_admin_created_profile_without_explicit_pivot_assignment(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $gestor = User::factory()->create(['role' => 'cuentas', 'is_active' => true]);
+        $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+
+        $emailAccount = EmailAccount::create([
+            'email' => 'adminaccount@example.com',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        $profile = Profile::create([
+            'name' => 'Perfil Creado Por Admin',
+            'email_account_id' => $emailAccount->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+        $profile->users()->attach($collaborator->id);
+
+        Livewire::actingAs($gestor)
+            ->test(Index::class)
+            ->assertSee('Perfil Creado Por Admin')
+            ->call('edit', $profile->id)
+            ->assertSet('showModal', true)
+            ->assertSet('name', 'Perfil Creado Por Admin')
+            ->set('name', 'Perfil Actualizado Por Gestor')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('showModal', false);
+
+        $profile->refresh();
+        $this->assertSame('Perfil Actualizado Por Gestor', $profile->name);
+    }
+
+    public function test_gestor_can_view_and_edit_admin_created_email_account(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $gestor = User::factory()->create(['role' => 'cuentas', 'is_active' => true]);
+
+        $emailAccount = EmailAccount::create([
+            'email' => 'adminemail@example.com',
+            'alias' => 'Admin Correo',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        Livewire::actingAs($gestor)
+            ->test(\App\Livewire\Admin\Emails\Index::class)
+            ->assertSee('adminemail@example.com')
+            ->call('edit', $emailAccount->id)
+            ->assertSet('showModal', true)
+            ->assertSet('email', 'adminemail@example.com')
+            ->set('alias', 'Admin Correo Editado Por Gestor')
+            ->call('save')
+            ->assertHasNoErrors()
+            ->assertSet('showModal', false);
+
+        $emailAccount->refresh();
+        $this->assertSame('Admin Correo Editado Por Gestor', $emailAccount->alias);
+    }
 }
