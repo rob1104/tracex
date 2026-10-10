@@ -1,54 +1,7 @@
 <div>
     <div class="min-h-[calc(100vh-4rem)] bg-slate-100">
         <div class="mx-auto max-w-[1720px] px-0 sm:px-4 lg:px-6">
-            <div class="grid min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:grid-cols-[232px_minmax(0,1fr)] lg:rounded-xl">
-                <aside class="flex flex-col bg-slate-900 px-3 py-5 text-slate-200 lg:min-h-full">
-                    <div class="hidden items-center gap-3 px-3 pb-7 lg:flex">
-                        <span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-xl font-bold text-white shadow-lg shadow-blue-950/30">T</span>
-                        <div>
-                            <p class="text-lg font-bold tracking-wide text-white">TraceX</p>
-                            <p class="text-[11px] text-slate-400">Monitoreo de Facebook</p>
-                        </div>
-                    </div>
-
-                    <nav class="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1" aria-label="Módulos de TraceX">
-                        <p class="hidden px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Principal</p>
-                        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">⌂</span> Inicio
-                        </a>
-                        @if(auth()->user()->isAdmin())
-                            <a href="{{ route('admin.evidences.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                                <span class="w-5 text-center">▣</span> Evidencias
-                            </a>
-                        @endif
-                        <a href="{{ route('admin.facebook_monitoring.index') }}#recent-activity" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">◷</span> Actividad
-                        </a>
-                        <a href="{{ route('admin.facebook_monitoring.index') }}#drive-import" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">☁</span> Google Drive
-                        </a>
-
-                        <p class="hidden px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Módulos</p>
-                        <a href="{{ route('admin.facebook_monitoring.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">👥</span> Monitoreo de usuarios
-                        </a>
-                        <a href="#facebook-pending-imports" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">↓</span> Sin asignar
-                            <span class="ml-auto rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300">{{ $pendingImports->total() }}</span>
-                        </a>
-                        <a href="{{ route('admin.profiles.index') }}" wire:navigate aria-current="page" class="flex items-center gap-3 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20">
-                            <span class="w-5 text-center">◉</span> Perfiles sociales
-                        </a>
-                        <a href="{{ route('admin.emails.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center">✉</span> Cuentas de correo
-                        </a>
-                    </nav>
-
-                    <div class="mt-auto hidden border-t border-slate-800 px-3 pt-5 text-xs lg:block">
-                        <p class="text-slate-400">Exportaciones de Meta</p>
-                        <p class="mt-2 text-slate-500">TraceX · Facebook</p>
-                    </div>
-                </aside>
+            <div class="min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:rounded-xl">
 
                 <main class="min-w-0 bg-slate-50/70 p-4 sm:p-6 xl:p-8">
                     <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
@@ -625,7 +578,7 @@
                                         Perfiles a Transferir
                                         <span class="bg-indigo-100 text-indigo-800 text-xs py-1 px-2 rounded-full">{{ count($sourceProfiles) }} perfiles encontrados</span>
                                     </h4>
-                                    
+
                                     @if(count($sourceProfiles) > 0)
                                         <div class="mb-2 flex justify-end">
                                             <button type="button" wire:click="toggleSelectAll" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium focus:outline-none">
@@ -695,7 +648,7 @@
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 min-h-[500px]">
                         <div class="mb-6 relative">
                             <x-input-label value="Seleccione o busque un colaborador" />
-                            
+
                             <!-- Alpine Searchable Dropdown for Colaborador -->
                             @php
                                 $initialSelectedColabText = 'Seleccione un colaborador...';
@@ -720,7 +673,7 @@
                                 }"
                                 class="relative mt-1"
                                 @click.outside="open = false">
-                                
+
                                 <button type="button" @click="open = !open" class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
                                     <span class="block truncate" x-text="selectedText">{{ $initialSelectedColabText }}</span>
                                     <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">

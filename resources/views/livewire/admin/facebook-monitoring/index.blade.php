@@ -1,67 +1,6 @@
 <div class="min-h-[calc(100vh-4rem)] bg-slate-100" wire:poll.60s>
     <div class="mx-auto max-w-[1720px] px-0 sm:px-4 lg:px-6">
-        <div class="grid min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:grid-cols-[232px_minmax(0,1fr)] lg:rounded-xl">
-            <aside class="flex flex-col bg-slate-900 px-3 py-5 text-slate-200 lg:min-h-full">
-                <div class="hidden items-center gap-3 px-3 pb-7 lg:flex">
-                    <span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-xl font-bold text-white shadow-lg shadow-blue-950/30">T</span>
-                    <div>
-                        <p class="text-lg font-bold tracking-wide text-white">TraceX</p>
-                        <p class="text-[11px] text-slate-400">Monitoreo de Facebook</p>
-                    </div>
-                </div>
-
-                <nav class="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1" aria-label="Módulos de TraceX">
-                    <p class="hidden px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Principal</p>
-                    <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">⌂</span> Inicio
-                    </a>
-                    @if(auth()->user()->isAdmin())
-                        <a href="{{ route('admin.evidences.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center text-base">▣</span> Evidencias
-                        </a>
-                    @else
-                        <a href="{{ route('admin.profiles.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center text-base">▣</span> Evidencias
-                        </a>
-                    @endif
-                    <a href="#recent-activity" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">◷</span> Actividad
-                    </a>
-                    <a href="#drive-import" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">☁</span> Google Drive
-                    </a>
-
-                    <p class="hidden px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Módulos</p>
-                    <a href="{{ route('admin.facebook_monitoring.index') }}" wire:navigate aria-current="page" class="flex items-center gap-3 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20">
-                        <span class="w-5 text-center text-base">👥</span> Monitoreo de usuarios
-                    </a>
-                    <a href="#monitored-profiles" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">👥</span> Usuarios monitoreados
-                    </a>
-                    @if(auth()->user()->isAdmin())
-                        <a href="{{ route('admin.evidence_types.index') }}#facebook-exports" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center text-base">↓</span> Sin asignar
-                            <span class="ml-auto rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300">{{ $pendingAssignmentCount }}</span>
-                        </a>
-                    @else
-                        <a href="{{ route('admin.profiles.index') }}#facebook-pending-imports" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                            <span class="w-5 text-center text-base">↓</span> Sin asignar
-                            <span class="ml-auto rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300">{{ $pendingAssignmentCount }}</span>
-                        </a>
-                    @endif
-                    <a href="{{ route('admin.profiles.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">◉</span> Perfiles sociales
-                    </a>
-                    <a href="{{ route('admin.emails.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
-                        <span class="w-5 text-center text-base">✉</span> Cuentas de correo
-                    </a>
-                </nav>
-
-                <div class="mt-auto hidden border-t border-slate-800 px-3 pt-5 text-xs lg:block">
-                    <p class="text-slate-400">Exportaciones de Meta</p>
-                    <p class="mt-2 text-slate-500">TraceX · Facebook</p>
-                </div>
-            </aside>
+        <div class="min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:rounded-xl">
 
             <main class="min-w-0 bg-slate-50/70 p-4 sm:p-6 xl:p-8">
                 <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
