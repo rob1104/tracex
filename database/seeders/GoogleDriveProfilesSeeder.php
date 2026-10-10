@@ -87,6 +87,7 @@ class GoogleDriveProfilesSeeder extends Seeder
                 ],
                 [
                     'email_account_id' => $emailAccount->id,
+                    'facebook_identifier' => 'id:'.$item['fb_id'],
                     'password' => 'fbpassword123',
                     'status' => 'active',
                     'created_by' => $user->id,
