@@ -156,7 +156,7 @@
                     </div>
                 @else
                     <div class="text-center py-10">
-                        @if($filterType || $filterDateFrom || $filterDateTo)
+                        @if($filterType || $filterOrigin || $filterDateFrom || $filterDateTo)
                             <p class="text-slate-500 mb-4 text-lg">No hay evidencias que coincidan con los filtros aplicados.</p>
                             <button wire:click="clearFilters" class="text-indigo-600 hover:text-indigo-900 font-medium">Limpiar filtros</button>
                         @else
