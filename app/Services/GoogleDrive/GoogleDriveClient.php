@@ -3,9 +3,11 @@
 namespace App\Services\GoogleDrive;
 
 use Exception;
+use Google\Client as GoogleClient;
+use Google\Service\Drive as GoogleDriveService;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class GoogleDriveClient
 {
@@ -17,11 +19,10 @@ class GoogleDriveClient
 
     protected ?string $folderId;
 
-    protected ?string $accessToken = null;
+    protected ?GoogleClient $googleClient = null;
 
-    /**
-     * Create a new Google Drive client instance.
-     */
+    protected ?GoogleDriveService $driveService = null;
+
     public function __construct(
         ?string $clientId = null,
         ?string $clientSecret = null,
@@ -35,41 +36,35 @@ class GoogleDriveClient
     }
 
     /**
-     * Obtain a fresh OAuth 2.0 access token using the refresh token.
+     * Return the current OAuth access token, refreshing it when needed.
      *
      * @throws Exception
      */
     public function getAccessToken(): string
     {
-        if ($this->accessToken) {
-            return $this->accessToken;
+        $client = $this->googleClient();
+
+        if ($client->isAccessTokenExpired()) {
+            $token = $client->fetchAccessTokenWithRefreshToken($this->refreshToken);
+            if (isset($token['error'])) {
+                $description = $token['error_description'] ?? $token['error'];
+                throw new Exception('Google Drive OAuth token refresh failed: '.$description);
+            }
+
+            $client->setAccessToken($token);
         }
 
-        $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
-            'refresh_token' => $this->refreshToken,
-            'grant_type' => 'refresh_token',
-        ]);
+        $token = $client->getAccessToken();
+        $accessToken = $token['access_token'] ?? null;
 
-        if (! $response->successful()) {
-            Log::error('Google Drive OAuth2 token refresh failed', [
-                'status' => $response->status(),
-                'body' => $response->json(),
-            ]);
-
-            throw new Exception('Failed to obtain Google Drive access token: '.$response->body());
+        if (! is_string($accessToken) || $accessToken === '') {
+            throw new Exception('Google Drive did not return an access token.');
         }
 
-        $data = $response->json();
-        $this->accessToken = $data['access_token'];
-
-        return $this->accessToken;
+        return $accessToken;
     }
 
     /**
-     * List Facebook export folders (matching 'meta-') in the configured or specified parent folder.
-     *
      * @return array<int, array{id: string, name: string, createdTime?: string}>
      *
      * @throws Exception
@@ -77,82 +72,105 @@ class GoogleDriveClient
     public function listExportFolders(?string $parentFolderId = null): array
     {
         $targetFolder = $parentFolderId ?? $this->folderId ?? 'root';
-        $token = $this->getAccessToken();
-
         $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains 'meta-'";
-        if ($targetFolder) {
+
+        if ($targetFolder !== null && $targetFolder !== '') {
             $query .= " and '{$targetFolder}' in parents";
         }
 
-        $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
-            'q' => $query,
-            'fields' => 'files(id, name, createdTime)',
-            'pageSize' => 100,
-        ]);
+        $folders = [];
+        $pageToken = null;
 
-        if (! $response->successful()) {
-            throw new Exception('Failed to list export folders from Google Drive: '.$response->body());
-        }
+        do {
+            $params = [
+                'q' => $query,
+                'fields' => 'nextPageToken,files(id,name,createdTime)',
+                'pageSize' => 100,
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
+            ];
 
-        return $response->json('files', []);
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = $this->driveService()->files->listFiles($params);
+
+            foreach ($response->getFiles() as $file) {
+                $folders[] = [
+                    'id' => $file->getId(),
+                    'name' => $file->getName(),
+                    'createdTime' => $file->getCreatedTime(),
+                ];
+            }
+
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null);
+
+        return $folders;
     }
 
     /**
-     * Recursively list all JSON files under a Google Drive folder hierarchy, capturing their relative subpaths.
-     *
      * @return array<int, array{id: string, name: string, size: ?int, relative_path: string}>
      *
      * @throws Exception
      */
     public function getFolderJsonFiles(string $folderId): array
     {
-        $token = $this->getAccessToken();
         $queue = [['id' => $folderId, 'subpath' => '']];
         $jsonFiles = [];
 
-        while (! empty($queue)) {
+        while ($queue !== []) {
             $current = array_shift($queue);
-            $currentFolder = $current['id'];
-            $currentSubpath = $current['subpath'];
+            $pageToken = null;
 
-            $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
-                'q' => "'{$currentFolder}' in parents and trashed = false",
-                'fields' => 'files(id, name, mimeType, size)',
-                'pageSize' => 100,
-            ]);
+            do {
+                $params = [
+                    'q' => "'{$current['id']}' in parents and trashed = false",
+                    'fields' => 'nextPageToken,files(id,name,mimeType,size)',
+                    'pageSize' => 100,
+                    'supportsAllDrives' => true,
+                    'includeItemsFromAllDrives' => true,
+                ];
 
-            if (! $response->successful()) {
-                throw new Exception("Failed to list contents of folder [{$currentFolder}] from Google Drive: ".$response->body());
-            }
-
-            $items = $response->json('files', []);
-            foreach ($items as $item) {
-                $itemSubpath = $currentSubpath !== '' ? $currentSubpath.'/'.$item['name'] : $item['name'];
-
-                if ($item['mimeType'] === 'application/vnd.google-apps.folder') {
-                    $queue[] = [
-                        'id' => $item['id'],
-                        'subpath' => $itemSubpath,
-                    ];
-                } elseif (str_ends_with(strtolower($item['name']), '.json') || ($item['mimeType'] ?? '') === 'application/json') {
-                    $jsonFiles[] = [
-                        'id' => $item['id'],
-                        'name' => $item['name'],
-                        'size' => isset($item['size']) ? (int) $item['size'] : null,
-                        'relative_path' => $itemSubpath,
-                    ];
+                if ($pageToken !== null) {
+                    $params['pageToken'] = $pageToken;
                 }
-            }
+
+                $response = $this->driveService()->files->listFiles($params);
+
+                foreach ($response->getFiles() as $item) {
+                    $itemSubpath = $current['subpath'] !== ''
+                        ? $current['subpath'].'/'.$item->getName()
+                        : $item->getName();
+
+                    if ($item->getMimeType() === 'application/vnd.google-apps.folder') {
+                        $queue[] = [
+                            'id' => $item->getId(),
+                            'subpath' => $itemSubpath,
+                        ];
+                    } elseif (
+                        str_ends_with(strtolower($item->getName()), '.json')
+                        || $item->getMimeType() === 'application/json'
+                    ) {
+                        $jsonFiles[] = [
+                            'id' => $item->getId(),
+                            'name' => $item->getName(),
+                            'size' => $item->getSize() === null ? null : (int) $item->getSize(),
+                            'relative_path' => $itemSubpath,
+                        ];
+                    }
+                }
+
+                $pageToken = $response->getNextPageToken();
+            } while ($pageToken !== null);
         }
 
         return $jsonFiles;
     }
 
     /**
-     * Download all JSON files contained within an export folder into a local destination directory.
-     * Preserves relative paths and verifies integrity for each downloaded file.
-     *
-     * @return array<string, int> Array mapping relative paths to downloaded file sizes in bytes.
+     * @return array<string, int>
      *
      * @throws Exception
      */
@@ -163,29 +181,29 @@ class GoogleDriveClient
 
         try {
             foreach ($jsonFiles as $file) {
-                $destPath = rtrim($destinationDir, '/\\').DIRECTORY_SEPARATOR.str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $file['relative_path']);
-                $actualSize = $this->downloadFile($file['id'], $destPath);
+                $destinationPath = rtrim($destinationDir, '/\\')
+                    .DIRECTORY_SEPARATOR
+                    .str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $file['relative_path']);
+                $actualSize = $this->downloadFile($file['id'], $destinationPath);
 
-                if (! $this->verifyFileIntegrity($destPath, $actualSize)) {
+                if (! $this->verifyFileIntegrity($destinationPath, $actualSize)) {
                     throw new Exception("Integrity verification failed for downloaded file [{$file['relative_path']}]");
                 }
 
                 $downloaded[$file['relative_path']] = $actualSize;
             }
-        } catch (Exception $e) {
+        } catch (Throwable $exception) {
             if (File::exists($destinationDir)) {
                 File::deleteDirectory($destinationDir);
             }
 
-            throw $e;
+            throw new Exception('Failed to download the Google Drive export folder.', previous: $exception);
         }
 
         return $downloaded;
     }
 
     /**
-     * List all JSON files inside the configured or specified Drive folder.
-     *
      * @return array<int, array{id: string, name: string, size: ?int, mimeType: string}>
      *
      * @throws Exception
@@ -193,52 +211,79 @@ class GoogleDriveClient
     public function listFiles(?string $folderId = null): array
     {
         $targetFolder = $folderId ?? $this->folderId ?? 'root';
-        $token = $this->getAccessToken();
-
         $query = "trashed = false and (mimeType = 'application/json' or name contains '.json')";
-        if ($targetFolder) {
+
+        if ($targetFolder !== null && $targetFolder !== '') {
             $query .= " and '{$targetFolder}' in parents";
         }
 
-        $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
-            'q' => $query,
-            'fields' => 'files(id, name, size, mimeType)',
-            'pageSize' => 100,
-        ]);
+        $files = [];
+        $pageToken = null;
 
-        if (! $response->successful()) {
-            throw new Exception('Failed to list files from Google Drive: '.$response->body());
-        }
+        do {
+            $params = [
+                'q' => $query,
+                'fields' => 'nextPageToken,files(id,name,size,mimeType)',
+                'pageSize' => 100,
+                'supportsAllDrives' => true,
+                'includeItemsFromAllDrives' => true,
+            ];
 
-        return $response->json('files', []);
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = $this->driveService()->files->listFiles($params);
+
+            foreach ($response->getFiles() as $file) {
+                $files[] = [
+                    'id' => $file->getId(),
+                    'name' => $file->getName(),
+                    'size' => $file->getSize() === null ? null : (int) $file->getSize(),
+                    'mimeType' => $file->getMimeType(),
+                ];
+            }
+
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null);
+
+        return $files;
     }
 
     /**
-     * Download a file from Google Drive and save it to the specified local path.
+     * Download a file to disk without loading the export into memory.
      *
      * @throws Exception
      */
     public function downloadFile(string $fileId, string $destinationPath): int
     {
-        $token = $this->getAccessToken();
+        $this->getAccessToken();
 
-        $dir = dirname($destinationPath);
-        if (! File::exists($dir)) {
-            File::makeDirectory($dir, 0755, true);
+        $directory = dirname($destinationPath);
+        if (! File::exists($directory)) {
+            File::makeDirectory($directory, 0755, true);
         }
 
-        $response = Http::withToken($token)
-            ->sink($destinationPath)
-            ->get("https://www.googleapis.com/drive/v3/files/{$fileId}", [
-                'alt' => 'media',
-            ]);
-
-        if (! $response->successful()) {
+        try {
+            $response = $this->googleClient()->authorize()->get(
+                'https://www.googleapis.com/drive/v3/files/'.rawurlencode($fileId),
+                [
+                    'query' => ['alt' => 'media'],
+                    'sink' => $destinationPath,
+                ]
+            );
+        } catch (Throwable $exception) {
             if (File::exists($destinationPath)) {
                 File::delete($destinationPath);
             }
 
-            throw new Exception("Failed to download file [{$fileId}] from Google Drive: ".$response->status());
+            throw new Exception("Failed to download file [{$fileId}] from Google Drive.", previous: $exception);
+        }
+
+        if ($response->getStatusCode() < 200 || $response->getStatusCode() >= 300) {
+            File::delete($destinationPath);
+
+            throw new Exception("Google Drive returned status {$response->getStatusCode()} while downloading file [{$fileId}].");
         }
 
         return File::size($destinationPath);
@@ -246,7 +291,6 @@ class GoogleDriveClient
 
     /**
      * Verify that the downloaded file exists, is not empty, and contains valid JSON.
-     * Uses PHP 8.3 json_validate() to avoid allocating full in-memory AST objects and prevent Out of Memory errors.
      */
     public function verifyFileIntegrity(string $filePath, ?int $expectedBytes = null): bool
     {
@@ -263,41 +307,38 @@ class GoogleDriveClient
             return false;
         }
 
-        $content = File::get($filePath);
-
-        return json_validate($content);
+        return json_validate(File::get($filePath));
     }
 
     /**
-     * Delete a file or folder permanently from Google Drive (Zero-Retention Rule).
+     * Permanently delete a file or folder from Google Drive.
      *
      * @throws Exception
      */
     public function deleteFile(string $fileId): bool
     {
-        $token = $this->getAccessToken();
+        try {
+            $this->driveService()->files->delete($fileId, ['supportsAllDrives' => true]);
 
-        $response = Http::withToken($token)
-            ->delete("https://www.googleapis.com/drive/v3/files/{$fileId}");
-
-        if ($response->status() === 204 || $response->successful()) {
             Log::info("Item permanently removed from Google Drive: {$fileId}");
 
             return true;
+        } catch (Throwable $exception) {
+            $code = method_exists($exception, 'getCode') ? (int) $exception->getCode() : 0;
+
+            if ($code === 404) {
+                Log::warning("Item already deleted or not found in Google Drive: {$fileId}");
+
+                return true;
+            }
+
+            Log::error("Failed to delete item from Google Drive: {$fileId}", [
+                'error' => $exception->getMessage(),
+                'code' => $code,
+            ]);
+
+            throw new Exception("Google Drive failed to delete item {$fileId}.", previous: $exception);
         }
-
-        if ($response->status() === 404) {
-            Log::warning("Item already deleted or not found in Google Drive: {$fileId}");
-
-            return true;
-        }
-
-        Log::error("Failed to delete item from Google Drive: {$fileId}", [
-            'status' => $response->status(),
-            'body' => $response->body(),
-        ]);
-
-        throw new Exception("Google Drive API returned status {$response->status()} upon deleting item {$fileId}");
     }
 
     /**
@@ -308,5 +349,48 @@ class GoogleDriveClient
     public function deleteFolder(string $folderId): bool
     {
         return $this->deleteFile($folderId);
+    }
+
+    /**
+     * @throws Exception
+     */
+    protected function googleClient(): GoogleClient
+    {
+        if ($this->googleClient !== null) {
+            return $this->googleClient;
+        }
+
+        if ($this->clientId === '' || $this->clientSecret === '' || $this->refreshToken === '') {
+            throw new Exception('Google Drive OAuth credentials are not configured.');
+        }
+
+        $client = new GoogleClient;
+        $client->setApplicationName(config('app.name', 'TraceX'));
+        $client->setClientId($this->clientId);
+        $client->setClientSecret($this->clientSecret);
+        $client->setRedirectUri((string) config('services.google.drive.redirect_uri'));
+        $client->setAccessType('offline');
+        $client->addScope(GoogleDriveService::DRIVE);
+
+        $token = $client->fetchAccessTokenWithRefreshToken($this->refreshToken);
+        if (isset($token['error'])) {
+            $description = $token['error_description'] ?? $token['error'];
+            throw new Exception('Google Drive OAuth token refresh failed: '.$description);
+        }
+
+        $client->setAccessToken($token);
+        $this->googleClient = $client;
+
+        return $client;
+    }
+
+    /**
+     * @throws Exception
+     */
+    protected function driveService(): GoogleDriveService
+    {
+        $this->getAccessToken();
+
+        return $this->driveService ??= new GoogleDriveService($this->googleClient());
     }
 }

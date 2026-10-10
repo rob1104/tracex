@@ -17,13 +17,13 @@ class FacebookExportParser
     private const ZONA = 'America/Mexico_City';
 
     private const REACCIONES = [
-        'LIKE'  => 'me_gusta',
-        'LOVE'  => 'me_encanta',
-        'CARE'  => 'me_importa',
-        'HAHA'  => 'me_divierte',
-        'WOW'   => 'me_asombra',
-        'SORRY' => 'me_entristece',
-        'ANGER' => 'me_enoja',
+        'LIKE' => 'LIKE',
+        'LOVE' => 'LOVE',
+        'CARE' => 'CARE',
+        'HAHA' => 'HAHA',
+        'WOW' => 'WOW',
+        'SORRY' => 'SORRY',
+        'ANGER' => 'ANGER',
     ];
 
     public function __construct(private string $directorio) {}
@@ -35,7 +35,7 @@ class FacebookExportParser
 
         return [
             'nombre' => $p['name']['full_name'] ?? null,
-            'uri'    => $p['profile_uri'] ?? null,
+            'uri' => $p['profile_uri'] ?? null,
         ];
     }
 
@@ -93,9 +93,9 @@ class FacebookExportParser
                 }
 
                 yield [
-                    'texto'    => $texto,
+                    'texto' => $texto,
                     'contexto' => $c['title'] ?? null,
-                    'fecha'    => $this->fecha($ts),
+                    'fecha' => $this->fecha($ts),
                 ];
             }
         }
@@ -111,9 +111,9 @@ class FacebookExportParser
                 $codigo = $this->primero($r['data'] ?? [], 'reaction')['reaction'] ?? 'LIKE';
 
                 yield [
-                    'tipo'     => self::REACCIONES[strtoupper($codigo)] ?? mb_strtolower($codigo),
+                    'tipo' => self::REACCIONES[strtoupper($codigo)] ?? trim($codigo),
                     'objetivo' => $r['title'] ?? null,
-                    'fecha'    => $this->fecha($r['timestamp']),
+                    'fecha' => $this->fecha($r['timestamp']),
                 ];
             }
         }
@@ -136,8 +136,8 @@ class FacebookExportParser
 
                 yield [
                     'descripcion' => $this->primero($p['data'] ?? [], 'post')['post'] ?? ($titulo ?: null),
-                    'enlace'      => $enlace,
-                    'fecha'       => $this->fecha($p['timestamp']),
+                    'enlace' => $enlace,
+                    'fecha' => $this->fecha($p['timestamp']),
                 ];
             }
         }

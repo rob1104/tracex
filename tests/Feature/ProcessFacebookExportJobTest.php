@@ -40,7 +40,17 @@ class ProcessFacebookExportJobTest extends TestCase
             'status' => 'downloaded',
         ]);
 
-        file_put_contents($this->testDirectory.'/test.json', json_encode(['foo' => 'bar']));
+        file_put_contents($this->testDirectory.'/comments.json', json_encode([
+            [
+                'timestamp' => 1791500000,
+                'data' => [
+                    ['comment' => [
+                        'comment' => 'Comentario de prueba',
+                        'timestamp' => 1791500000,
+                    ]],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR));
         $this->assertDirectoryExists($this->testDirectory);
 
         $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);

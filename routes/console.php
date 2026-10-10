@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\FacebookImportLog;
-use App\Models\Importacion;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -40,13 +39,3 @@ if (method_exists($syncSchedule, $frequency)) {
 */
 Schedule::command('model:prune', ['--model' => [FacebookImportLog::class]])
     ->daily();
-
-
-Schedule::command('drive:importar')->everyFiveMinutes()->withoutOverlapping();
-
-Schedule::call(function () {
-    Importacion::whereIn('estado', ['sin_dueno', 'rechazado', 'error'])
-        ->where('created_at', '<', now()->subDays(7))
-        ->get()
-        ->each->delete();
-})->daily()->name('limpiar-cargas-sin-asignar');

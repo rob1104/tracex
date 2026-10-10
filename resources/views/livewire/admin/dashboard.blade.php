@@ -158,8 +158,11 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" data-navigate-once></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2" data-navigate-once></script>
+    @assets
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    @endassets
+
     @script
     <script>
         Alpine.data('dashboardCharts', () => {
@@ -167,7 +170,7 @@
             return {
                 init() {
                     const renderCharts = () => {
-                        if (typeof Chart === 'undefined') {
+                        if (typeof Chart === 'undefined' || typeof ChartDataLabels === 'undefined') {
                             setTimeout(renderCharts, 50);
                             return;
                         }
