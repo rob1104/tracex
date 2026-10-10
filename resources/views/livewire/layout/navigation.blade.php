@@ -40,6 +40,12 @@ new class extends Component
                         Panel Principal
                     </x-nav-link>
 
+                    @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                        <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
+                            Monitoreo de Usuarios
+                        </x-nav-link>
+                    @endif
+
                     @if(auth()->user()->isUser())
                         <x-nav-link :href="route('evidences.create')" :active="request()->routeIs('evidences.create')" wire:navigate>
                             Registrar Evidencia
@@ -134,6 +140,12 @@ new class extends Component
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate>
                 Panel Principal
             </x-responsive-nav-link>
+
+            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
+                    Monitoreo de Usuarios
+                </x-responsive-nav-link>
+            @endif
 
             @if(auth()->user()->isUser())
                 <x-responsive-nav-link :href="route('evidences.create')" :active="request()->routeIs('evidences.create')" wire:navigate>

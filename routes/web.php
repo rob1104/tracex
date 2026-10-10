@@ -29,6 +29,7 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
 });
 
 Route::middleware(['auth', 'verified', 'role:admin,cuentas'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/monitoreo-usuarios', App\Livewire\Admin\FacebookMonitoring\Index::class)->name('facebook_monitoring.index');
     Route::get('/cuentas-correo', App\Livewire\Admin\Emails\Index::class)->name('emails.index');
     Route::get('/perfiles-sociales', App\Livewire\Admin\Profiles\Index::class)->name('profiles.index');
 });

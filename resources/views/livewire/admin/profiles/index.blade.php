@@ -94,6 +94,10 @@
                                     @endif
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaboradores</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Facebook asociado</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actividad de Facebook</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exportaciones</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Última exportación</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th> <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                     <th scope="col" class="relative px-4 py-2"><span class="sr-only">Acciones</span></th>
                                 </tr>
@@ -157,6 +161,48 @@
                                                 {{ $profile->users->count() }} Asignados
                                             </button>
                                         </td>
+                                        <td class="px-4 py-3 whitespace-normal text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                <span class="text-xs font-medium text-blue-700">Perfil monitoreado</span>
+                                            @else
+                                                @php
+                                                    $associatedFacebookProfiles = $profile->users
+                                                        ->flatMap(fn ($assignedUser) => $facebookProfilesByUser[$assignedUser->id] ?? [])
+                                                        ->unique('id');
+                                                @endphp
+                                                @forelse($associatedFacebookProfiles as $facebookProfile)
+                                                    <div class="text-xs text-gray-700">{{ $facebookProfile['name'] }}</div>
+                                                @empty
+                                                    <span class="text-xs text-gray-400">Sin asociación</span>
+                                                @endforelse
+                                                @if($associatedFacebookProfiles->isNotEmpty())
+                                                    <span class="mt-1 block text-xs text-gray-400" title="Se determina por los colaboradores asignados a ambos perfiles">Por colaborador asignado</span>
+                                                @endif
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                <div>{{ $profile->facebook_comments_count ?? 0 }} comentarios</div>
+                                                <div class="text-xs text-gray-500">{{ $profile->facebook_reactions_count ?? 0 }} reacciones</div>
+                                                <div class="text-xs text-gray-500">{{ $profile->facebook_shares_count ?? 0 }} compartidos</div>
+                                            @else
+                                                <span class="text-xs text-gray-400">No aplica</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                {{ $profile->facebook_exports_count ?? 0 }} recibidas
+                                            @else
+                                                <span class="text-xs text-gray-400">No aplica</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook' && $profile->latest_facebook_export_at)
+                                                {{ \Illuminate\Support\Carbon::parse($profile->latest_facebook_export_at)->format('d/m/Y H:i') }}
+                                            @else
+                                                <span class="text-xs text-gray-400">Sin exportaciones</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center space-x-2 text-sm"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><div class="flex flex-col"><span class="font-semibold text-gray-700">{{ $profile->created_at->format('d M Y') }}</span><span class="text-xs text-gray-500">{{ $profile->created_at->format('h:i A') }}</span></div></div></td> <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">@if($profile->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
                                             @elseif($profile->status === 'restricted')
@@ -183,7 +229,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-4 py-3 text-center text-sm text-gray-500">
+                                        <td colspan="{{ auth()->user()->isAdmin() ? 12 : 11 }}" class="px-4 py-3 text-center text-sm text-gray-500">
                                             No hay perfiles sociales registrados.
                                         </td>
                                     </tr>
@@ -195,7 +241,7 @@
                         {{ $profiles->links() }}
                     </div>
 
-                    <section class="mt-10 border-t border-gray-200 pt-8">
+                    <section id="facebook-pending-imports" class="mt-10 border-t border-gray-200 pt-8">
                         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
                                 <h3 class="text-lg font-semibold text-gray-900">Importaciones pendientes de asignacion</h3>

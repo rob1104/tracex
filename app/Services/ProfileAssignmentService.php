@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Evidence;
 use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
+use App\Models\FacebookUser;
 use App\Models\Profile;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,8 @@ class ProfileAssignmentService
     {
         $name = trim((string) ($exportedProfile['nombre'] ?? ''));
         $identifier = FacebookProfileIdentifier::normalize($exportedProfile['identifier'] ?? null);
+        $uriIdentifier = FacebookProfileIdentifier::normalize($exportedProfile['uri'] ?? null);
+        $identifiers = array_values(array_unique(array_filter([$identifier, $uriIdentifier])));
         $facebookProfiles = Profile::query()
             ->with(['users' => function ($q) {
                 $q->where('is_active', true)->orderBy('users.id', 'asc');
@@ -30,9 +33,9 @@ class ProfileAssignmentService
 
         $profile = null;
 
-        if ($identifier !== null) {
+        foreach ($identifiers as $candidateIdentifier) {
             $profilesByIdentifier = (clone $facebookProfiles)
-                ->where('facebook_identifier', $identifier)
+                ->where('facebook_identifier', $candidateIdentifier)
                 ->limit(2)
                 ->get();
 
@@ -40,7 +43,10 @@ class ProfileAssignmentService
                 return ['profile' => null, 'user' => null];
             }
 
-            $profile = $profilesByIdentifier->first();
+            if ($profilesByIdentifier->isNotEmpty()) {
+                $profile = $profilesByIdentifier->first();
+                break;
+            }
         }
 
         if (! $profile && $name !== '') {
@@ -57,12 +63,12 @@ class ProfileAssignmentService
             $profile = $matchingProfiles->first();
             $storedIdentifier = FacebookProfileIdentifier::normalize($profile->facebook_identifier);
 
-            if ($identifier !== null && $storedIdentifier !== null && $storedIdentifier !== $identifier) {
+            if ($identifiers !== [] && $storedIdentifier !== null && ! in_array($storedIdentifier, $identifiers, true)) {
                 return ['profile' => null, 'user' => null];
             }
 
-            if ($identifier !== null && $storedIdentifier === null) {
-                $profile->facebook_identifier = $identifier;
+            if ($identifiers !== [] && $storedIdentifier === null) {
+                $profile->facebook_identifier = $identifier ?? $uriIdentifier;
                 $profile->save();
             }
         }
@@ -94,7 +100,7 @@ class ProfileAssignmentService
     }
 
     /**
-     * Bind a pending import log to a profile and user, and generate Evidence rows from its comments and reactions.
+     * Bind a pending import log to a profile and user, and generate Evidence rows from its Facebook activity.
      *
      * @return int Number of generated Evidence rows.
      */
@@ -111,6 +117,9 @@ class ProfileAssignmentService
 
             $profile->users()->syncWithoutDetaching([$user->id]);
             $this->assignImportLog($importLog, $profile, $user);
+            FacebookUser::query()
+                ->where('import_log_id', $importLog->id)
+                ->update(['profile_id' => $profile->id]);
 
             // Fetch EvidenceType IDs
             $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
@@ -124,6 +133,7 @@ class ProfileAssignmentService
 
             $evidences = [];
             $count = 0;
+            $shareCount = 0;
             $timestamp = now();
 
             foreach ($importLog->comments as $comment) {
@@ -177,13 +187,63 @@ class ProfileAssignmentService
                 }
             }
 
+            $importMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
+            $shares = is_array($importMetadata['facebook_shares'] ?? null)
+                ? $importMetadata['facebook_shares']
+                : [];
+
+            if ($shares !== []) {
+                $shareTypeId = EvidenceType::where('name', 'Compartido')->value('id')
+                    ?? EvidenceType::firstOrCreate(['name' => 'Compartido'])->id;
+
+                foreach ($shares as $share) {
+                    $description = trim((string) ($share['descripcion'] ?? ''));
+                    $url = trim((string) ($share['enlace'] ?? ''));
+                    if ($description === '' && $url === '') {
+                        continue;
+                    }
+
+                    $shareDescription = $description !== '' ? $description : 'Compartió una publicación de Facebook';
+                    if ($url !== '') {
+                        $shareDescription .= "\n".$url;
+                    }
+                    $publishedAt = $share['fecha'] ?? $timestamp;
+
+                    $evidences[] = [
+                        'user_id' => $user->id,
+                        'profile_id' => $profile->id,
+                        'evidence_type_id' => $shareTypeId,
+                        'facebook_import_log_id' => $importLog->id,
+                        'origin' => 'google_drive',
+                        'social_network' => 'Facebook',
+                        'comment' => $shareDescription,
+                        'external_published_at' => $publishedAt,
+                        'ip_address' => null,
+                        'user_agent' => 'Google Drive Sync Manual Claim',
+                        'created_at' => $publishedAt,
+                        'updated_at' => $timestamp,
+                    ];
+                    $count++;
+                    $shareCount++;
+
+                    if (count($evidences) === 500) {
+                        Evidence::insert($evidences);
+                        $evidences = [];
+                    }
+                }
+            }
+
             if ($evidences !== []) {
                 Evidence::insert($evidences);
             }
 
+            unset($importMetadata['facebook_shares']);
+            $importMetadata['facebook_shares_count'] = $shareCount;
+
             $importLog->update([
                 'status' => 'completed',
                 'error_message' => null,
+                'metadata' => $importMetadata,
             ]);
 
             return $count;

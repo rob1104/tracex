@@ -408,8 +408,11 @@ class Index extends Component
         $query = FacebookImportLog::pendingAssignment();
 
         if (auth()->user()->isCuentas()) {
-            $query->whereHas('profile', function ($profileQuery) {
-                $profileQuery->where('created_by', auth()->id());
+            $query->where(function ($pendingQuery) {
+                $pendingQuery->whereNull('profile_id')
+                    ->orWhereHas('profile', function ($profileQuery) {
+                        $profileQuery->where('created_by', auth()->id());
+                    });
             });
         }
 
@@ -532,8 +535,46 @@ class Index extends Component
             ->withCount(['comments', 'reactions'])
             ->latest('downloaded_at');
 
+        $profilesQuery = $this->buildQuery()
+            ->withCount([
+                'facebookImportLogs as facebook_exports_count',
+                'facebookComments as facebook_comments_count',
+                'facebookReactions as facebook_reactions_count',
+                'evidences as facebook_shares_count' => fn ($query) => $query
+                    ->where('origin', 'google_drive')
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+                    ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')),
+            ])
+            ->withMax('facebookImportLogs as latest_facebook_export_at', 'downloaded_at');
+
+        $profiles = $profilesQuery->paginate(15);
+        $assignedUserIds = $profiles->getCollection()
+            ->flatMap(fn (Profile $profile) => $profile->users->pluck('id'))
+            ->unique()
+            ->values();
+
+        $facebookProfilesQuery = Profile::query()
+            ->with('users:id,name')
+            ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+            ->whereHas('users', fn ($query) => $query->whereIn('users.id', $assignedUserIds));
+
+        if (auth()->user()->isCuentas()) {
+            $facebookProfilesQuery->where('created_by', auth()->id());
+        }
+
+        $facebookProfilesByUser = [];
+        foreach ($facebookProfilesQuery->get() as $facebookProfile) {
+            foreach ($facebookProfile->users as $assignedUser) {
+                $facebookProfilesByUser[$assignedUser->id][] = [
+                    'id' => $facebookProfile->id,
+                    'name' => $facebookProfile->name,
+                ];
+            }
+        }
+
         return view('livewire.admin.profiles.index', [
-            'profiles' => $this->buildQuery()->paginate(15),
+            'profiles' => $profiles,
+            'facebookProfilesByUser' => $facebookProfilesByUser,
             'pendingImports' => $pendingImportsQuery->paginate(10, pageName: 'pendingImportsPage'),
             'facebookProfiles' => $this->facebookProfilesQuery()->get(),
             'emails' => $emailQuery->orderBy('email')->get(),

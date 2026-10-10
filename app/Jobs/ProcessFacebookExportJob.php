@@ -83,6 +83,9 @@ class ProcessFacebookExportJob implements ShouldQueue
                     ?? EvidenceType::where('name', 'like', '%Reacci%')->value('id')
                     ?? EvidenceType::firstOrCreate(['name' => 'Like / Reacción'])->id;
 
+                $shareTypeId = EvidenceType::where('name', 'Compartido')->value('id')
+                    ?? EvidenceType::firstOrCreate(['name' => 'Compartido'])->id;
+
                 // 3. Clear previous data for idempotency
                 $importLog->comments()->delete();
                 $importLog->reactions()->delete();
@@ -104,8 +107,10 @@ class ProcessFacebookExportJob implements ShouldQueue
                 $comments = [];
                 $reactions = [];
                 $evidences = [];
+                $shares = [];
                 $commentCount = 0;
                 $reactionCount = 0;
+                $shareCount = 0;
                 $timestamp = now();
 
                 // Process Comments
@@ -222,8 +227,62 @@ class ProcessFacebookExportJob implements ShouldQueue
                     FacebookReaction::insert($reactions);
                 }
 
+                // Process shared posts using the existing Evidence model.
+                foreach ($parser->compartidos() as $share) {
+                    $description = trim((string) ($share['descripcion'] ?? ''));
+                    $url = trim((string) ($share['enlace'] ?? ''));
+                    $publishedAt = $share['fecha'] ?? $timestamp;
+
+                    if ($description === '' && $url === '') {
+                        continue;
+                    }
+
+                    $shares[] = [
+                        'descripcion' => $description,
+                        'enlace' => $url,
+                        'fecha' => $publishedAt,
+                    ];
+
+                    if ($assignedUser && $matchedProfile) {
+                        $shareDescription = $description !== '' ? $description : 'Compartió una publicación de Facebook';
+                        if ($url !== '') {
+                            $shareDescription .= "\n".$url;
+                        }
+
+                        $evidences[] = [
+                            'user_id' => $assignedUser->id,
+                            'profile_id' => $matchedProfile->id,
+                            'evidence_type_id' => $shareTypeId,
+                            'facebook_import_log_id' => $importLog->id,
+                            'origin' => 'google_drive',
+                            'social_network' => 'Facebook',
+                            'comment' => $shareDescription,
+                            'external_published_at' => $publishedAt,
+                            'ip_address' => null,
+                            'user_agent' => 'Google Drive Sync',
+                            'created_at' => $publishedAt,
+                            'updated_at' => $timestamp,
+                        ];
+                    }
+
+                    $shareCount++;
+
+                    if (count($evidences) === 500) {
+                        Evidence::insert($evidences);
+                        $evidences = [];
+                    }
+                }
+
                 if ($evidences !== []) {
                     Evidence::insert($evidences);
+                }
+
+                $metadata = $importLog->metadata ?? [];
+                $metadata['facebook_shares_count'] = $shareCount;
+                if ($matchedProfile && $assignedUser) {
+                    unset($metadata['facebook_shares']);
+                } else {
+                    $metadata['facebook_shares'] = $shares;
                 }
 
                 $importLog->update([
@@ -231,6 +290,7 @@ class ProcessFacebookExportJob implements ShouldQueue
                     'user_id' => $assignedUser?->id,
                     'total_comments_extracted' => $commentCount,
                     'total_reactions_extracted' => $reactionCount,
+                    'metadata' => $metadata,
                     'status' => $matchedProfile && $assignedUser ? 'completed' : 'pending_assignment',
                     'error_message' => $matchedProfile && $assignedUser ? null : 'Se requiere asignación manual de perfil y colaborador.',
                 ]);
