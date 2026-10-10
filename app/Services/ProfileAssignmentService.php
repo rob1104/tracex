@@ -7,6 +7,8 @@ use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ProfileAssignmentService
 {
@@ -19,30 +21,55 @@ class ProfileAssignmentService
     public function resolve(array $exportedProfile): array
     {
         $name = trim((string) ($exportedProfile['nombre'] ?? ''));
-
-        if ($name === '') {
-            return ['profile' => null, 'user' => null];
-        }
-
-        $normalizedName = mb_strtolower($name, 'UTF-8');
-
-        // Look for exact case-insensitive match on Facebook profiles
-        $matchingProfiles = Profile::query()
+        $identifier = FacebookProfileIdentifier::normalize($exportedProfile['identifier'] ?? null);
+        $facebookProfiles = Profile::query()
             ->with(['users' => function ($q) {
                 $q->where('is_active', true)->orderBy('users.id', 'asc');
             }, 'creator'])
-            ->whereRaw('LOWER(name) = ?', [$normalizedName])
-            ->whereRaw('LOWER(social_network) = ?', ['facebook'])
-            ->limit(2)
-            ->get();
+            ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
-        // If not found or ambiguous (multiple profiles with identical name), return null
-        if ($matchingProfiles->count() !== 1) {
-            return ['profile' => null, 'user' => null];
+        $profile = null;
+
+        if ($identifier !== null) {
+            $profilesByIdentifier = (clone $facebookProfiles)
+                ->where('facebook_identifier', $identifier)
+                ->limit(2)
+                ->get();
+
+            if ($profilesByIdentifier->count() > 1) {
+                return ['profile' => null, 'user' => null];
+            }
+
+            $profile = $profilesByIdentifier->first();
         }
 
-        /** @var Profile $profile */
-        $profile = $matchingProfiles->first();
+        if (! $profile && $name !== '') {
+            $normalizedName = mb_strtolower($name, 'UTF-8');
+            $matchingProfiles = (clone $facebookProfiles)
+                ->whereRaw('LOWER(name) = ?', [$normalizedName])
+                ->limit(2)
+                ->get();
+
+            if ($matchingProfiles->count() !== 1) {
+                return ['profile' => null, 'user' => null];
+            }
+
+            $profile = $matchingProfiles->first();
+            $storedIdentifier = FacebookProfileIdentifier::normalize($profile->facebook_identifier);
+
+            if ($identifier !== null && $storedIdentifier !== null && $storedIdentifier !== $identifier) {
+                return ['profile' => null, 'user' => null];
+            }
+
+            if ($identifier !== null && $storedIdentifier === null) {
+                $profile->facebook_identifier = $identifier;
+                $profile->save();
+            }
+        }
+
+        if (! $profile) {
+            return ['profile' => null, 'user' => null];
+        }
 
         // Resolve assigned collaborator (User):
         // 1. Primary: first active assigned collaborator in profile_user
@@ -73,77 +100,93 @@ class ProfileAssignmentService
      */
     public function claimPendingImport(FacebookImportLog $importLog, Profile $profile, User $user): int
     {
-        $this->assignImportLog($importLog, $profile, $user);
+        return DB::transaction(function () use ($importLog, $profile, $user): int {
+            $importLog = FacebookImportLog::query()->lockForUpdate()->findOrFail($importLog->id);
 
-        // Fetch EvidenceType IDs
-        $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
-            ?? EvidenceType::firstOrCreate(['name' => 'Comentario'])->id;
-
-        $reactionTypeId = EvidenceType::where('name', 'Like / Reacción')->value('id')
-            ?? EvidenceType::where('name', 'like', '%Reacci%')->value('id')
-            ?? EvidenceType::firstOrCreate(['name' => 'Like / Reacción'])->id;
-
-        $importLog->evidences()->delete();
-
-        $evidences = [];
-        $count = 0;
-        $timestamp = now();
-
-        foreach ($importLog->comments as $comment) {
-            $context = null;
-            if (is_array($comment->metadata) && ! empty($comment->metadata['context'])) {
-                $context = $comment->metadata['context'];
+            if ($importLog->status !== 'pending_assignment') {
+                throw ValidationException::withMessages([
+                    'pendingImport' => 'Esta carga ya fue asignada o ya no está pendiente.',
+                ]);
             }
 
-            $evidences[] = [
-                'user_id' => $user->id,
-                'profile_id' => $profile->id,
-                'evidence_type_id' => $commentTypeId,
-                'facebook_import_log_id' => $importLog->id,
-                'origin' => 'google_drive',
-                'social_network' => 'Facebook',
-                'comment' => $context ? "{$context}: {$comment->content}" : $comment->content,
-                'external_published_at' => $comment->published_at,
-                'ip_address' => null,
-                'user_agent' => 'Google Drive Sync Manual Claim',
-                'created_at' => $comment->published_at ?? $timestamp,
-                'updated_at' => $timestamp,
-            ];
-            $count++;
+            $profile->users()->syncWithoutDetaching([$user->id]);
+            $this->assignImportLog($importLog, $profile, $user);
 
-            if (count($evidences) === 500) {
+            // Fetch EvidenceType IDs
+            $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
+                ?? EvidenceType::firstOrCreate(['name' => 'Comentario'])->id;
+
+            $reactionTypeId = EvidenceType::where('name', 'Like / Reacción')->value('id')
+                ?? EvidenceType::where('name', 'like', '%Reacci%')->value('id')
+                ?? EvidenceType::firstOrCreate(['name' => 'Like / Reacción'])->id;
+
+            $importLog->evidences()->delete();
+
+            $evidences = [];
+            $count = 0;
+            $timestamp = now();
+
+            foreach ($importLog->comments as $comment) {
+                $context = null;
+                if (is_array($comment->metadata) && ! empty($comment->metadata['context'])) {
+                    $context = $comment->metadata['context'];
+                }
+
+                $evidences[] = [
+                    'user_id' => $user->id,
+                    'profile_id' => $profile->id,
+                    'evidence_type_id' => $commentTypeId,
+                    'facebook_import_log_id' => $importLog->id,
+                    'origin' => 'google_drive',
+                    'social_network' => 'Facebook',
+                    'comment' => $context ? "{$context}: {$comment->content}" : $comment->content,
+                    'external_published_at' => $comment->published_at,
+                    'ip_address' => null,
+                    'user_agent' => 'Google Drive Sync Manual Claim',
+                    'created_at' => $comment->published_at ?? $timestamp,
+                    'updated_at' => $timestamp,
+                ];
+                $count++;
+
+                if (count($evidences) === 500) {
+                    Evidence::insert($evidences);
+                    $evidences = [];
+                }
+            }
+
+            foreach ($importLog->reactions as $reaction) {
+                $evidences[] = [
+                    'user_id' => $user->id,
+                    'profile_id' => $profile->id,
+                    'evidence_type_id' => $reactionTypeId,
+                    'facebook_import_log_id' => $importLog->id,
+                    'origin' => 'google_drive',
+                    'social_network' => 'Facebook',
+                    'comment' => "Reacción [{$reaction->reaction_type}]".($reaction->title ? " en: {$reaction->title}" : ''),
+                    'external_published_at' => $reaction->published_at,
+                    'ip_address' => null,
+                    'user_agent' => 'Google Drive Sync Manual Claim',
+                    'created_at' => $reaction->published_at ?? $timestamp,
+                    'updated_at' => $timestamp,
+                ];
+                $count++;
+
+                if (count($evidences) === 500) {
+                    Evidence::insert($evidences);
+                    $evidences = [];
+                }
+            }
+
+            if ($evidences !== []) {
                 Evidence::insert($evidences);
-                $evidences = [];
             }
-        }
 
-        foreach ($importLog->reactions as $reaction) {
-            $evidences[] = [
-                'user_id' => $user->id,
-                'profile_id' => $profile->id,
-                'evidence_type_id' => $reactionTypeId,
-                'facebook_import_log_id' => $importLog->id,
-                'origin' => 'google_drive',
-                'social_network' => 'Facebook',
-                'comment' => "Reacción [{$reaction->reaction_type}]".($reaction->title ? " en: {$reaction->title}" : ''),
-                'external_published_at' => $reaction->published_at,
-                'ip_address' => null,
-                'user_agent' => 'Google Drive Sync Manual Claim',
-                'created_at' => $reaction->published_at ?? $timestamp,
-                'updated_at' => $timestamp,
-            ];
-            $count++;
+            $importLog->update([
+                'status' => 'completed',
+                'error_message' => null,
+            ]);
 
-            if (count($evidences) === 500) {
-                Evidence::insert($evidences);
-                $evidences = [];
-            }
-        }
-
-        if ($evidences !== []) {
-            Evidence::insert($evidences);
-        }
-
-        return $count;
+            return $count;
+        });
     }
 }

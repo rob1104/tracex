@@ -10,6 +10,7 @@ use App\Models\FacebookReaction;
 use App\Models\FacebookUser;
 use App\Models\Profile;
 use App\Services\FacebookExportParser;
+use App\Services\FacebookProfileIdentifier;
 use App\Services\ProfileAssignmentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -46,7 +47,7 @@ class ProcessFacebookExportJob implements ShouldQueue
             return;
         }
 
-        if ($importLog->status === 'completed') {
+        if (in_array($importLog->status, ['completed', 'pending_assignment'], true)) {
             $this->cleanLocalPath();
 
             return;
@@ -65,6 +66,8 @@ class ProcessFacebookExportJob implements ShouldQueue
             DB::transaction(function () use ($importLog): void {
                 $parser = new FacebookExportParser($this->localPath);
                 $profileDetails = $parser->perfil();
+                $exportIdentifier = FacebookProfileIdentifier::normalize($parser->identificador());
+                $profileDetails['identifier'] = $exportIdentifier;
 
                 // 1. Resolve Profile and Collaborator User
                 $assignmentService = app(ProfileAssignmentService::class);
@@ -87,14 +90,14 @@ class ProcessFacebookExportJob implements ShouldQueue
                 $importLog->evidences()->delete();
 
                 $facebookUser = FacebookUser::create([
-                    'profile_id' => $matchedProfile?->id ?? $this->findProfileId($profileDetails['nombre'] ?? null),
+                    'profile_id' => $matchedProfile?->id,
                     'import_log_id' => $importLog->id,
                     'age_range' => null,
                     'joined_at' => null,
                     'metadata' => [
                         'name' => $profileDetails['nombre'] ?? null,
                         'profile_uri' => $profileDetails['uri'] ?? null,
-                        'export_identifier' => $parser->identificador(),
+                        'export_identifier' => $exportIdentifier,
                     ],
                 ]);
 
@@ -228,8 +231,8 @@ class ProcessFacebookExportJob implements ShouldQueue
                     'user_id' => $assignedUser?->id,
                     'total_comments_extracted' => $commentCount,
                     'total_reactions_extracted' => $reactionCount,
-                    'status' => 'completed',
-                    'error_message' => null,
+                    'status' => $matchedProfile && $assignedUser ? 'completed' : 'pending_assignment',
+                    'error_message' => $matchedProfile && $assignedUser ? null : 'Se requiere asignación manual de perfil y colaborador.',
                 ]);
             });
         } catch (Throwable $exception) {
@@ -263,7 +266,7 @@ class ProcessFacebookExportJob implements ShouldQueue
         ]);
 
         $importLog = FacebookImportLog::find($this->importLogId);
-        if ($importLog && $importLog->status !== 'completed') {
+        if ($importLog && ! in_array($importLog->status, ['completed', 'pending_assignment'], true)) {
             $importLog->update([
                 'status' => 'failed',
                 'error_message' => mb_substr(
@@ -284,21 +287,5 @@ class ProcessFacebookExportJob implements ShouldQueue
         } elseif (File::exists($this->localPath)) {
             File::delete($this->localPath);
         }
-    }
-
-    protected function findProfileId(?string $exportedName): ?int
-    {
-        $normalizedName = mb_strtolower(trim((string) $exportedName));
-        if ($normalizedName === '') {
-            return null;
-        }
-
-        $profileIds = Profile::query()
-            ->whereRaw('LOWER(name) = ?', [$normalizedName])
-            ->whereRaw('LOWER(social_network) = ?', ['facebook'])
-            ->limit(2)
-            ->pluck('id');
-
-        return $profileIds->count() === 1 ? (int) $profileIds->first() : null;
     }
 }

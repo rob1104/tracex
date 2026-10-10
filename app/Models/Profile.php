@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\FacebookProfileIdentifier;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-#[Fillable(['email_account_id', 'name', 'password', 'social_network', 'status', 'created_by'])]
+#[Fillable(['email_account_id', 'name', 'password', 'facebook_identifier', 'social_network', 'status', 'created_by'])]
 class Profile extends Model
 {
     protected function casts(): array
@@ -14,6 +15,11 @@ class Profile extends Model
         return [
             'password' => 'encrypted',
         ];
+    }
+
+    public function setFacebookIdentifierAttribute(?string $value): void
+    {
+        $this->attributes['facebook_identifier'] = FacebookProfileIdentifier::normalize($value);
     }
 
     public function emailAccount()

@@ -3,8 +3,12 @@
 namespace App\Livewire\Admin\Profiles;
 
 use App\Models\EmailAccount;
+use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\FacebookProfileIdentifier;
+use App\Services\ProfileAssignmentService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -29,6 +33,8 @@ class Index extends Component
     #[Validate('required|string|max:255')]
     public $name = '';
 
+    public $facebook_identifier = '';
+
     #[Validate('nullable|string|max:255')]
     public $password = '';
 
@@ -49,7 +55,9 @@ class Index extends Component
     public $filter_gestor = '';
 
     public $filter_network = '';
+
     public $filterDateFrom = '';
+
     public $filterDateTo = '';
 
     // For Assignment Modal
@@ -74,6 +82,14 @@ class Index extends Component
     public $selectedColabViewId = '';
 
     public $viewingColabProfiles = [];
+
+    public $showClaimImportModal = false;
+
+    public $claimImportId = null;
+
+    public $claimProfileId = '';
+
+    public $claimUserId = '';
 
     public function updatedSelectedColabViewId($value)
     {
@@ -171,7 +187,7 @@ class Index extends Component
 
     public function create()
     {
-        $this->reset(['profileId', 'email_account_id', 'name', 'password', 'social_network', 'status']);
+        $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status']);
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
     }
@@ -187,6 +203,7 @@ class Index extends Component
         $this->profileId = $profile->id;
         $this->email_account_id = $profile->email_account_id;
         $this->name = $profile->name;
+        $this->facebook_identifier = $profile->facebook_identifier;
         $this->password = $profile->password;
         $this->social_network = $profile->social_network;
         $this->status = $profile->status;
@@ -199,6 +216,7 @@ class Index extends Component
         $rules = [
             'email_account_id' => 'required|exists:email_accounts,id',
             'name' => 'required|string|max:255',
+            'facebook_identifier' => 'nullable|string|max:512',
             'password' => 'nullable|string|max:255',
             'social_network' => 'required|string|max:255',
             'status' => 'required|in:active,suspended,restricted',
@@ -210,9 +228,25 @@ class Index extends Component
 
         $this->validate($rules);
 
+        $rawFacebookIdentifier = trim((string) $this->facebook_identifier);
+        $facebookIdentifier = FacebookProfileIdentifier::normalize($rawFacebookIdentifier);
+
+        if ($rawFacebookIdentifier !== '' && strtolower($this->social_network) !== 'facebook') {
+            $this->addError('facebook_identifier', 'Este identificador solo se usa en perfiles de Facebook.');
+
+            return;
+        }
+
+        if ($rawFacebookIdentifier !== '' && ($facebookIdentifier === null || mb_strlen($facebookIdentifier) > 191)) {
+            $this->addError('facebook_identifier', 'Ingresa un ID numerico o una URL valida de Facebook.');
+
+            return;
+        }
+
         $data = [
             'email_account_id' => $this->email_account_id,
             'name' => $this->name,
+            'facebook_identifier' => strtolower($this->social_network) === 'facebook' ? $facebookIdentifier : null,
             'password' => $this->password,
             'social_network' => $this->social_network,
             'status' => $this->status,
@@ -292,9 +326,95 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingFilterNetwork() { $this->resetPage(); }
-    public function updatingFilterDateFrom() { $this->resetPage(); }
-    public function updatingFilterDateTo() { $this->resetPage(); }
+    public function updatingFilterNetwork()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterDateFrom()
+    {
+        $this->resetPage();
+    }
+
+    public function updatingFilterDateTo()
+    {
+        $this->resetPage();
+    }
+
+    public function openClaimImportModal($id): void
+    {
+        $this->authorizeImportManagement();
+
+        $importLog = $this->pendingImportsQuery()->findOrFail($id);
+        $this->claimImportId = $importLog->id;
+        $this->claimProfileId = $importLog->profile_id && $this->facebookProfilesQuery()->whereKey($importLog->profile_id)->exists()
+            ? (string) $importLog->profile_id
+            : '';
+        $this->claimUserId = $importLog->user_id && User::query()
+            ->whereKey($importLog->user_id)
+            ->where('role', 'user')
+            ->where('is_active', true)
+            ->exists()
+            ? (string) $importLog->user_id
+            : '';
+        $this->resetValidation();
+        $this->showClaimImportModal = true;
+    }
+
+    public function claimImport(): void
+    {
+        $this->authorizeImportManagement();
+        $this->validate([
+            'claimImportId' => 'required|integer|exists:facebook_import_logs,id',
+            'claimProfileId' => 'required|integer|exists:profiles,id',
+            'claimUserId' => 'required|integer|exists:users,id',
+        ]);
+
+        $importLog = $this->pendingImportsQuery()->findOrFail($this->claimImportId);
+        $profile = $this->facebookProfilesQuery()->findOrFail($this->claimProfileId);
+        $user = User::query()
+            ->whereKey($this->claimUserId)
+            ->where('role', 'user')
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $evidenceCount = app(ProfileAssignmentService::class)->claimPendingImport($importLog, $profile, $user);
+
+        $this->reset(['showClaimImportModal', 'claimImportId', 'claimProfileId', 'claimUserId']);
+        $this->resetPage('pendingImportsPage');
+        session()->flash('status', "Carga asignada correctamente. Se generaron {$evidenceCount} evidencias.");
+    }
+
+    private function authorizeImportManagement(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+    }
+
+    private function facebookProfilesQuery()
+    {
+        $query = Profile::query()
+            ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+            ->orderBy('name');
+
+        if (auth()->user()->isCuentas()) {
+            $query->where('created_by', auth()->id());
+        }
+
+        return $query;
+    }
+
+    private function pendingImportsQuery()
+    {
+        $query = FacebookImportLog::pendingAssignment();
+
+        if (auth()->user()->isCuentas()) {
+            $query->whereHas('profile', function ($profileQuery) {
+                $profileQuery->where('created_by', auth()->id());
+            });
+        }
+
+        return $query;
+    }
 
     public function buildQuery()
     {
@@ -314,7 +434,9 @@ class Index extends Component
             $query->where('status', $this->filter_status);
         }
 
-        if ($this->filter_network) { $query->where('social_network', $this->filter_network); }
+        if ($this->filter_network) {
+            $query->where('social_network', $this->filter_network);
+        }
 
         if ($this->filterDateFrom) {
             $query->whereDate('created_at', '>=', $this->filterDateFrom);
@@ -326,7 +448,8 @@ class Index extends Component
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%'.$this->search.'%')
-                    ->orWhere('social_network', 'like', '%'.$this->search.'%');
+                    ->orWhere('social_network', 'like', '%'.$this->search.'%')
+                    ->orWhere('facebook_identifier', 'like', '%'.$this->search.'%');
             });
         }
 
@@ -380,7 +503,7 @@ class Index extends Component
             $filters['email'] = $email ? $email->email : null;
         }
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.profiles', [
+        $pdf = Pdf::loadView('pdf.profiles', [
             'profiles' => $profiles,
             'filters' => $filters,
             'generator' => auth()->user(),
@@ -404,8 +527,15 @@ class Index extends Component
             $networksQuery->where('created_by', auth()->id());
         }
 
+        $pendingImportsQuery = $this->pendingImportsQuery()
+            ->with(['profile', 'user', 'facebookUsers'])
+            ->withCount(['comments', 'reactions'])
+            ->latest('downloaded_at');
+
         return view('livewire.admin.profiles.index', [
             'profiles' => $this->buildQuery()->paginate(15),
+            'pendingImports' => $pendingImportsQuery->paginate(10, pageName: 'pendingImportsPage'),
+            'facebookProfiles' => $this->facebookProfilesQuery()->get(),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
             'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
@@ -413,4 +543,3 @@ class Index extends Component
         ])->layout('layouts.app');
     }
 }
-

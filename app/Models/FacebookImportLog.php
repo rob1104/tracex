@@ -102,4 +102,9 @@ class FacebookImportLog extends Model
     {
         return $query->where('status', 'downloaded');
     }
+
+    public function scopePendingAssignment(Builder $query): Builder
+    {
+        return $query->where('status', 'pending_assignment');
+    }
 }
