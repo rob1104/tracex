@@ -63,7 +63,13 @@ class Index extends Component
 
         $emailAccount = EmailAccount::query()
             ->where('status', 'active')
-            ->when(auth()->user()->isCuentas(), fn ($query) => $query->where('created_by', auth()->id()))
+            ->when(auth()->user()->isCuentas(), function ($query) {
+                $query->where(function ($accountQuery) {
+                    $accountQuery->where('created_by', auth()->id())
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('role', 'admin'));
+                });
+            })
             ->findOrFail($this->monitorEmailAccountId);
 
         if (Profile::query()
@@ -108,15 +114,25 @@ class Index extends Component
         $this->activityTab = 'recent';
     }
 
+    private function restrictToManageableProfiles($query)
+    {
+        if (auth()->user()->isCuentas()) {
+            $query->where(function ($profileQuery) {
+                $profileQuery->where('created_by', auth()->id())
+                    ->orWhereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()))
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('role', 'admin'));
+            });
+        }
+
+        return $query;
+    }
+
     private function facebookProfilesQuery()
     {
-        $query = Profile::query()
+        $query = $this->restrictToManageableProfiles(Profile::query()
             ->with('emailAccount')
-            ->whereRaw('LOWER(social_network) = ?', ['facebook']);
-
-        if (auth()->user()->isCuentas()) {
-            $query->where('created_by', auth()->id());
-        }
+            ->whereRaw('LOWER(social_network) = ?', ['facebook']));
 
         if ($this->search !== '') {
             $query->where(function ($profileQuery) {
@@ -134,9 +150,8 @@ class Index extends Component
 
         if (auth()->user()->isCuentas()) {
             $query->where(function ($importsQuery) {
-                $importsQuery->whereHas('profile', function ($profileQuery) {
-                    $profileQuery->where('created_by', auth()->id());
-                })->orWhere(function ($unassignedQuery) {
+                $importsQuery->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery))
+                    ->orWhere(function ($unassignedQuery) {
                     $unassignedQuery->whereNull('profile_id')->where('status', 'pending_assignment');
                 });
             });
@@ -156,9 +171,7 @@ class Index extends Component
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
         if (auth()->user()->isCuentas()) {
-            $query->whereHas('profile', function ($profileQuery) {
-                $profileQuery->where('created_by', auth()->id());
-            });
+            $query->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
         }
 
         if ($this->activityProfileId !== '') {
@@ -182,10 +195,9 @@ class Index extends Component
             ])
             ->withMax('facebookImportLogs as latest_facebook_export_at', 'downloaded_at');
 
-        $profileCountQuery = Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook']);
-        if (auth()->user()->isCuentas()) {
-            $profileCountQuery->where('created_by', auth()->id());
-        }
+        $profileCountQuery = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        );
 
         $importsQuery = $this->importsQuery();
         $processingCount = (clone $importsQuery)->whereIn('status', ['downloaded', 'processing'])->count();
@@ -193,7 +205,11 @@ class Index extends Component
 
         $emailsQuery = EmailAccount::query()->where('status', 'active');
         if (auth()->user()->isCuentas()) {
-            $emailsQuery->where('created_by', auth()->id());
+            $emailsQuery->where(function ($accountQuery) {
+                $accountQuery->where('created_by', auth()->id())
+                    ->orWhereNull('created_by')
+                    ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('role', 'admin'));
+            });
         }
 
         $driveConfigured = filled(config('services.google.drive.client_id'))

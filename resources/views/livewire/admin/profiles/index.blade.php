@@ -1,14 +1,84 @@
 <div>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Perfiles Sociales
-        </h2>
-    </x-slot>
+    <div class="min-h-[calc(100vh-4rem)] bg-slate-100">
+        <div class="mx-auto max-w-[1720px] px-0 sm:px-4 lg:px-6">
+            <div class="grid min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:grid-cols-[232px_minmax(0,1fr)] lg:rounded-xl">
+                <aside class="flex flex-col bg-slate-900 px-3 py-5 text-slate-200 lg:min-h-full">
+                    <div class="hidden items-center gap-3 px-3 pb-7 lg:flex">
+                        <span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-xl font-bold text-white shadow-lg shadow-blue-950/30">T</span>
+                        <div>
+                            <p class="text-lg font-bold tracking-wide text-white">TraceX</p>
+                            <p class="text-[11px] text-slate-400">Monitoreo de Facebook</p>
+                        </div>
+                    </div>
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 bg-white border-b border-gray-200">
+                    <nav class="grid grid-cols-2 gap-1 sm:grid-cols-3 lg:block lg:space-y-1" aria-label="Módulos de TraceX">
+                        <p class="hidden px-3 pb-2 pt-1 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Principal</p>
+                        <a href="{{ route('dashboard') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">⌂</span> Inicio
+                        </a>
+                        @if(auth()->user()->isAdmin())
+                            <a href="{{ route('admin.evidences.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                                <span class="w-5 text-center">▣</span> Evidencias
+                            </a>
+                        @endif
+                        <a href="{{ route('admin.facebook_monitoring.index') }}#recent-activity" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">◷</span> Actividad
+                        </a>
+                        <a href="{{ route('admin.facebook_monitoring.index') }}#drive-import" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">☁</span> Google Drive
+                        </a>
+
+                        <p class="hidden px-3 pb-2 pt-6 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 lg:block">Módulos</p>
+                        <a href="{{ route('admin.facebook_monitoring.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">👥</span> Monitoreo de usuarios
+                        </a>
+                        <a href="#facebook-pending-imports" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">↓</span> Sin asignar
+                            <span class="ml-auto rounded-full bg-amber-400/15 px-2 py-0.5 text-xs font-semibold text-amber-300">{{ $pendingImports->total() }}</span>
+                        </a>
+                        <a href="{{ route('admin.profiles.index') }}" wire:navigate aria-current="page" class="flex items-center gap-3 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-950/20">
+                            <span class="w-5 text-center">◉</span> Perfiles sociales
+                        </a>
+                        <a href="{{ route('admin.emails.index') }}" wire:navigate class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white">
+                            <span class="w-5 text-center">✉</span> Cuentas de correo
+                        </a>
+                    </nav>
+
+                    <div class="mt-auto hidden border-t border-slate-800 px-3 pt-5 text-xs lg:block">
+                        <p class="text-slate-400">Exportaciones de Meta</p>
+                        <p class="mt-2 text-slate-500">TraceX · Facebook</p>
+                    </div>
+                </aside>
+
+                <main class="min-w-0 bg-slate-50/70 p-4 sm:p-6 xl:p-8">
+                    <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Módulo de monitoreo</p>
+                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Perfiles sociales</h1>
+                            <p class="mt-1 text-sm text-slate-500">Administra perfiles, asignaciones y exportaciones de Facebook recibidas desde Drive.</p>
+                        </div>
+                        <a href="{{ route('admin.facebook_monitoring.index') }}" wire:navigate class="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 xl:self-auto">
+                            <span aria-hidden="true">◷</span> Abrir monitoreo
+                        </a>
+                    </header>
+
+                    @if (session('status'))
+                        <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('status') }}</div>
+                    @endif
+
+                    <section class="mb-5 grid gap-3 sm:grid-cols-2" aria-label="Resumen de perfiles e importaciones">
+                        <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xl text-blue-600">◉</span>
+                            <div><p class="text-xs text-slate-500">Perfiles visibles</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $profiles->total() }}</p><p class="mt-1 text-xs text-slate-400">Incluye los perfiles accesibles para tu cuenta</p></div>
+                        </article>
+                        <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-amber-50 text-xl text-amber-600">↓</span>
+                            <div><p class="text-xs text-slate-500">Exportaciones sin asignar</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $pendingImports->total() }}</p><p class="mt-1 text-xs text-slate-400">Pendientes de perfil y colaborador</p></div>
+                        </article>
+                    </section>
+
+                    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div class="p-4 sm:p-6">
                     <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
                         <div class="flex-1 w-full sm:w-1/3 mr-4">
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil..." class="w-full" />
@@ -76,12 +146,6 @@
                             <x-text-input type="date" wire:model.live="filterDateTo" id="filterDateTo" class="w-full text-sm" />
                         </div>
                     </div>
-
-                    @if (session('status'))
-                        <div class="mb-4 font-medium text-sm text-green-600 bg-green-50 p-4 rounded-lg">
-                            {{ session('status') }}
-                        </div>
-                    @endif
 
                     <div class="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
                         <table class="min-w-full divide-y divide-gray-200">
@@ -297,6 +361,8 @@
                         <div class="mt-4">{{ $pendingImports->links() }}</div>
                     </section>
                 </div>
+                    </section>
+                </main>
             </div>
         </div>
     </div>
