@@ -32,12 +32,14 @@ class Index extends Component
 
     public function create()
     {
+        $this->resetValidation();
         $this->reset(['typeId', 'name', 'description']);
         $this->showModal = true;
     }
 
     public function edit($id)
     {
+        $this->resetValidation();
         $type = EvidenceType::findOrFail($id);
         $this->typeId = $type->id;
         $this->name = $type->name;
