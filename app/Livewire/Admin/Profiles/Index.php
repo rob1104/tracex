@@ -197,13 +197,16 @@ class Index extends Component
 
     public function create()
     {
+        $this->resetValidation();
         $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status']);
+        $this->status = 'active';
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
     }
 
     public function edit($id)
     {
+        $this->resetValidation();
         $profile = Profile::findOrFail($id);
 
         if (! $this->canManageProfile($profile)) {
@@ -214,9 +217,13 @@ class Index extends Component
         $this->email_account_id = $profile->email_account_id;
         $this->name = $profile->name;
         $this->facebook_identifier = $profile->facebook_identifier;
-        $this->password = $profile->password;
+        try {
+            $this->password = $profile->password;
+        } catch (\Throwable $e) {
+            $this->password = '';
+        }
         $this->social_network = $profile->social_network;
-        $this->status = $profile->status;
+        $this->status = $profile->status ?: 'active';
         $this->created_by = $profile->created_by;
         $this->showModal = true;
     }
