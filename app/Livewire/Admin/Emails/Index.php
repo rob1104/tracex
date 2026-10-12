@@ -106,7 +106,9 @@ class Index extends Component
 
     public function create()
     {
+        $this->resetValidation();
         $this->reset(['emailId', 'alias', 'email', 'password', 'status']);
+        $this->status = 'active';
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
     }
@@ -130,6 +132,7 @@ class Index extends Component
 
     public function edit($id)
     {
+        $this->resetValidation();
         $account = EmailAccount::findOrFail($id);
 
         if (! $this->canManageEmail($account)) {
@@ -139,8 +142,12 @@ class Index extends Component
         $this->emailId = $account->id;
         $this->alias = $account->alias;
         $this->email = $account->email;
-        $this->password = $account->password; // Will be decrypted automatically thanks to casting
-        $this->status = $account->status;
+        try {
+            $this->password = $account->password; // Will be decrypted automatically thanks to casting
+        } catch (\Throwable $e) {
+            $this->password = '';
+        }
+        $this->status = $account->status ?: 'active';
         $this->created_by = $account->created_by;
         $this->showModal = true;
     }
