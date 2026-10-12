@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 
-#[Fillable(['alias', 'email', 'password', 'status', 'created_by', 'assigned_user_id'])]
+#[Fillable(['alias', 'email', 'password', 'status', 'created_by'])]
 class EmailAccount extends Model
 {
     protected function casts(): array
@@ -23,10 +23,5 @@ class EmailAccount extends Model
     public function creator()
     {
         return $this->belongsTo(User::class, 'created_by');
-    }
-
-    public function assignedUser()
-    {
-        return $this->belongsTo(User::class, 'assigned_user_id');
     }
 }

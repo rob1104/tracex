@@ -188,7 +188,7 @@ class ProfileAssignmentServiceTest extends TestCase
         $this->assertSame($profile->id, $user->evidences->first()->profile_id);
     }
 
-    public function test_it_resolves_profile_and_user_via_email_account_with_assigned_user(): void
+    public function test_it_resolves_facebook_profile_and_collaborator_via_email_account_email(): void
     {
         $creator = User::factory()->create(['role' => 'admin']);
         $collaborator = User::factory()->create([
@@ -204,7 +204,6 @@ class ProfileAssignmentServiceTest extends TestCase
             'password' => 'secret123',
             'status' => 'active',
             'created_by' => $creator->id,
-            'assigned_user_id' => $collaborator->id,
         ]);
 
         $profile = Profile::create([
@@ -214,6 +213,8 @@ class ProfileAssignmentServiceTest extends TestCase
             'status' => 'active',
             'created_by' => $creator->id,
         ]);
+
+        $profile->users()->attach($collaborator->id);
 
         $result = $this->service->resolve([
             'nombre' => 'Juana Rodriguez',
@@ -231,7 +232,7 @@ class ProfileAssignmentServiceTest extends TestCase
     public function test_it_does_not_auto_create_profile_when_facebook_profile_does_not_exist(): void
     {
         $creator = User::factory()->create(['role' => 'admin']);
-        $collaborator = User::factory()->create([
+        User::factory()->create([
             'name' => 'Sergio Perez',
             'email' => 'sergio.perez@empresa.com',
             'role' => 'user',
@@ -244,7 +245,6 @@ class ProfileAssignmentServiceTest extends TestCase
             'password' => 'secret123',
             'status' => 'active',
             'created_by' => $creator->id,
-            'assigned_user_id' => $collaborator->id,
         ]);
 
         $result = $this->service->resolve([

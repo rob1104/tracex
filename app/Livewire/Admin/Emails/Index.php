@@ -38,8 +38,6 @@ class Index extends Component
 
     public $created_by = '';
 
-    public $assigned_user_id = '';
-
     public function updatingSearch()
     {
         $this->resetPage();
@@ -108,7 +106,7 @@ class Index extends Component
 
     public function create()
     {
-        $this->reset(['emailId', 'alias', 'email', 'password', 'status', 'assigned_user_id']);
+        $this->reset(['emailId', 'alias', 'email', 'password', 'status']);
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
     }
@@ -144,7 +142,6 @@ class Index extends Component
         $this->password = $account->password; // Will be decrypted automatically thanks to casting
         $this->status = $account->status;
         $this->created_by = $account->created_by;
-        $this->assigned_user_id = $account->assigned_user_id;
         $this->showModal = true;
     }
 
@@ -155,7 +152,6 @@ class Index extends Component
             'email' => 'required|email|max:255|unique:email_accounts,email,'.$this->emailId,
             'password' => 'required|string|max:255',
             'status' => 'required|in:active,suspended',
-            'assigned_user_id' => 'nullable|exists:users,id',
         ];
 
         if (auth()->user()->isAdmin()) {
@@ -169,7 +165,6 @@ class Index extends Component
             'email' => $this->email,
             'password' => $this->password, // Encrypted casting will encrypt this on save
             'status' => $this->status,
-            'assigned_user_id' => $this->assigned_user_id ?: null,
         ];
 
         if (auth()->user()->isAdmin()) {
@@ -264,7 +259,7 @@ class Index extends Component
 
     public function buildQuery()
     {
-        $query = EmailAccount::with(['creator', 'profiles', 'assignedUser']);
+        $query = EmailAccount::with(['creator', 'profiles']);
 
         if (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
@@ -310,14 +305,13 @@ class Index extends Component
         return response()->streamDownload(function () use ($accounts) {
             $file = fopen('php://output', 'w');
             fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
-            fputcsv($file, ['ID', 'Alias', 'Email', 'Colaborador Asignado', 'Estado', 'Gestor Asignado', 'Perfiles Vinculados', 'Fecha de Creación']);
+            fputcsv($file, ['ID', 'Alias', 'Email', 'Estado', 'Gestor Asignado', 'Perfiles Vinculados', 'Fecha de Creación']);
 
             foreach ($accounts as $a) {
                 fputcsv($file, [
                     $a->id,
                     $a->alias ?? 'N/A',
                     $a->email,
-                    $a->assignedUser ? $a->assignedUser->name : 'Sin asignar',
                     $a->status === 'active' ? 'Activa' : 'Suspendida',
                     $a->creator ? $a->creator->name : 'N/A',
                     $a->profiles->count(),
@@ -361,7 +355,6 @@ class Index extends Component
         return view('livewire.admin.emails.index', [
             'accounts' => $this->buildQuery()->paginate(15),
             'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
-            'collaborators' => User::where('role', 'user')->where('is_active', true)->orderBy('name')->get(),
         ])->layout('layouts.app');
     }
 }

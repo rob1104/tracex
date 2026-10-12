@@ -75,7 +75,6 @@
                                 <tr>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaborador Asignado</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfiles</th>
                                     @if(auth()->user()->isAdmin())
                                         <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor Asignado</th>
@@ -90,16 +89,6 @@
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm font-medium text-gray-900">{{ $account->alias ?: '-' }}</td>
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">{{ $account->email }}</td>
-                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
-                                            @if($account->assignedUser)
-                                                <div class="font-medium text-gray-900">{{ $account->assignedUser->name }}</div>
-                                                <div class="text-xs text-gray-500">{{ $account->assignedUser->email }}</div>
-                                            @else
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">
-                                                    Sin asignar
-                                                </span>
-                                            @endif
-                                        </td>
                                         <td class="px-4 py-3 whitespace-nowrap">
                                             <button wire:click="viewProfiles({{ $account->id }})" class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-colors">
                                                 {{ $account->profiles->count() }} Perfiles
@@ -141,7 +130,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="8" class="px-4 py-3 text-center text-sm text-gray-500">
+                                        <td colspan="{{ auth()->user()->isAdmin() ? 8 : 7 }}" class="px-4 py-3 text-center text-sm text-gray-500">
                                             No hay cuentas de correo registradas.
                                         </td>
                                     </tr>
@@ -183,17 +172,6 @@
                                 <x-input-label for="password" value="Contraseña" />
                                 <x-text-input wire:model="password" id="password" class="block mt-1 w-full" type="text" required />
                                 <x-input-error :messages="$errors->get('password')" class="mt-2" />
-                            </div>
-                            <div>
-                                <x-input-label for="assigned_user_id" value="Colaborador Asignado" />
-                                <select wire:model="assigned_user_id" id="assigned_user_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
-                                    <option value="">Sin colaborador asignado</option>
-                                    @foreach($collaborators as $collab)
-                                        <option value="{{ $collab->id }}">{{ $collab->name }} ({{ $collab->email }})</option>
-                                    @endforeach
-                                </select>
-                                <x-input-error :messages="$errors->get('assigned_user_id')" class="mt-2" />
-                                <p class="mt-1 text-xs text-gray-500">Las importaciones de Facebook asociadas a este correo se asignarán automáticamente a este colaborador.</p>
                             </div>
                             <div>
                                 <x-input-label for="status" value="Estatus" />
