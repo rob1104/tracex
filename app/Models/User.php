@@ -65,4 +65,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Profile::class, 'created_by');
     }
+
+    public function assignedEmailAccounts()
+    {
+        return $this->hasMany(EmailAccount::class, 'assigned_user_id');
+    }
 }

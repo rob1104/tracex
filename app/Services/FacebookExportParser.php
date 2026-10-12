@@ -102,14 +102,55 @@ class FacebookExportParser
         }
     }
 
-    /** Nombre y URL del perfil, si el export incluye la información del perfil. */
+    /** Nombre y URL del perfil, y correos asociados si el export incluye la información del perfil. */
     public function perfil(): array
     {
         $p = $this->datosPerfil();
 
+        $emails = [];
+
+        if (! empty($p['emails'])) {
+            if (is_array($p['emails'])) {
+                foreach (['emails', 'previous_emails', 'pending_emails', 'ad_account_emails'] as $key) {
+                    if (! empty($p['emails'][$key]) && is_array($p['emails'][$key])) {
+                        foreach ($p['emails'][$key] as $email) {
+                            if (is_string($email)) {
+                                $trimmed = mb_strtolower(trim($email));
+                                if (filter_var($trimmed, FILTER_VALIDATE_EMAIL)) {
+                                    $emails[] = $trimmed;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                foreach ($p['emails'] as $item) {
+                    if (is_string($item)) {
+                        $trimmed = mb_strtolower(trim($item));
+                        if (filter_var($trimmed, FILTER_VALIDATE_EMAIL)) {
+                            $emails[] = $trimmed;
+                        }
+                    }
+                }
+            } elseif (is_string($p['emails'])) {
+                $trimmed = mb_strtolower(trim($p['emails']));
+                if (filter_var($trimmed, FILTER_VALIDATE_EMAIL)) {
+                    $emails[] = $trimmed;
+                }
+            }
+        }
+
+        if (! empty($p['email']) && is_string($p['email'])) {
+            $trimmed = mb_strtolower(trim($p['email']));
+            if (filter_var($trimmed, FILTER_VALIDATE_EMAIL)) {
+                $emails[] = $trimmed;
+            }
+        }
+
         return [
             'nombre' => $p['name']['full_name'] ?? null,
             'uri' => $p['profile_uri'] ?? null,
+            'emails' => array_values(array_unique($emails)),
         ];
     }
 

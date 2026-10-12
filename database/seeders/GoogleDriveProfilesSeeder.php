@@ -80,6 +80,7 @@ class GoogleDriveProfilesSeeder extends Seeder
                     'password' => 'secret123',
                     'status' => 'active',
                     'created_by' => $admin->id,
+                    'assigned_user_id' => $user->id,
                 ]
             );
 

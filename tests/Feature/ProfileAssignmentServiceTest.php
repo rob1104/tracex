@@ -187,4 +187,77 @@ class ProfileAssignmentServiceTest extends TestCase
         $this->assertSame('google_drive', $user->evidences->first()->origin);
         $this->assertSame($profile->id, $user->evidences->first()->profile_id);
     }
+
+    public function test_it_resolves_profile_and_user_via_email_account_with_assigned_user(): void
+    {
+        $creator = User::factory()->create(['role' => 'admin']);
+        $collaborator = User::factory()->create([
+            'name' => 'Juana Rodriguez',
+            'email' => 'juana.rodriguez@empresa.com',
+            'role' => 'user',
+            'is_active' => true,
+        ]);
+
+        $emailAccount = EmailAccount::create([
+            'email' => 'juana.rogj69@gmail.com',
+            'alias' => 'Correo Juana Rodriguez',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $creator->id,
+            'assigned_user_id' => $collaborator->id,
+        ]);
+
+        $profile = Profile::create([
+            'email_account_id' => $emailAccount->id,
+            'name' => 'Juana Rodriguez FB',
+            'social_network' => 'facebook',
+            'status' => 'active',
+            'created_by' => $creator->id,
+        ]);
+
+        $result = $this->service->resolve([
+            'nombre' => 'Juana Rodriguez',
+            'emails' => ['Juana.Rogj69@gmail.com'],
+            'uri' => 'https://facebook.com/profile.php?id=61593018723655',
+        ]);
+
+        $this->assertNotNull($result['profile']);
+        $this->assertSame($profile->id, $result['profile']->id);
+        $this->assertNotNull($result['user']);
+        $this->assertSame($collaborator->id, $result['user']->id);
+        $this->assertTrue($result['profile']->users->contains($collaborator));
+    }
+
+    public function test_it_does_not_auto_create_profile_when_facebook_profile_does_not_exist(): void
+    {
+        $creator = User::factory()->create(['role' => 'admin']);
+        $collaborator = User::factory()->create([
+            'name' => 'Sergio Perez',
+            'email' => 'sergio.perez@empresa.com',
+            'role' => 'user',
+            'is_active' => true,
+        ]);
+
+        $emailAccount = EmailAccount::create([
+            'email' => 'sergio.perez@outlook.com',
+            'alias' => 'Correo Sergio Perez',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $creator->id,
+            'assigned_user_id' => $collaborator->id,
+        ]);
+
+        $result = $this->service->resolve([
+            'nombre' => 'Sergio Perez Meta',
+            'emails' => ['sergio.perez@outlook.com'],
+            'identifier' => 'id:61592991939900',
+        ]);
+
+        $this->assertNull($result['profile']);
+        $this->assertNull($result['user']);
+        $this->assertDatabaseMissing('profiles', [
+            'email_account_id' => $emailAccount->id,
+            'social_network' => 'Facebook',
+        ]);
+    }
 }

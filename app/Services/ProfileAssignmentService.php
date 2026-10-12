@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\EmailAccount;
 use App\Models\Evidence;
 use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
@@ -16,7 +17,7 @@ class ProfileAssignmentService
     /**
      * Resolve the matched Profile and assigned collaborator User for a given exported profile payload.
      *
-     * @param  array{nombre?: ?string, uri?: ?string, identifier?: ?string}  $exportedProfile
+     * @param  array{nombre?: ?string, uri?: ?string, identifier?: ?string, emails?: array<string>}  $exportedProfile
      * @return array{profile: ?Profile, user: ?User}
      */
     public function resolve(array $exportedProfile): array
@@ -25,6 +26,74 @@ class ProfileAssignmentService
         $identifier = FacebookProfileIdentifier::normalize($exportedProfile['identifier'] ?? null);
         $uriIdentifier = FacebookProfileIdentifier::normalize($exportedProfile['uri'] ?? null);
         $identifiers = array_values(array_unique(array_filter([$identifier, $uriIdentifier])));
+        $emails = array_values(array_unique(array_filter(array_map('strtolower', array_map('trim', (array) ($exportedProfile['emails'] ?? []))))));
+
+        // 1. Resolution via Exported Emails (Primary)
+        if ($emails !== []) {
+            $emailAccount = EmailAccount::query()
+                ->whereIn('email', $emails)
+                ->with(['assignedUser', 'creator', 'profiles' => function ($q) {
+                    $q->whereRaw('LOWER(social_network) = ?', ['facebook'])
+                        ->with(['users' => fn ($uq) => $uq->where('is_active', true)->orderBy('users.id', 'asc')]);
+                }])
+                ->first();
+
+            if ($emailAccount) {
+                $user = ($emailAccount->assignedUser && $emailAccount->assignedUser->is_active)
+                    ? $emailAccount->assignedUser
+                    : null;
+
+                $profile = $emailAccount->profiles->first();
+
+                if (! $user && $profile) {
+                    $user = $profile->users->first();
+                }
+
+                if (! $user) {
+                    $directUser = User::query()
+                        ->whereIn('email', $emails)
+                        ->where('is_active', true)
+                        ->first();
+
+                    if ($directUser) {
+                        $user = $directUser;
+                        if (! $emailAccount->assigned_user_id) {
+                            $emailAccount->assigned_user_id = $directUser->id;
+                            $emailAccount->save();
+                        }
+                    }
+                }
+
+                if (! $profile) {
+                    // Si el perfil de Facebook no está registrado en el sistema, no se auto-crea ni asocia
+                    // automáticamente; se mantiene sin asociación hasta que un administrador lo asigne.
+                    return [
+                        'profile' => null,
+                        'user' => null,
+                    ];
+                }
+
+                $storedIdentifier = FacebookProfileIdentifier::normalize($profile->facebook_identifier);
+                if ($identifiers !== [] && $storedIdentifier === null) {
+                    $profile->facebook_identifier = $identifier ?? $uriIdentifier;
+                    $profile->save();
+                }
+
+                if ($user) {
+                    $profile->users()->syncWithoutDetaching([$user->id]);
+                    $profile->unsetRelation('users');
+                }
+
+                $user = $user ?? $profile->creator ?? $emailAccount->creator;
+
+                return [
+                    'profile' => $profile,
+                    'user' => $user,
+                ];
+            }
+        }
+
+        // 2. Fallback Resolution via Facebook Identifier or Name
         $facebookProfiles = Profile::query()
             ->with(['users' => function ($q) {
                 $q->where('is_active', true)->orderBy('users.id', 'asc');
@@ -77,10 +146,24 @@ class ProfileAssignmentService
             return ['profile' => null, 'user' => null];
         }
 
+        // If direct user with export email exists, bind to this profile
+        $directUser = null;
+        if ($emails !== []) {
+            $directUser = User::query()
+                ->whereIn('email', $emails)
+                ->where('is_active', true)
+                ->first();
+
+            if ($directUser) {
+                $profile->users()->syncWithoutDetaching([$directUser->id]);
+            }
+        }
+
         // Resolve assigned collaborator (User):
-        // 1. Primary: first active assigned collaborator in profile_user
-        // 2. Fallback: profile creator (created_by)
-        $user = $profile->users->first() ?? $profile->creator;
+        // 1. Direct matched user by email
+        // 2. First active assigned collaborator in profile_user
+        // 3. Fallback: profile creator (created_by)
+        $user = $directUser ?? $profile->users->first() ?? $profile->creator;
 
         return [
             'profile' => $profile,

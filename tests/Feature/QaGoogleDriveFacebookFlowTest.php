@@ -240,6 +240,16 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
                 'profile_uri' => 'https://facebook.com/maria.fernanda',
             ],
         ]));
+        File::put("{$folderDir}/comments.json", json_encode([
+            'comments_v2' => [
+                [
+                    'timestamp' => 1760000000,
+                    'data' => [
+                        ['comment' => ['comment' => 'Hola mundo', 'timestamp' => 1760000000]],
+                    ],
+                ],
+            ],
+        ]));
 
         $log1 = FacebookImportLog::create([
             'drive_file_id' => 'folder_match_1',
@@ -275,6 +285,16 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
             'profile_v2' => [
                 'name' => ['full_name' => 'Juan Perez Duplicado'],
                 'profile_uri' => 'https://facebook.com/juan.perez',
+            ],
+        ]));
+        File::put("{$ambiguousDir}/comments.json", json_encode([
+            'comments_v2' => [
+                [
+                    'timestamp' => 1760000000,
+                    'data' => [
+                        ['comment' => ['comment' => 'Comentario duplicado', 'timestamp' => 1760000000]],
+                    ],
+                ],
             ],
         ]));
 
