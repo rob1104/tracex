@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
+    'user_id',
+    'profile_id',
     'drive_file_id',
     'file_name',
     'file_size_bytes',
@@ -50,6 +53,21 @@ class FacebookImportLog extends Model
         ];
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function profile(): BelongsTo
+    {
+        return $this->belongsTo(Profile::class);
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(Evidence::class, 'facebook_import_log_id');
+    }
+
     public function facebookUsers(): HasMany
     {
         return $this->hasMany(FacebookUser::class, 'import_log_id');
@@ -83,5 +101,10 @@ class FacebookImportLog extends Model
     public function scopeDownloaded(Builder $query): Builder
     {
         return $query->where('status', 'downloaded');
+    }
+
+    public function scopePendingAssignment(Builder $query): Builder
+    {
+        return $query->where('status', 'pending_assignment');
     }
 }

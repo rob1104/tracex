@@ -20,6 +20,65 @@
                 </div>
             @endif
 
+            <section id="facebook-exports" class="mb-8 overflow-hidden rounded-2xl border border-amber-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-2 border-b border-slate-100 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900">Exportaciones de Facebook sin asignar</h2>
+                        <p class="mt-1 text-sm text-slate-500">Aquí quedan las exportaciones de Drive que no encontraron un perfil o colaborador automáticamente.</p>
+                    </div>
+                    <span class="w-fit rounded-full bg-amber-50 px-3 py-1.5 text-sm font-semibold text-amber-800">{{ $pendingImports->total() }} pendientes</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Carpeta de Drive</th>
+                                <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Facebook detectado</th>
+                                <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Actividad extraída</th>
+                                <th class="px-5 py-3 text-left text-xs font-bold uppercase tracking-wide text-slate-500">Recibida</th>
+                                <th class="px-5 py-3 text-right text-xs font-bold uppercase tracking-wide text-slate-500">Acción</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @forelse($pendingImports as $importLog)
+                                @php
+                                    $facebookUser = $importLog->facebookUsers->first();
+                                    $facebookMetadata = is_array($facebookUser?->metadata) ? $facebookUser->metadata : [];
+                                @endphp
+                                <tr wire:key="catalog-facebook-import-{{ $importLog->id }}" class="hover:bg-amber-50/30">
+                                    <td class="px-5 py-4 text-sm text-slate-800">
+                                        <div class="font-semibold">{{ $importLog->file_name }}</div>
+                                        <div class="mt-1 text-xs text-slate-500">ID: {{ $importLog->drive_file_id }}</div>
+                                        @if($importLog->error_message)<p class="mt-1 max-w-md text-xs text-amber-700">{{ $importLog->error_message }}</p>@endif
+                                    </td>
+                                    <td class="px-5 py-4 text-sm text-slate-700">
+                                        <div>{{ $importLog->profile?->name ?? ($facebookMetadata['name'] ?? 'Sin coincidencia') }}</div>
+                                        @if(! empty($facebookMetadata['profile_uri']))
+                                            <div class="mt-1 max-w-xs break-all text-xs text-slate-500">{{ $facebookMetadata['profile_uri'] }}</div>
+                                        @endif
+                                        @if(! $importLog->profile_id && ! empty($facebookMetadata['export_identifier']))
+                                            <div class="mt-1 text-xs text-slate-500">ID detectado: {{ $facebookMetadata['export_identifier'] }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
+                                        {{ $importLog->comments_count }} comentarios<br>
+                                        {{ $importLog->reactions_count }} reacciones<br>
+                                        {{ data_get($importLog->metadata, 'facebook_shares_count', count((array) data_get($importLog->metadata, 'facebook_shares', []))) }} compartidos
+                                    </td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-600">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
+                                    <td class="whitespace-nowrap px-5 py-4 text-right">
+                                        <button wire:click="openImportAssignmentModal({{ $importLog->id }})" class="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-indigo-700">Asignar</button>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="5" class="px-5 py-10 text-center text-sm text-slate-500">No hay exportaciones pendientes de asignación.</td></tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="border-t border-slate-100 px-5 py-4 sm:px-6">{{ $pendingImports->links() }}</div>
+            </section>
+
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900 overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200">
@@ -109,6 +168,47 @@
                             <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar</x-primary-button>
                             <button type="button" wire:click="$set('showModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                                 Cancelar
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showImportAssignmentModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="facebook-import-assignment-title">
+            <div class="flex min-h-screen items-center justify-center px-4 py-10">
+                <button type="button" class="fixed inset-0 bg-slate-900/50" wire:click="$set('showImportAssignmentModal', false)" aria-label="Cerrar"></button>
+                <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+                    <h3 id="facebook-import-assignment-title" class="text-lg font-bold text-slate-900">Asignar exportación de Facebook</h3>
+                    <p class="mt-1 text-sm text-slate-500">Elige el perfil y el colaborador. TraceX agregará la actividad importada a su historial.</p>
+                    <form wire:submit="assignPendingImport" class="mt-5 space-y-4">
+                        <div>
+                            <x-input-label for="claimProfileId" value="Perfil de Facebook" />
+                            <select id="claimProfileId" wire:model="claimProfileId" class="mt-1 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                <option value="">Selecciona un perfil</option>
+                                @foreach($facebookProfiles as $facebookProfile)
+                                    <option value="{{ $facebookProfile->id }}">{{ $facebookProfile->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('claimProfileId')" class="mt-1" />
+                        </div>
+                        <div>
+                            <x-input-label for="claimUserId" value="Colaborador" />
+                            <select id="claimUserId" wire:model="claimUserId" class="mt-1 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" required>
+                                <option value="">Selecciona un colaborador</option>
+                                @foreach($collaborators as $collaborator)
+                                    <option value="{{ $collaborator->id }}">{{ $collaborator->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('claimUserId')" class="mt-1" />
+                        </div>
+                        <div class="flex justify-end gap-3 border-t border-slate-100 pt-4">
+                            <button type="button" wire:click="$set('showImportAssignmentModal', false)" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Cancelar</button>
+                            <button type="submit" wire:loading.attr="disabled" wire:target="assignPendingImport" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50">
+                                <span wire:loading.remove wire:target="assignPendingImport">Asignar exportación</span>
+                                <span wire:loading wire:target="assignPendingImport">Procesando...</span>
                             </button>
                         </div>
                     </form>

@@ -20,7 +20,7 @@ class EvidenceTypeSeeder extends Seeder
         ];
 
         foreach ($types as $type) {
-            EvidenceType::create($type);
+            EvidenceType::firstOrCreate(['name' => $type['name']], $type);
         }
     }
 }

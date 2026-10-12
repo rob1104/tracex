@@ -14,7 +14,7 @@
         
         <!-- Filters -->
         <div class="bg-white p-4 shadow-sm sm:rounded-lg mb-6 flex flex-col sm:flex-row gap-4 items-end">
-            <div class="w-full sm:w-1/3">
+            <div class="w-full sm:w-1/4">
                 <x-input-label value="Tipo de Evidencia" />
                 <select wire:model.live="filterType" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
                     <option value="">Todos los tipos</option>
@@ -24,17 +24,26 @@
                 </select>
             </div>
 
-            <div class="w-full sm:w-1/3">
+            <div class="w-full sm:w-1/4">
+                <x-input-label value="Origen" />
+                <select wire:model.live="filterOrigin" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
+                    <option value="">Todos los orígenes</option>
+                    <option value="manual">Manual</option>
+                    <option value="google_drive">Google Drive</option>
+                </select>
+            </div>
+
+            <div class="w-full sm:w-1/4">
                 <x-input-label value="Desde" />
                 <x-text-input wire:model.live="filterDateFrom" type="date" class="block w-full mt-1" />
             </div>
 
-            <div class="w-full sm:w-1/3">
+            <div class="w-full sm:w-1/4">
                 <x-input-label value="Hasta" />
                 <x-text-input wire:model.live="filterDateTo" type="date" class="block w-full mt-1" />
             </div>
 
-            @if($filterType || $filterDateFrom || $filterDateTo)
+            @if($filterType || $filterOrigin || $filterDateFrom || $filterDateTo)
                 <div class="w-full sm:w-auto flex items-center mb-1">
                     <button wire:click="clearFilters" class="inline-flex items-center px-4 py-2 bg-gray-100 border border-transparent rounded-md font-semibold text-xs text-gray-700 uppercase tracking-widest hover:bg-gray-200 focus:bg-gray-200 active:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition ease-in-out duration-150">
                         Limpiar
@@ -82,8 +91,11 @@
                                 <tr class="hover:bg-slate-50 transition-colors">
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
                                         <div class="flex flex-col">
-                                            <span>{{ $evidence->created_at->translatedFormat('d M Y') }}</span>
-                                            <span class="text-xs text-gray-400">{{ $evidence->created_at->format('h:i A') }}</span>
+                                            @php
+                                                $displayDate = $evidence->external_published_at ?? $evidence->created_at;
+                                            @endphp
+                                            <span>{{ $displayDate->translatedFormat('d M Y') }}</span>
+                                            <span class="text-xs text-gray-400">{{ $displayDate->format('h:i A') }}</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -91,9 +103,21 @@
                                             @if($evidence->profile)
                                                 <span class="font-medium text-gray-700">{{ $evidence->profile->name }}</span>
                                             @endif
-                                            <span class="px-2.5 py-1 text-xs font-semibold rounded-full border {{ $netColor }} w-fit">
-                                                {{ $evidence->social_network }}
-                                            </span>
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full border {{ $netColor }} w-fit">
+                                                    {{ $evidence->social_network }}
+                                                </span>
+                                                @if($evidence->origin === 'google_drive')
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                        <svg class="w-2.5 h-2.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>
+                                                        Drive
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                                                        Manual
+                                                    </span>
+                                                @endif
+                                            </div>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -102,16 +126,25 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-sm text-gray-500">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($evidence->images as $image)
-                                                <button wire:click="showImage('{{ url('storage/'.$image->screenshot_path) }}')" class="relative group focus:outline-none z-0 hover:z-10 transition-transform hover:scale-110">
-                                                    <img class="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover cursor-pointer" src="{{ url('storage/'.$image->screenshot_path) }}" alt=""/>
-                                                </button>
-                                            @endforeach
-                                        </div>
+                                        @if($evidence->images->isNotEmpty())
+                                            <div class="flex -space-x-2 overflow-hidden">
+                                                @foreach($evidence->images as $image)
+                                                    <button wire:click="showImage('{{ url('storage/'.$image->screenshot_path) }}')" class="relative group focus:outline-none z-0 hover:z-10 transition-transform hover:scale-110">
+                                                        <img class="inline-block h-8 w-8 rounded-full ring-2 ring-white object-cover cursor-pointer" src="{{ url('storage/'.$image->screenshot_path) }}" alt=""/>
+                                                    </button>
+                                                @endforeach
+                                            </div>
+                                        @elseif($evidence->origin === 'google_drive')
+                                            <span class="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                                JSON Sync
+                                            </span>
+                                        @else
+                                            <span class="text-xs text-gray-400 italic">Sin capturas</span>
+                                        @endif
                                     </td>
-                                    <td class="px-6 py-4 text-sm text-gray-500">
-                                        {{ Str::limit($evidence->comment, 50) }}
+                                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                                        <span title="{{ $evidence->comment }}">{{ Str::limit($evidence->comment, 60) }}</span>
                                     </td>
                                 </tr>
                             @endforeach
@@ -123,7 +156,7 @@
                     </div>
                 @else
                     <div class="text-center py-10">
-                        @if($filterType || $filterDateFrom || $filterDateTo)
+                        @if($filterType || $filterOrigin || $filterDateFrom || $filterDateTo)
                             <p class="text-slate-500 mb-4 text-lg">No hay evidencias que coincidan con los filtros aplicados.</p>
                             <button wire:click="clearFilters" class="text-indigo-600 hover:text-indigo-900 font-medium">Limpiar filtros</button>
                         @else

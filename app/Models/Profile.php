@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Services\FacebookProfileIdentifier;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
-#[Fillable(['email_account_id', 'name', 'password', 'social_network', 'status', 'created_by'])]
+#[Fillable(['email_account_id', 'name', 'password', 'facebook_identifier', 'social_network', 'status', 'created_by'])]
 class Profile extends Model
 {
     protected function casts(): array
@@ -14,6 +16,11 @@ class Profile extends Model
         return [
             'password' => 'encrypted',
         ];
+    }
+
+    public function setFacebookIdentifierAttribute(?string $value): void
+    {
+        $this->attributes['facebook_identifier'] = FacebookProfileIdentifier::normalize($value);
     }
 
     public function emailAccount()
@@ -34,5 +41,35 @@ class Profile extends Model
     public function facebookUsers(): HasMany
     {
         return $this->hasMany(FacebookUser::class);
+    }
+
+    public function facebookImportLogs(): HasMany
+    {
+        return $this->hasMany(FacebookImportLog::class);
+    }
+
+    public function facebookComments(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookComment::class, FacebookUser::class, 'profile_id', 'facebook_user_id', 'id', 'id');
+    }
+
+    public function facebookReactions(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookReaction::class, FacebookUser::class, 'profile_id', 'facebook_user_id', 'id', 'id');
+    }
+
+    public function facebookCommentsThroughImports(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookComment::class, FacebookImportLog::class, 'profile_id', 'import_log_id', 'id', 'id');
+    }
+
+    public function facebookReactionsThroughImports(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookReaction::class, FacebookImportLog::class, 'profile_id', 'import_log_id', 'id', 'id');
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(Evidence::class);
     }
 }

@@ -1,14 +1,37 @@
 <div>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            Perfiles Sociales
-        </h2>
-    </x-slot>
+    <div class="min-h-[calc(100vh-4rem)] bg-slate-100">
+        <div class="mx-auto max-w-[1720px] px-0 sm:px-4 lg:px-6">
+            <div class="min-h-[calc(100vh-4rem)] overflow-hidden bg-white shadow-sm lg:rounded-xl">
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 bg-white border-b border-gray-200">
+                <main class="min-w-0 bg-slate-50/70 p-4 sm:p-6 xl:p-8">
+                    <header class="mb-6 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Módulo de monitoreo</p>
+                            <h1 class="mt-1 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">Perfiles sociales</h1>
+                            <p class="mt-1 text-sm text-slate-500">Administra perfiles, asignaciones y exportaciones de Facebook recibidas desde Drive.</p>
+                        </div>
+                        <a href="{{ route('admin.facebook_monitoring.index') }}" wire:navigate class="inline-flex items-center justify-center gap-2 self-start rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 xl:self-auto">
+                            <span aria-hidden="true">◷</span> Abrir monitoreo
+                        </a>
+                    </header>
+
+                    @if (session('status'))
+                        <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('status') }}</div>
+                    @endif
+
+                    <section class="mb-5 grid gap-3 sm:grid-cols-2" aria-label="Resumen de perfiles e importaciones">
+                        <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xl text-blue-600">◉</span>
+                            <div><p class="text-xs text-slate-500">Perfiles visibles</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $profiles->total() }}</p><p class="mt-1 text-xs text-slate-400">Incluye los perfiles accesibles para tu cuenta</p></div>
+                        </article>
+                        <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                            <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-amber-50 text-xl text-amber-600">↓</span>
+                            <div><p class="text-xs text-slate-500">Exportaciones sin asignar</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $pendingImports->total() }}</p><p class="mt-1 text-xs text-slate-400">Pendientes de perfil y colaborador</p></div>
+                        </article>
+                    </section>
+
+                    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <div class="p-4 sm:p-6">
                     <div class="flex flex-col sm:flex-row justify-between items-center mb-6 space-y-4 sm:space-y-0">
                         <div class="flex-1 w-full sm:w-1/3 mr-4">
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil..." class="w-full" />
@@ -77,12 +100,6 @@
                         </div>
                     </div>
 
-                    @if (session('status'))
-                        <div class="mb-4 font-medium text-sm text-green-600 bg-green-50 p-4 rounded-lg">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
                     <div class="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
@@ -94,6 +111,10 @@
                                     @endif
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Colaboradores</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Facebook asociado</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actividad de Facebook</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Exportaciones</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Última exportación</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th> <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                     <th scope="col" class="relative px-4 py-2"><span class="sr-only">Acciones</span></th>
                                 </tr>
@@ -121,6 +142,11 @@
                                                             {{ $profile->social_network }}
                                                         </span>
                                                     </div>
+                                                    @if($profile->facebook_identifier)
+                                                        <div class="mt-1 max-w-xs break-all text-xs text-gray-500" title="Identificador de Facebook">
+                                                            Identificador de Facebook: {{ $profile->facebook_identifier }}
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </div>
                                         </td>
@@ -152,6 +178,48 @@
                                                 {{ $profile->users->count() }} Asignados
                                             </button>
                                         </td>
+                                        <td class="px-4 py-3 whitespace-normal text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                <span class="text-xs font-medium text-blue-700">Perfil monitoreado</span>
+                                            @else
+                                                @php
+                                                    $associatedFacebookProfiles = $profile->users
+                                                        ->flatMap(fn ($assignedUser) => $facebookProfilesByUser[$assignedUser->id] ?? [])
+                                                        ->unique('id');
+                                                @endphp
+                                                @forelse($associatedFacebookProfiles as $facebookProfile)
+                                                    <div class="text-xs text-gray-700">{{ $facebookProfile['name'] }}</div>
+                                                @empty
+                                                    <span class="text-xs text-gray-400">Sin asociación</span>
+                                                @endforelse
+                                                @if($associatedFacebookProfiles->isNotEmpty())
+                                                    <span class="mt-1 block text-xs text-gray-400" title="Se determina por los colaboradores asignados a ambos perfiles">Por colaborador asignado</span>
+                                                @endif
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                <div>{{ $profile->facebook_comments_count ?? 0 }} comentarios</div>
+                                                <div class="text-xs text-gray-500">{{ $profile->facebook_reactions_count ?? 0 }} reacciones</div>
+                                                <div class="text-xs text-gray-500">{{ $profile->facebook_shares_count ?? 0 }} compartidos</div>
+                                            @else
+                                                <span class="text-xs text-gray-400">No aplica</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook')
+                                                {{ $profile->facebook_exports_count ?? 0 }} recibidas
+                                            @else
+                                                <span class="text-xs text-gray-400">No aplica</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                            @if(strtolower($profile->social_network) === 'facebook' && $profile->latest_facebook_export_at)
+                                                {{ \Illuminate\Support\Carbon::parse($profile->latest_facebook_export_at)->format('d/m/Y H:i') }}
+                                            @else
+                                                <span class="text-xs text-gray-400">Sin exportaciones</span>
+                                            @endif
+                                        </td>
                                         <td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center space-x-2 text-sm"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><div class="flex flex-col"><span class="font-semibold text-gray-700">{{ $profile->created_at->format('d M Y') }}</span><span class="text-xs text-gray-500">{{ $profile->created_at->format('h:i A') }}</span></div></div></td> <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">@if($profile->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
                                             @elseif($profile->status === 'restricted')
@@ -178,7 +246,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-4 py-3 text-center text-sm text-gray-500">
+                                        <td colspan="{{ auth()->user()->isAdmin() ? 12 : 11 }}" class="px-4 py-3 text-center text-sm text-gray-500">
                                             No hay perfiles sociales registrados.
                                         </td>
                                     </tr>
@@ -189,18 +257,76 @@
                     <div class="mt-4">
                         {{ $profiles->links() }}
                     </div>
+
+                    <section id="facebook-pending-imports" class="mt-10 border-t border-gray-200 pt-8">
+                        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900">Importaciones pendientes de asignacion</h3>
+                                <p class="text-sm text-gray-500">Asigna cada exportacion de Facebook a un perfil y colaborador para crear sus evidencias.</p>
+                            </div>
+                            <span class="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">{{ $pendingImports->total() }} pendientes</span>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-lg border border-gray-200">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Exportacion</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Perfil detectado</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Datos extraidos</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Descarga</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">Accion</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-200 bg-white">
+                                    @forelse($pendingImports as $importLog)
+                                        @php
+                                            $facebookUser = $importLog->facebookUsers->first();
+                                            $profileName = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['name'] ?? null) : null;
+                                        @endphp
+                                        <tr>
+                                            <td class="px-4 py-3 text-sm text-gray-900">
+                                                <div class="font-medium">{{ $importLog->file_name }}</div>
+                                                @if($importLog->error_message)
+                                                    <div class="mt-1 max-w-sm text-xs text-amber-700">{{ $importLog->error_message }}</div>
+                                                @endif
+                                            </td>
+                                            <td class="px-4 py-3 text-sm text-gray-700">{{ $importLog->profile?->name ?? $profileName ?? 'Sin coincidencia automatica' }}</td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                                {{ $importLog->comments_count }} comentarios<br>
+                                                {{ $importLog->reactions_count }} reacciones
+                                            </td>
+                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
+                                            <td class="px-4 py-3 text-right">
+                                                <button wire:click="openClaimImportModal({{ $importLog->id }})" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-indigo-700">
+                                                    Asignar
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="px-4 py-8 text-center text-sm text-gray-500">No hay importaciones pendientes.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-4">{{ $pendingImports->links() }}</div>
+                    </section>
                 </div>
+                    </section>
+                </main>
             </div>
         </div>
     </div>
 
     <!-- Modal Form CRUD -->
     @if($showModal)
-        <div x-data x-init="setTimeout(() => $refs.firstInput.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div x-data x-init="setTimeout(() => $refs.firstInput?.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
                 <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="save">
                         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 space-y-4">
                             <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
@@ -212,28 +338,19 @@
                                 <x-input-error :messages="$errors->get('name')" class="mt-2" />
                             </div>
                             <!-- Alpine Searchable Dropdown for Email Account -->
+                            @php
+                                $initialSelectedEmailText = 'Seleccione una cuenta...';
+                                if ($email_account_id) {
+                                    $selectedEmailModel = $emails->firstWhere('id', (int) $email_account_id) ?? \App\Models\EmailAccount::find($email_account_id);
+                                    if ($selectedEmailModel) {
+                                        $initialSelectedEmailText = $selectedEmailModel->email . ($selectedEmailModel->alias ? ' (' . $selectedEmailModel->alias . ')' : '');
+                                    }
+                                }
+                            @endphp
                             <div x-data="{
                                     search: '',
                                     open: false,
-                                    selectedText: 'Seleccione una cuenta...',
-
-                                    init() {
-                                        this.updateSelectedText();
-                                        $watch('$wire.email_account_id', () => {
-                                            this.updateSelectedText();
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.email_account_id) {
-                                            this.selectedText = 'Seleccione una cuenta...';
-                                            return;
-                                        }
-                                        let selectedOpt = this.$refs.accountsList.querySelector(`li[data-id='${$wire.email_account_id}']`);
-                                        if (selectedOpt) {
-                                            this.selectedText = selectedOpt.getAttribute('data-text');
-                                        }
-                                    },
+                                    selectedText: @js($initialSelectedEmailText),
 
                                     selectAccount(id, text) {
                                         $wire.set('email_account_id', id);
@@ -247,7 +364,7 @@
                                 <x-input-label value="Cuenta de Correo Asociada" />
 
                                 <button type="button" @click="open = !open" class="mt-1 relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                    <span class="block truncate" x-text="selectedText">Seleccione una cuenta...</span>
+                                    <span class="block truncate" x-text="selectedText">{{ $initialSelectedEmailText }}</span>
                                     <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                         <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                             <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -259,8 +376,8 @@
                                     <div class="px-2 pb-2 sticky top-0 bg-white pt-2">
                                         <input type="text" x-model="search" placeholder="Buscar por correo o alias..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
                                     </div>
-                                    <ul x-ref="accountsList" class="max-h-48 overflow-y-auto">
-                                        <li @click="$wire.set('email_account_id', ''); selectedText = 'Seleccione una cuenta...'; open = false;" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
+                                    <ul class="max-h-48 overflow-y-auto">
+                                        <li @click="selectAccount('', 'Seleccione una cuenta...')" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
                                             <span class="block font-normal truncate">-- Seleccione --</span>
                                         </li>
                                         @foreach($emails as $email)
@@ -295,6 +412,12 @@
                                     <option value="YouTube">YouTube</option>
                                 </select>
                                 <x-input-error :messages="$errors->get('social_network')" class="mt-2" />
+                            </div>
+                            <div>
+                                <x-input-label for="facebook_identifier" value="Identificador de Facebook (opcional)" />
+                                <x-text-input wire:model="facebook_identifier" id="facebook_identifier" class="mt-1 block w-full" type="text" maxlength="512" placeholder="id:1000987654321 o https://facebook.com/usuario" />
+                                <p class="mt-1 text-xs text-gray-500">Puedes pegar el ID o la URL del perfil. El sistema usa este dato para vincular las exportaciones de Drive.</p>
+                                <x-input-error :messages="$errors->get('facebook_identifier')" class="mt-2" />
                             </div>
                             <div>
                                 <x-input-label for="password" value="Contraseña" />
@@ -455,7 +578,7 @@
                                         Perfiles a Transferir
                                         <span class="bg-indigo-100 text-indigo-800 text-xs py-1 px-2 rounded-full">{{ count($sourceProfiles) }} perfiles encontrados</span>
                                     </h4>
-                                    
+
                                     @if(count($sourceProfiles) > 0)
                                         <div class="mb-2 flex justify-end">
                                             <button type="button" wire:click="toggleSelectAll" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium focus:outline-none">
@@ -525,30 +648,21 @@
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 min-h-[500px]">
                         <div class="mb-6 relative">
                             <x-input-label value="Seleccione o busque un colaborador" />
-                            
+
                             <!-- Alpine Searchable Dropdown for Colaborador -->
+                            @php
+                                $initialSelectedColabText = 'Seleccione un colaborador...';
+                                if ($selectedColabViewId) {
+                                    $selectedColabModel = $usersList->firstWhere('id', (int) $selectedColabViewId) ?? \App\Models\User::find($selectedColabViewId);
+                                    if ($selectedColabModel) {
+                                        $initialSelectedColabText = $selectedColabModel->name;
+                                    }
+                                }
+                            @endphp
                             <div x-data="{
                                     search: '',
                                     open: false,
-                                    selectedText: 'Seleccione un colaborador...',
-
-                                    init() {
-                                        this.updateSelectedText();
-                                        $watch('$wire.selectedColabViewId', () => {
-                                            this.updateSelectedText();
-                                        });
-                                    },
-
-                                    updateSelectedText() {
-                                        if (!$wire.selectedColabViewId) {
-                                            this.selectedText = 'Seleccione un colaborador...';
-                                            return;
-                                        }
-                                        let item = this.$refs.colabsList.querySelector(`li[data-id='${$wire.selectedColabViewId}']`);
-                                        if (item) {
-                                            this.selectedText = item.getAttribute('data-text');
-                                        }
-                                    },
+                                    selectedText: @js($initialSelectedColabText),
 
                                     selectColab(id, text) {
                                         $wire.set('selectedColabViewId', id);
@@ -559,9 +673,9 @@
                                 }"
                                 class="relative mt-1"
                                 @click.outside="open = false">
-                                
+
                                 <button type="button" @click="open = !open" class="relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 sm:text-sm">
-                                    <span class="block truncate" x-text="selectedText"></span>
+                                    <span class="block truncate" x-text="selectedText">{{ $initialSelectedColabText }}</span>
                                     <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
                                         <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                             <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -644,6 +758,52 @@
                             Cerrar
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @if($showClaimImportModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="claim-import-title">
+            <div class="flex min-h-screen items-center justify-center px-4 py-10">
+                <button type="button" class="fixed inset-0 bg-gray-900/50" wire:click="$set('showClaimImportModal', false)" aria-label="Cerrar modal"></button>
+                <div class="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+                    <h3 id="claim-import-title" class="text-lg font-semibold text-gray-900">Asignar importacion de Facebook</h3>
+                    <p class="mt-1 text-sm text-gray-500">Selecciona el perfil social y el colaborador que recibira las evidencias.</p>
+
+                    <form wire:submit="claimImport" class="mt-5 space-y-4">
+                        <div>
+                            <x-input-label for="claimProfileId" value="Perfil de Facebook" />
+                            <select id="claimProfileId" wire:model="claimProfileId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">Selecciona un perfil</option>
+                                @foreach($facebookProfiles as $facebookProfile)
+                                    <option value="{{ $facebookProfile->id }}">{{ $facebookProfile->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('claimProfileId')" class="mt-2" />
+                        </div>
+
+                        <div>
+                            <x-input-label for="claimUserId" value="Colaborador" />
+                            <select id="claimUserId" wire:model="claimUserId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">Selecciona un colaborador</option>
+                                @foreach($usersList as $collaborator)
+                                    <option value="{{ $collaborator->id }}">{{ $collaborator->name }}</option>
+                                @endforeach
+                            </select>
+                            <x-input-error :messages="$errors->get('claimUserId')" class="mt-2" />
+                        </div>
+
+                        <x-input-error :messages="$errors->get('pendingImport')" class="mt-2" />
+
+                        <div class="flex justify-end gap-3 border-t border-gray-200 pt-4">
+                            <button type="button" wire:click="$set('showClaimImportModal', false)" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">Cancelar</button>
+                            <button type="submit" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50" wire:loading.attr="disabled" wire:target="claimImport">
+                                <span wire:loading.remove wire:target="claimImport">Guardar asignacion</span>
+                                <span wire:loading wire:target="claimImport">Procesando...</span>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

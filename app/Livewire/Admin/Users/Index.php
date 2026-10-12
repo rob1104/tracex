@@ -4,6 +4,7 @@ namespace App\Livewire\Admin\Users;
 
 use App\Models\EmailAccount;
 use App\Models\User;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -37,7 +38,15 @@ class Index extends Component
         $user = User::findOrFail($id);
         if ($user->role === 'cuentas') {
             $this->viewingUserName = $user->name;
-            $this->viewingUserAccounts = EmailAccount::withCount('profiles')->where('created_by', $user->id)->orderBy('email', 'asc')->get();
+            $query = EmailAccount::withCount('profiles')->where('created_by', $user->id);
+            if ((clone $query)->count() === 0) {
+                $query = EmailAccount::withCount('profiles')->where(function ($q) use ($user) {
+                    $q->where('created_by', $user->id)
+                        ->orWhereNull('created_by')
+                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                });
+            }
+            $this->viewingUserAccounts = $query->orderBy('email', 'asc')->get();
             $this->showAccountsModal = true;
         }
     }
@@ -151,7 +160,7 @@ class Index extends Component
             'search' => $this->search ?: 'Todos',
         ];
 
-        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.users', [
+        $pdf = Pdf::loadView('pdf.users', [
             'users' => $users,
             'filters' => $filters,
             'generator' => auth()->user(),
