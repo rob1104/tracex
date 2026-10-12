@@ -7,6 +7,7 @@ use App\Models\Evidence;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Services\FacebookProfileIdentifier;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -152,8 +153,8 @@ class Index extends Component
             $query->where(function ($importsQuery) {
                 $importsQuery->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery))
                     ->orWhere(function ($unassignedQuery) {
-                    $unassignedQuery->whereNull('profile_id')->where('status', 'pending_assignment');
-                });
+                        $unassignedQuery->whereNull('profile_id')->where('status', 'pending_assignment');
+                    });
             });
         }
 
@@ -186,8 +187,8 @@ class Index extends Component
         $profilesQuery = $this->facebookProfilesQuery()
             ->withCount([
                 'facebookImportLogs as facebook_exports_count',
-                'facebookComments as facebook_comments_count',
-                'facebookReactions as facebook_reactions_count',
+                'facebookCommentsThroughImports as facebook_comments_count',
+                'facebookReactionsThroughImports as facebook_reactions_count',
                 'evidences as facebook_shares_count' => fn ($query) => $query
                     ->where('origin', 'google_drive')
                     ->whereRaw('LOWER(social_network) = ?', ['facebook'])
@@ -285,7 +286,7 @@ class Index extends Component
         }
 
         foreach ($chartRows as $row) {
-            $activityDate = \Illuminate\Support\Carbon::parse($row->activity_date);
+            $activityDate = Carbon::parse($row->activity_date);
             $bucketKey = ($this->chartGrouping === 'week' ? $activityDate->copy()->startOfWeek() : $activityDate)->toDateString();
             if (! isset($chartBuckets[$bucketKey])) {
                 continue;

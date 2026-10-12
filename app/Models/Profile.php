@@ -58,6 +58,16 @@ class Profile extends Model
         return $this->hasManyThrough(FacebookReaction::class, FacebookUser::class, 'profile_id', 'facebook_user_id', 'id', 'id');
     }
 
+    public function facebookCommentsThroughImports(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookComment::class, FacebookImportLog::class, 'profile_id', 'import_log_id', 'id', 'id');
+    }
+
+    public function facebookReactionsThroughImports(): HasManyThrough
+    {
+        return $this->hasManyThrough(FacebookReaction::class, FacebookImportLog::class, 'profile_id', 'import_log_id', 'id', 'id');
+    }
+
     public function evidences(): HasMany
     {
         return $this->hasMany(Evidence::class);
