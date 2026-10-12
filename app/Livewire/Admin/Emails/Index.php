@@ -55,6 +55,8 @@ class Index extends Component
 
     public function updatedSourceGestorId($value)
     {
+        $this->authorizeAccountManagement();
+
         if (auth()->user()->isCuentas() && $value != auth()->id()) {
             return;
         }
@@ -78,12 +80,15 @@ class Index extends Component
 
     public function openMassAssignModal()
     {
+        $this->authorizeAccountManagement();
         $this->reset(['sourceGestorId', 'destinationGestorId', 'sourceAccounts', 'selectedAccounts']);
         $this->showMassAssignModal = true;
     }
 
     public function executeMassAssignment()
     {
+        $this->authorizeAccountManagement();
+
         if (auth()->user()->isCuentas() && $this->sourceGestorId != auth()->id()) {
             abort(403);
         }
@@ -106,6 +111,7 @@ class Index extends Component
 
     public function create()
     {
+        $this->authorizeAccountManagement();
         $this->reset(['emailId', 'alias', 'email', 'password', 'status']);
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
@@ -113,8 +119,12 @@ class Index extends Component
 
     private function canManageEmail(EmailAccount $account): bool
     {
-        if (! auth()->user()->isCuentas()) {
+        if (auth()->user()->isAdmin()) {
             return true;
+        }
+
+        if (auth()->user()->isUser()) {
+            return false;
         }
 
         if ($account->created_by === auth()->id()) {
@@ -126,6 +136,21 @@ class Index extends Component
         }
 
         return (bool) ($account->creator && $account->creator->isAdmin());
+    }
+
+    private function canViewEmail(EmailAccount $account): bool
+    {
+        if (auth()->user()->isAdmin() || $this->canManageEmail($account)) {
+            return true;
+        }
+
+        return auth()->user()->isUser()
+            && $account->profiles()->whereHas('users', fn ($query) => $query->where('users.id', auth()->id()))->exists();
+    }
+
+    private function authorizeAccountManagement(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
     }
 
     public function edit($id)
@@ -147,6 +172,8 @@ class Index extends Component
 
     public function save()
     {
+        $this->authorizeAccountManagement();
+
         $rules = [
             'alias' => 'nullable|string|max:255',
             'email' => 'required|email|max:255|unique:email_accounts,email,'.$this->emailId,
@@ -215,8 +242,13 @@ class Index extends Component
     public function viewProfiles($id)
     {
         $account = EmailAccount::with('profiles')->findOrFail($id);
-        if (! $this->canManageEmail($account)) {
+        if (! $this->canViewEmail($account)) {
             abort(403);
+        }
+        if (auth()->user()->isUser()) {
+            $account->setRelation('profiles', $account->profiles()
+                ->whereHas('users', fn ($query) => $query->where('users.id', auth()->id()))
+                ->get());
         }
         $this->selectedAccountForProfiles = $account;
         $this->showProfilesModal = true;
@@ -261,7 +293,11 @@ class Index extends Component
     {
         $query = EmailAccount::with(['creator', 'profiles']);
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->with(['profiles' => fn ($profileQuery) => $profileQuery
+                ->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()))]);
+            $query->whereHas('profiles.users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
                 $q->where('created_by', auth()->id())
                     ->orWhereNull('created_by')

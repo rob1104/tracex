@@ -6,6 +6,7 @@ use App\Models\EmailAccount;
 use App\Models\Evidence;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
+use App\Models\User;
 use App\Services\FacebookProfileIdentifier;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +18,8 @@ class Index extends Component
     use WithPagination;
 
     public string $search = '';
+
+    public string $collaboratorId = '';
 
     public string $monitorName = '';
 
@@ -37,8 +40,15 @@ class Index extends Component
         $this->resetPage();
     }
 
+    public function updatedCollaboratorId(): void
+    {
+        $this->resetPage();
+    }
+
     public function registerMonitoredFacebookProfile(): void
     {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+
         $this->validate([
             'monitorName' => 'required|string|max:255',
             'monitorFacebookUrl' => 'required|string|max:512',
@@ -117,7 +127,9 @@ class Index extends Component
 
     private function restrictToManageableProfiles($query)
     {
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($profileQuery) {
                 $profileQuery->where('created_by', auth()->id())
                     ->orWhereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()))
@@ -129,11 +141,24 @@ class Index extends Component
         return $query;
     }
 
+    private function filterProfilesByCollaborator($query)
+    {
+        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+            $collaboratorId = (int) $this->collaboratorId;
+            $query->where(function ($profileQuery) use ($collaboratorId) {
+                $profileQuery->where('created_by', $collaboratorId)
+                    ->orWhereHas('users', fn ($userQuery) => $userQuery->where('users.id', $collaboratorId));
+            });
+        }
+
+        return $query;
+    }
+
     private function facebookProfilesQuery()
     {
-        $query = $this->restrictToManageableProfiles(Profile::query()
-            ->with('emailAccount')
-            ->whereRaw('LOWER(social_network) = ?', ['facebook']));
+        $query = $this->filterProfilesByCollaborator($this->restrictToManageableProfiles(Profile::query()
+            ->with(['emailAccount.creator', 'users'])
+            ->whereRaw('LOWER(social_network) = ?', ['facebook'])));
 
         if ($this->search !== '') {
             $query->where(function ($profileQuery) {
@@ -149,12 +174,26 @@ class Index extends Component
     {
         $query = FacebookImportLog::query();
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->where(function ($importsQuery) {
+                $importsQuery->where('user_id', auth()->id())
+                    ->orWhereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+            });
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($importsQuery) {
                 $importsQuery->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery))
                     ->orWhere(function ($unassignedQuery) {
                         $unassignedQuery->whereNull('profile_id')->where('status', 'pending_assignment');
                     });
+            });
+        }
+
+        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+            $collaboratorId = (int) $this->collaboratorId;
+            $query->where(function ($importsQuery) use ($collaboratorId) {
+                $importsQuery->where('user_id', $collaboratorId)
+                    ->orWhereHas('profile', fn ($profileQuery) => $profileQuery->where('created_by', $collaboratorId))
+                    ->orWhereHas('profile.users', fn ($userQuery) => $userQuery->where('users.id', $collaboratorId));
             });
         }
 
@@ -171,8 +210,17 @@ class Index extends Component
             ->where('origin', 'google_drive')
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->where(function ($activityQuery) {
+                $activityQuery->where('user_id', auth()->id())
+                    ->orWhereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+            });
+        } elseif (auth()->user()->isCuentas()) {
             $query->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+        }
+
+        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+            $query->where('user_id', (int) $this->collaboratorId);
         }
 
         if ($this->activityProfileId !== '') {
@@ -196,16 +244,18 @@ class Index extends Component
             ])
             ->withMax('facebookImportLogs as latest_facebook_export_at', 'downloaded_at');
 
-        $profileCountQuery = $this->restrictToManageableProfiles(
+        $profileCountQuery = $this->filterProfilesByCollaborator($this->restrictToManageableProfiles(
             Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
-        );
+        ));
 
         $importsQuery = $this->importsQuery();
         $processingCount = (clone $importsQuery)->whereIn('status', ['downloaded', 'processing'])->count();
         $pendingAssignmentCount = (clone $importsQuery)->where('status', 'pending_assignment')->count();
 
         $emailsQuery = EmailAccount::query()->where('status', 'active');
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $emailsQuery->whereHas('profiles.users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $emailsQuery->where(function ($accountQuery) {
                 $accountQuery->where('created_by', auth()->id())
                     ->orWhereNull('created_by')
@@ -309,6 +359,9 @@ class Index extends Component
 
         return view('livewire.admin.facebook-monitoring.index', [
             'profiles' => $profilesQuery->latest()->paginate(6),
+            'collaborators' => auth()->user()->isAdmin()
+                ? User::query()->where('role', 'user')->where('is_active', true)->orderBy('name')->get()
+                : collect(),
             'emails' => $emailsQuery->orderBy('email')->get(),
             'totalProfiles' => $profileCountQuery->count(),
             'totalImports' => (clone $importsQuery)->count(),

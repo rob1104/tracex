@@ -37,16 +37,19 @@
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar perfil..." class="w-full" />
                         </div>
                         <div class="flex gap-3 flex-wrap justify-end">
+                            @if(! auth()->user()->isUser())
                             <button wire:click="openColabProfilesModal" class="inline-flex items-center px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                 Ver por Colaborador
                             </button>
+                            @endif
                             @if(auth()->user()->isAdmin() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
                                 </button>
                             @endif
-                            <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button> <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button> <x-primary-button wire:click="create">
-                                Nuevo Perfil
-                            </x-primary-button>
+                            <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button> <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button>
+                            @if(! auth()->user()->isUser())
+                                <x-primary-button wire:click="create">Nuevo Perfil</x-primary-button>
+                            @endif
                         </div>
                     </div>
 
@@ -158,6 +161,9 @@
                                             <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">{{ $profile->creator->name ?? 'N/A' }}</td>
                                         @endif
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
+                                            @if(auth()->user()->isUser())
+                                                <span class="text-xs text-gray-400">Privado</span>
+                                            @else
                                             @if($profile->password)
                                                 <button wire:click="revealPassword({{ $profile->id }})" class="text-indigo-600 hover:text-indigo-900 flex items-center gap-1 text-xs font-semibold bg-indigo-50 px-2 py-1 rounded transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
@@ -169,14 +175,19 @@
                                             @else
                                                 <span class="text-xs text-gray-400">Sin contraseña</span>
                                             @endif
+                                            @endif
                                         </td>
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
+                                            @if(auth()->user()->isUser())
+                                                <span class="text-xs font-medium text-emerald-700">Asignado a ti</span>
+                                            @else
                                             <button wire:click="openAssignModal({{ $profile->id }})" class="flex items-center gap-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors font-semibold text-xs border border-indigo-200">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                                                 </svg>
                                                 {{ $profile->users->count() }} Asignados
                                             </button>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-3 whitespace-normal text-sm text-gray-700">
                                             @if(strtolower($profile->social_network) === 'facebook')
@@ -230,6 +241,7 @@
                                         </td>
                                         <td class="px-4 py-3 whitespace-normal break-words text-right text-sm font-medium">
                                             <div class="flex items-center justify-end space-x-2">
+                                                @if(! auth()->user()->isUser())
                                                 <button wire:click="edit({{ $profile->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                                 </button>
@@ -241,12 +253,13 @@
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                                     @endif
                                                 </button>
+                                                @endif
                                             </div>
                                         </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="{{ auth()->user()->isAdmin() ? 12 : 11 }}" class="px-4 py-3 text-center text-sm text-gray-500">
+                                        <td colspan="{{ auth()->user()->isAdmin() ? 12 : (auth()->user()->isUser() ? 10 : 11) }}" class="px-4 py-3 text-center text-sm text-gray-500">
                                             No hay perfiles sociales registrados.
                                         </td>
                                     </tr>
@@ -258,6 +271,7 @@
                         {{ $profiles->links() }}
                     </div>
 
+                    @if(! auth()->user()->isUser())
                     <section id="facebook-pending-imports" class="mt-10 border-t border-gray-200 pt-8">
                         <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -313,6 +327,7 @@
                         </div>
                         <div class="mt-4">{{ $pendingImports->links() }}</div>
                     </section>
+                    @endif
                 </div>
                     </section>
                 </main>
