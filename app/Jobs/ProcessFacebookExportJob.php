@@ -63,11 +63,30 @@ class ProcessFacebookExportJob implements ShouldQueue
         ]);
 
         try {
-            DB::transaction(function () use ($importLog): void {
-                $parser = new FacebookExportParser($this->localPath);
-                $profileDetails = $parser->perfil();
-                $exportIdentifier = FacebookProfileIdentifier::normalize($parser->identificador());
-                $profileDetails['identifier'] = $exportIdentifier;
+            // Validate and parse before deleting data from a previous processing attempt.
+            $parser = new FacebookExportParser($this->localPath);
+            $parser->validarEstructura();
+            $profileDetails = $parser->perfil();
+            $exportIdentifier = FacebookProfileIdentifier::normalize($parser->identificador());
+            $profileDetails['identifier'] = $exportIdentifier;
+
+            $hasComments = false;
+            foreach ($parser->comentarios() as $_) {
+                $hasComments = true;
+                break;
+            }
+
+            $hasReactions = false;
+            foreach ($parser->reacciones() as $_) {
+                $hasReactions = true;
+                break;
+            }
+
+            if (! $hasComments && ! $hasReactions) {
+                throw new RuntimeException('Estructura de exportación inválida: no se extrajeron comentarios ni reacciones válidas para importar.');
+            }
+
+            DB::transaction(function () use ($importLog, $profileDetails, $exportIdentifier, $parser): void {
 
                 // 1. Resolve Profile and Collaborator User
                 $assignmentService = app(ProfileAssignmentService::class);

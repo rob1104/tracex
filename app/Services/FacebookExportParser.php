@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use RuntimeException;
 
 /**
  * Lee la carpeta de un export de Facebook (JSON) y devuelve filas planas.
@@ -27,6 +28,79 @@ class FacebookExportParser
     ];
 
     public function __construct(private string $directorio) {}
+
+    /**
+     * Valida que la estructura del directorio de exportación de Facebook sea válida y reconocida.
+     * Lanza una excepción si faltan archivos esperados, si el JSON no es válido o si el formato ha cambiado.
+     *
+     * @throws RuntimeException
+     */
+    public function validarEstructura(): void
+    {
+        if (! is_dir($this->directorio)) {
+            throw new RuntimeException("El directorio de exportación no existe: {$this->directorio}");
+        }
+
+        $archivosPerfil = $this->archivos('/^profile_information\.json$/');
+        $archivosComentarios = $this->archivos('/^comments.*\.json$/');
+        $archivosReacciones = $this->archivos('/^(likes_and_reactions|reactions).*\.json$/');
+        $archivosCompartidos = $this->archivos('/^(your_posts|posts).*\.json$/');
+
+        $totalArchivosReconocidos = count($archivosPerfil)
+            + count($archivosComentarios)
+            + count($archivosReacciones)
+            + count($archivosCompartidos);
+
+        if ($totalArchivosReconocidos === 0) {
+            throw new RuntimeException("Estructura de exportación inválida: no se encontraron archivos reconocidos de Facebook en {$this->directorio}.");
+        }
+
+        foreach ($archivosPerfil as $ruta) {
+            $datos = $this->leer($ruta);
+            $tienePerfil = isset($datos['profile_v2'])
+                || isset($datos['profile'])
+                || isset($datos['name'])
+                || isset($datos['profile_uri'])
+                || isset($datos['registration_timestamp']);
+
+            if (! $tienePerfil) {
+                throw new RuntimeException('Formato JSON no reconocido en el archivo de perfil: '.basename($ruta));
+            }
+        }
+
+        foreach ($archivosComentarios as $ruta) {
+            $datos = $this->leer($ruta);
+            $esValido = isset($datos['comments_v2'])
+                || isset($datos['comments'])
+                || array_is_list($datos);
+
+            if (! $esValido) {
+                throw new RuntimeException('Formato JSON no reconocido en el archivo de comentarios: '.basename($ruta));
+            }
+        }
+
+        foreach ($archivosReacciones as $ruta) {
+            $datos = $this->leer($ruta);
+            $esValido = isset($datos['reactions_v2'])
+                || isset($datos['reactions'])
+                || array_is_list($datos);
+
+            if (! $esValido) {
+                throw new RuntimeException('Formato JSON no reconocido en el archivo de reacciones: '.basename($ruta));
+            }
+        }
+
+        foreach ($archivosCompartidos as $ruta) {
+            $datos = $this->leer($ruta);
+            $esValido = isset($datos['status_updates_v2'])
+                || isset($datos['posts'])
+                || array_is_list($datos);
+
+            if (! $esValido) {
+                throw new RuntimeException('Formato JSON no reconocido en el archivo de publicaciones: '.basename($ruta));
+            }
+        }
+    }
 
     /** Nombre y URL del perfil, si el export incluye la información del perfil. */
     public function perfil(): array
@@ -108,10 +182,24 @@ class FacebookExportParser
                 if (! isset($r['timestamp'])) {
                     continue;
                 }
-                $codigo = $this->primero($r['data'] ?? [], 'reaction')['reaction'] ?? 'LIKE';
+
+                $reactionItem = $this->primero($r['data'] ?? [], 'reaction');
+                $codigo = $reactionItem['reaction'] ?? null;
+
+                // Omitir registros incompletos cuando falta el tipo de reacción (no asignar LIKE por defecto)
+                if (! is_string($codigo) || trim($codigo) === '') {
+                    continue;
+                }
+
+                $codigoLimpio = trim($codigo);
+                $tipo = self::REACCIONES[strtoupper($codigoLimpio)] ?? $codigoLimpio;
+
+                if ($tipo === '') {
+                    continue;
+                }
 
                 yield [
-                    'tipo' => self::REACCIONES[strtoupper($codigo)] ?? trim($codigo),
+                    'tipo' => $tipo,
                     'objetivo' => $r['title'] ?? null,
                     'fecha' => $this->fecha($r['timestamp']),
                 ];
@@ -162,7 +250,20 @@ class FacebookExportParser
 
     private function leer(string $ruta): array
     {
-        $datos = json_decode(file_get_contents($ruta), true, 512, JSON_THROW_ON_ERROR);
+        $contenido = file_get_contents($ruta);
+        if ($contenido === false) {
+            throw new RuntimeException("No se pudo leer el archivo: {$ruta}");
+        }
+
+        try {
+            $datos = json_decode($contenido, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new RuntimeException('Error al decodificar JSON en '.basename($ruta).': '.$e->getMessage(), 0, $e);
+        }
+
+        if (! is_array($datos)) {
+            throw new RuntimeException('El archivo '.basename($ruta).' no contiene una estructura JSON válida.');
+        }
 
         return $this->arreglarCodificacion($datos);
     }
