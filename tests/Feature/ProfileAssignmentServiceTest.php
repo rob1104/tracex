@@ -25,7 +25,7 @@ class ProfileAssignmentServiceTest extends TestCase
         $this->service = new ProfileAssignmentService;
     }
 
-    public function test_it_resolves_profile_and_assigned_collaborator(): void
+    public function test_it_requires_facebook_identifier_to_resolve_profile(): void
     {
         $creator = User::factory()->create(['role' => 'admin']);
         $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
@@ -48,13 +48,11 @@ class ProfileAssignmentServiceTest extends TestCase
 
         $result = $this->service->resolve(['nombre' => 'roberto sánchez']);
 
-        $this->assertNotNull($result['profile']);
-        $this->assertSame($profile->id, $result['profile']->id);
-        $this->assertNotNull($result['user']);
-        $this->assertSame($collaborator->id, $result['user']->id);
+        $this->assertNull($result['profile']);
+        $this->assertNull($result['user']);
     }
 
-    public function test_it_falls_back_to_creator_when_no_collaborator_is_assigned(): void
+    public function test_it_does_not_resolve_profiles_by_name_or_fall_back_to_creator(): void
     {
         $creator = User::factory()->create(['role' => 'cuentas']);
 
@@ -63,7 +61,6 @@ class ProfileAssignmentServiceTest extends TestCase
             'password' => 'secret',
             'status' => 'active',
         ]);
-
         $profile = Profile::create([
             'email_account_id' => $email->id,
             'name' => 'Andrea Morales',
@@ -74,10 +71,9 @@ class ProfileAssignmentServiceTest extends TestCase
 
         $result = $this->service->resolve(['nombre' => 'Andrea Morales']);
 
-        $this->assertNotNull($result['profile']);
-        $this->assertSame($profile->id, $result['profile']->id);
-        $this->assertNotNull($result['user']);
-        $this->assertSame($creator->id, $result['user']->id);
+        $this->assertNull($result['profile']);
+        $this->assertNull($result['user']);
+        $this->assertDatabaseHas('profiles', ['id' => $profile->id]);
     }
 
     public function test_it_returns_null_when_profile_is_ambiguous(): void
@@ -188,7 +184,7 @@ class ProfileAssignmentServiceTest extends TestCase
         $this->assertSame($profile->id, $user->evidences->first()->profile_id);
     }
 
-    public function test_it_resolves_facebook_profile_and_collaborator_via_email_account_email(): void
+    public function test_it_resolves_facebook_profile_by_identifier_and_keeps_existing_assignment(): void
     {
         $creator = User::factory()->create(['role' => 'admin']);
         $collaborator = User::factory()->create([
@@ -210,6 +206,7 @@ class ProfileAssignmentServiceTest extends TestCase
             'email_account_id' => $emailAccount->id,
             'name' => 'Juana Rodriguez FB',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:61593018723655',
             'status' => 'active',
             'created_by' => $creator->id,
         ]);
@@ -227,6 +224,39 @@ class ProfileAssignmentServiceTest extends TestCase
         $this->assertNotNull($result['user']);
         $this->assertSame($collaborator->id, $result['user']->id);
         $this->assertTrue($result['profile']->users->contains($collaborator));
+    }
+
+    public function test_email_match_does_not_assign_an_unassigned_profile(): void
+    {
+        $emailAccount = EmailAccount::create([
+            'email' => 'identity@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+        $profile = Profile::create([
+            'email_account_id' => $emailAccount->id,
+            'name' => 'Stable identity profile',
+            'social_network' => 'facebook',
+            'facebook_identifier' => 'id:4321',
+            'status' => 'active',
+        ]);
+        $profileMatchingEmailOnly = Profile::create([
+            'email_account_id' => $emailAccount->id,
+            'name' => 'Email only candidate',
+            'social_network' => 'facebook',
+            'facebook_identifier' => 'id:other',
+            'status' => 'active',
+        ]);
+
+        $result = $this->service->resolve([
+            'identifier' => 'id:4321',
+            'emails' => ['identity@example.com'],
+        ]);
+
+        $this->assertSame($profile->id, $result['profile']->id);
+        $this->assertNotSame($profileMatchingEmailOnly->id, $result['profile']->id);
+        $this->assertNull($result['user']);
+        $this->assertDatabaseMissing('profile_user', ['profile_id' => $profile->id]);
     }
 
     public function test_it_does_not_auto_create_profile_when_facebook_profile_does_not_exist(): void

@@ -336,6 +336,7 @@ class Index extends Component
 
     public function exportCsv()
     {
+        $this->authorizeExport();
         $accounts = $this->buildQuery()->get();
 
         return response()->streamDownload(function () use ($accounts) {
@@ -360,6 +361,7 @@ class Index extends Component
 
     public function exportPdf()
     {
+        $this->authorizeExport();
         $accounts = $this->buildQuery()->get();
 
         $filters = [
@@ -384,6 +386,11 @@ class Index extends Component
         return response()->streamDownload(function () use ($pdf) {
             echo $pdf->stream();
         }, 'reporte_cuentas_correo_'.date('Y-m-d').'.pdf');
+    }
+
+    private function authorizeExport(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
     }
 
     public function render()

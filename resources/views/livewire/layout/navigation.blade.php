@@ -50,6 +50,9 @@ new class extends Component
                         <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
                             Usuarios de Plataforma
                         </x-nav-link>
+                        <x-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                            Catálogo
+                        </x-nav-link>
                         <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
                             Cuentas de Correo
                         </x-nav-link>
@@ -156,6 +159,9 @@ new class extends Component
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
                     Usuarios de Plataforma
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                    Catálogo
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
                     Cuentas de Correo
