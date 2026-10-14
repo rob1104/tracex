@@ -125,7 +125,7 @@
                                                 <button wire:click="edit({{ $account->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                                 </button>
-                                                
+
                                                 <button wire:click="toggleStatus({{ $account->id }})" title="{{ $account->status === 'active' ? 'Suspender' : 'Activar' }}" class="p-2 {{ $account->status === 'active' ? 'text-amber-600 hover:text-amber-900 bg-amber-50 hover:bg-amber-100' : 'text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100' }} rounded-lg transition-colors">
                                                     @if($account->status === 'active')
                                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
@@ -159,7 +159,7 @@
     @if($showModal)
         <div x-data x-init="setTimeout(() => $refs.firstInput?.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 z-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showModal', false)"></div>
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
                 <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="save">
@@ -349,7 +349,7 @@
                                         Cuentas a Transferir
                                         <span class="bg-indigo-100 text-indigo-800 text-xs py-1 px-2 rounded-full">{{ count($sourceAccounts) }} cuentas encontradas</span>
                                     </h4>
-                                    
+
                                     @if(count($sourceAccounts) > 0)
                                         <div class="mb-2 flex justify-end">
                                             <button type="button" wire:click="toggleSelectAll" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium focus:outline-none">
