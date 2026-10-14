@@ -40,9 +40,37 @@ new class extends Component
                         Panel Principal
                     </x-nav-link>
 
-                    @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                    @if(auth()->user()->isAdmin())
+                        <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
+                            Monitoreo de Colaboradores
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                            Reporte de Evidencias
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
+                            Usuarios de Plataforma
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                            Catálogo
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                            Cuentas de Correo
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                            Perfiles de Facebook
+                        </x-nav-link>
+                    @elseif(auth()->user()->isCuentas() || auth()->user()->isUser())
                         <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                             Monitoreo de Usuarios
+                        </x-nav-link>
+                    @endif
+
+                    @if(auth()->user()->isUser() || auth()->user()->isCuentas())
+                        <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                            Cuentas de Correo
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                            Perfiles
                         </x-nav-link>
                     @endif
 
@@ -55,26 +83,7 @@ new class extends Component
                         </x-nav-link>
                     @endif
 
-                    @if(auth()->user()->isAdmin())
-                        <x-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
-                            Reporte de Evidencias
-                        </x-nav-link>
-                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
-                            Usuarios
-                        </x-nav-link>
-                        <x-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
-                            Catálogo
-                        </x-nav-link>
-                    @endif
 
-                    @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
-                        <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
-                            Cuentas de Correo
-                        </x-nav-link>
-                        <x-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
-                            Perfiles
-                        </x-nav-link>
-                    @endif
                 </div>
             </div>
 
@@ -141,9 +150,37 @@ new class extends Component
                 Panel Principal
             </x-responsive-nav-link>
 
-            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+            @if(auth()->user()->isAdmin())
+                <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
+                    Monitoreo de Colaboradores
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                    Reporte de Evidencias
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
+                    Usuarios de Plataforma
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                    Catálogo
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                    Cuentas de Correo
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                    Perfiles de Facebook
+                </x-responsive-nav-link>
+            @elseif(auth()->user()->isCuentas() || auth()->user()->isUser())
                 <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                     Monitoreo de Usuarios
+                </x-responsive-nav-link>
+            @endif
+
+            @if(auth()->user()->isUser() || auth()->user()->isCuentas())
+                <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
+                    Cuentas de Correo
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
+                    Perfiles
                 </x-responsive-nav-link>
             @endif
 
@@ -156,26 +193,6 @@ new class extends Component
                 </x-responsive-nav-link>
             @endif
 
-            @if(auth()->user()->isAdmin())
-                <x-responsive-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
-                    Reporte de Evidencias
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
-                    Usuarios
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
-                    Catálogo
-                </x-responsive-nav-link>
-            @endif
-
-            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
-                <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
-                    Cuentas de Correo
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.profiles.index')" :active="request()->routeIs('admin.profiles.index')" wire:navigate>
-                    Perfiles
-                </x-responsive-nav-link>
-            @endif
         </div>
 
         <!-- Responsive Settings Options -->

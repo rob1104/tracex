@@ -16,23 +16,24 @@ class ProfileAssignmentService
     /**
      * Resolve the matched Profile and assigned collaborator User for a given exported profile payload.
      *
-     * @param  array{nombre?: ?string, uri?: ?string, identifier?: ?string}  $exportedProfile
+     * @param  array{nombre?: ?string, uri?: ?string, identifier?: ?string, emails?: array<string>}  $exportedProfile
      * @return array{profile: ?Profile, user: ?User}
      */
     public function resolve(array $exportedProfile): array
     {
-        $name = trim((string) ($exportedProfile['nombre'] ?? ''));
         $identifier = FacebookProfileIdentifier::normalize($exportedProfile['identifier'] ?? null);
         $uriIdentifier = FacebookProfileIdentifier::normalize($exportedProfile['uri'] ?? null);
         $identifiers = array_values(array_unique(array_filter([$identifier, $uriIdentifier])));
+
         $facebookProfiles = Profile::query()
             ->with(['users' => function ($q) {
-                $q->where('is_active', true)->orderBy('users.id', 'asc');
-            }, 'creator'])
+                $q->where('users.is_active', true)->where('users.role', 'user')->orderBy('users.id', 'asc');
+            }])
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
         $profile = null;
 
+        // Facebook's stable identifier is the only automatic profile matching key.
         foreach ($identifiers as $candidateIdentifier) {
             $profilesByIdentifier = (clone $facebookProfiles)
                 ->where('facebook_identifier', $candidateIdentifier)
@@ -49,38 +50,13 @@ class ProfileAssignmentService
             }
         }
 
-        if (! $profile && $name !== '') {
-            $normalizedName = mb_strtolower($name, 'UTF-8');
-            $matchingProfiles = (clone $facebookProfiles)
-                ->whereRaw('LOWER(name) = ?', [$normalizedName])
-                ->limit(2)
-                ->get();
-
-            if ($matchingProfiles->count() !== 1) {
-                return ['profile' => null, 'user' => null];
-            }
-
-            $profile = $matchingProfiles->first();
-            $storedIdentifier = FacebookProfileIdentifier::normalize($profile->facebook_identifier);
-
-            if ($identifiers !== [] && $storedIdentifier !== null && ! in_array($storedIdentifier, $identifiers, true)) {
-                return ['profile' => null, 'user' => null];
-            }
-
-            if ($identifiers !== [] && $storedIdentifier === null) {
-                $profile->facebook_identifier = $identifier ?? $uriIdentifier;
-                $profile->save();
-            }
-        }
-
+        // Si el perfil de Facebook no está registrado en el sistema, no se auto-crea ni asocia
+        // automáticamente; se mantiene sin asociación hasta que un administrador lo asigne.
         if (! $profile) {
             return ['profile' => null, 'user' => null];
         }
 
-        // Resolve assigned collaborator (User):
-        // 1. Primary: first active assigned collaborator in profile_user
-        // 2. Fallback: profile creator (created_by)
-        $user = $profile->users->first() ?? $profile->creator;
+        $user = $profile->users->first();
 
         return [
             'profile' => $profile,

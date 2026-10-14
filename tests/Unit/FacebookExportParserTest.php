@@ -105,4 +105,34 @@ class FacebookExportParserTest extends TestCase
             $this->assertNotSame('LIKE', $r['tipo']);
         }
     }
+
+    public function test_perfil_extracts_emails_from_profile_information(): void
+    {
+        file_put_contents($this->testDirectory.'/profile_information.json', json_encode([
+            'profile_v2' => [
+                'name' => [
+                    'full_name' => 'Juana Rodriguez',
+                ],
+                'emails' => [
+                    'emails' => [
+                        'Juana.Rogj69@gmail.com',
+                    ],
+                    'previous_emails' => [],
+                    'pending_emails' => [],
+                    'ad_account_emails' => [
+                        'juana.ads@gmail.com',
+                    ],
+                ],
+                'profile_uri' => 'https://www.facebook.com/profile.php?id=61593018723655',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $perfil = $parser->perfil();
+
+        $this->assertSame('Juana Rodriguez', $perfil['nombre']);
+        $this->assertSame('https://www.facebook.com/profile.php?id=61593018723655', $perfil['uri']);
+        $this->assertContains('juana.rogj69@gmail.com', $perfil['emails']);
+        $this->assertContains('juana.ads@gmail.com', $perfil['emails']);
+    }
 }

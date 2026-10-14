@@ -7,18 +7,29 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Módulo de monitoreo</p>
                         <h1 class="mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                            <span class="text-3xl" aria-hidden="true">👥</span> Monitoreo de usuarios
+                            <span class="text-3xl" aria-hidden="true">👥</span> {{ auth()->user()->isAdmin() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
                         </h1>
-                        <p class="mt-1 text-sm text-slate-500">Consulta la actividad de Facebook recibida mediante exportaciones oficiales y Google Drive.</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida mediante exportaciones oficiales y Google Drive.' }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
+                        @if(auth()->user()->isAdmin())
+                            <label class="sr-only" for="collaboratorFilter">Filtrar por colaborador</label>
+                            <select id="collaboratorFilter" wire:model.live="collaboratorId" class="rounded-lg border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Todos los colaboradores</option>
+                                @foreach($collaborators as $collaborator)
+                                    <option value="{{ $collaborator->id }}">{{ $collaborator->name }}</option>
+                                @endforeach
+                            </select>
+                        @endif
                         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
                             <span class="font-semibold text-slate-700">Google Drive:</span>
                             <span class="{{ $driveConfigured ? 'text-emerald-700' : 'text-amber-700' }}">{{ $driveConfigured ? 'Configurado' : 'Pendiente de configurar' }}</span>
                         </div>
-                        <a href="#register-facebook-profile" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                            <span class="text-lg leading-none" aria-hidden="true">＋</span> Agregar usuario
-                        </a>
+                        @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                            <a href="#register-facebook-profile" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
+                                <span class="text-lg leading-none" aria-hidden="true">＋</span> Agregar usuario
+                            </a>
+                        @endif
                     </div>
                 </header>
 
@@ -49,8 +60,8 @@
                     <section id="monitored-profiles" class="rounded-xl border border-slate-200 bg-white shadow-sm">
                         <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
-                                <h2 class="text-lg font-bold text-slate-900">Usuarios de Facebook monitoreados</h2>
-                                <p class="text-sm text-slate-500">Actividad acumulada y exportaciones asociadas a cada usuario.</p>
+                                <h2 class="text-lg font-bold text-slate-900">{{ auth()->user()->isAdmin() ? 'Perfiles de Facebook por colaborador' : 'Usuarios de Facebook monitoreados' }}</h2>
+                                <p class="text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Actividad acumulada y exportaciones vinculadas a los colaboradores.' : 'Actividad acumulada y exportaciones asociadas a cada usuario.' }}</p>
                             </div>
                             <div class="flex items-center gap-2">
                                 <div class="relative">
@@ -72,6 +83,9 @@
                                         <div class="min-w-0 flex-1">
                                             <h3 class="truncate text-sm font-bold text-slate-900">{{ $profile->name }}</h3>
                                             <p class="mt-0.5 truncate text-xs text-slate-500">{{ $profile->emailAccount?->email ?? 'Sin cuenta asociada' }}</p>
+                                            @if(auth()->user()->isAdmin())
+                                                <p class="mt-1 truncate text-xs text-indigo-700">Colaborador: {{ $profile->users->first()?->name ?? 'Sin asignar' }}</p>
+                                            @endif
                                             <span class="mt-1 inline-flex items-center gap-1.5 text-xs font-medium {{ $identifier !== '' ? 'text-emerald-700' : 'text-amber-700' }}"><span class="h-2 w-2 rounded-full {{ $identifier !== '' ? 'bg-emerald-500' : 'bg-amber-500' }}"></span> {{ $identifier !== '' ? 'Facebook vinculado' : 'ID por asociar' }}</span>
                                         </div>
                                     </div>
@@ -258,6 +272,7 @@
                     </section>
                 </div>
 
+                @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
                 <section id="register-facebook-profile" class="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="mb-4">
                         <h2 class="font-bold text-slate-900">Agregar usuario de Facebook</h2>
@@ -294,6 +309,7 @@
                         </div>
                     </form>
                 </section>
+                @endif
 
                 <footer class="flex flex-col gap-1 py-4 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
                     <span>TraceX · Panel de monitoreo de Facebook</span><span>Exportación de Meta → Drive → base de datos local</span>

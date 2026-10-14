@@ -71,6 +71,7 @@ class DriveHistorialIntegrationTest extends TestCase
             'email_account_id' => $email->id,
             'name' => 'Alejandro Morales',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:61590000000001',
             'status' => 'active',
         ]);
         $profile->users()->attach($collaborator->id);
@@ -99,7 +100,7 @@ class DriveHistorialIntegrationTest extends TestCase
                 $profileJson = [
                     'profile_v2' => [
                         'name' => ['full_name' => 'Alejandro Morales'],
-                        'profile_uri' => 'https://facebook.com/alejandro.morales',
+                        'profile_uri' => 'https://facebook.com/profile.php?id=61590000000001',
                         'registration_timestamp' => 1610000000,
                     ],
                 ];

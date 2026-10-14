@@ -93,6 +93,8 @@ class Index extends Component
 
     public function updatedSelectedColabViewId($value)
     {
+        $this->authorizeProfileManagement();
+
         if ($value) {
             $query = Profile::whereHas('users', function ($q) use ($value) {
                 $q->where('users.id', $value);
@@ -115,12 +117,15 @@ class Index extends Component
 
     public function openColabProfilesModal()
     {
+        $this->authorizeProfileManagement();
         $this->reset(['selectedColabViewId', 'viewingColabProfiles']);
         $this->showColabProfilesModal = true;
     }
 
     public function updatedSourceColabId($value)
     {
+        $this->authorizeProfileManagement();
+
         if ($value) {
             $query = Profile::whereHas('users', function ($q) use ($value) {
                 $q->where('users.id', $value);
@@ -154,12 +159,15 @@ class Index extends Component
 
     public function openMassAssignModal()
     {
+        $this->authorizeProfileManagement();
         $this->reset(['sourceColabId', 'destinationColabId', 'sourceProfiles', 'selectedProfiles']);
         $this->showMassAssignModal = true;
     }
 
     public function executeMassAssignment()
     {
+        $this->authorizeProfileManagement();
+
         $this->validate([
             'sourceColabId' => 'required|exists:users,id',
             'destinationColabId' => 'required|exists:users,id|different:sourceColabId',
@@ -197,6 +205,7 @@ class Index extends Component
 
     public function create()
     {
+        $this->authorizeProfileManagement();
         $this->resetValidation();
         $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status']);
         $this->status = 'active';
@@ -230,6 +239,8 @@ class Index extends Component
 
     public function save()
     {
+        $this->authorizeProfileManagement();
+
         $rules = [
             'email_account_id' => 'required|exists:email_accounts,id',
             'name' => 'required|string|max:255',
@@ -316,6 +327,7 @@ class Index extends Component
     // Assignment logic
     public function openAssignModal($id)
     {
+        $this->authorizeProfileManagement();
         $this->assignProfile = Profile::findOrFail($id);
         if (! $this->canManageProfile($this->assignProfile)) {
             abort(403);
@@ -326,6 +338,8 @@ class Index extends Component
 
     public function saveAssignments()
     {
+        $this->authorizeProfileManagement();
+
         if ($this->assignProfile) {
             if (! $this->canManageProfile($this->assignProfile)) {
                 abort(403);
@@ -407,8 +421,12 @@ class Index extends Component
 
     private function canManageProfile(Profile $profile): bool
     {
-        if (! auth()->user()->isCuentas()) {
+        if (auth()->user()->isAdmin()) {
             return true;
+        }
+
+        if (auth()->user()->isUser()) {
+            return false;
         }
 
         if ($profile->created_by === auth()->id()) {
@@ -426,6 +444,11 @@ class Index extends Component
         return (bool) ($profile->creator && $profile->creator->isAdmin());
     }
 
+    private function authorizeProfileManagement(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+    }
+
     private function authorizeImportManagement(): void
     {
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
@@ -437,7 +460,9 @@ class Index extends Component
             ->whereRaw('LOWER(social_network) = ?', ['facebook'])
             ->orderBy('name');
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
                 $q->where('created_by', auth()->id())
                     ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
@@ -453,7 +478,9 @@ class Index extends Component
     {
         $query = FacebookImportLog::pendingAssignment();
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->whereRaw('1 = 0');
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($pendingQuery) {
                 $pendingQuery->whereNull('profile_id')
                     ->orWhereHas('profile', function ($profileQuery) {
@@ -474,7 +501,10 @@ class Index extends Component
     {
         $query = Profile::with(['emailAccount', 'users', 'creator']);
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()))
+                ->with(['users' => fn ($userQuery) => $userQuery->where('users.id', auth()->id())]);
+        } elseif (auth()->user()->isCuentas()) {
             $query->where(function ($q) {
                 $q->where('created_by', auth()->id())
                     ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
@@ -517,6 +547,7 @@ class Index extends Component
 
     public function exportCsv()
     {
+        $this->authorizeExport();
         $profiles = $this->buildQuery()->get();
 
         return response()->streamDownload(function () use ($profiles) {
@@ -542,6 +573,7 @@ class Index extends Component
 
     public function exportPdf()
     {
+        $this->authorizeExport();
         $profiles = $this->buildQuery()->get();
 
         $filters = [
@@ -573,11 +605,18 @@ class Index extends Component
         }, 'reporte_perfiles_'.date('Y-m-d').'.pdf');
     }
 
+    private function authorizeExport(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+    }
+
     public function render()
     {
         $emailQuery = EmailAccount::query();
 
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $emailQuery->whereHas('profiles.users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $gestorId = auth()->id();
             $emailQuery->where(function ($q) use ($gestorId) {
                 $q->where('created_by', $gestorId)
@@ -603,7 +642,9 @@ class Index extends Component
 
         // Available networks for filter
         $networksQuery = Profile::select('social_network')->distinct();
-        if (auth()->user()->isCuentas()) {
+        if (auth()->user()->isUser()) {
+            $networksQuery->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', auth()->id()));
+        } elseif (auth()->user()->isCuentas()) {
             $networksQuery->where(function ($q) {
                 $q->where('created_by', auth()->id())
                     ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
@@ -635,6 +676,10 @@ class Index extends Component
             ->unique()
             ->values();
 
+        if (auth()->user()->isUser()) {
+            $assignedUserIds = collect([auth()->id()]);
+        }
+
         $facebookProfilesQuery = Profile::query()
             ->with('users:id,name')
             ->whereRaw('LOWER(social_network) = ?', ['facebook'])
@@ -662,7 +707,9 @@ class Index extends Component
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
             'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
-            'usersList' => User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get(),
+            'usersList' => auth()->user()->isAdmin() || auth()->user()->isCuentas()
+                ? User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get()
+                : collect(),
         ])->layout('layouts.app');
     }
 }

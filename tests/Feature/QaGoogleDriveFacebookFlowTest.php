@@ -63,6 +63,7 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
             'email_account_id' => $email->id,
             'name' => 'Carlos Mendoza',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:1000987654321',
             'status' => 'active',
         ]);
         $profile->users()->attach($user->id);
@@ -214,7 +215,7 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
     }
 
     /**
-     * Test Case 2: Profile Auto-Matching variations (case insensitivity, ambiguous profiles, and non-matches).
+     * Test Case 2: Profile auto-matching uses Facebook identifiers and leaves ambiguous matches unassigned.
      */
     public function test_profile_auto_matching_behavior(): void
     {
@@ -228,6 +229,7 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
             'email_account_id' => $email->id,
             'name' => 'MARIA FERNANDA',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:10001',
             'status' => 'active',
         ]);
 
@@ -237,7 +239,17 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
         File::put("{$folderDir}/profile_information.json", json_encode([
             'profile_v2' => [
                 'name' => ['full_name' => 'maria fernanda'],
-                'profile_uri' => 'https://facebook.com/maria.fernanda',
+                'profile_uri' => 'https://facebook.com/profile.php?id=10001',
+            ],
+        ]));
+        File::put("{$folderDir}/comments.json", json_encode([
+            'comments_v2' => [
+                [
+                    'timestamp' => 1760000000,
+                    'data' => [
+                        ['comment' => ['comment' => 'Hola mundo', 'timestamp' => 1760000000]],
+                    ],
+                ],
             ],
         ]));
 
@@ -255,17 +267,19 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
             'profile_id' => $singleProfile->id,
         ]);
 
-        // Ambiguous matching case: 2 profiles with exact same name
+        // Ambiguous matching case: two records share the same Facebook identifier.
         Profile::create([
             'email_account_id' => $email->id,
             'name' => 'Juan Perez Duplicado',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:20002',
             'status' => 'active',
         ]);
         Profile::create([
             'email_account_id' => $email->id,
             'name' => 'Juan Perez Duplicado',
             'social_network' => 'facebook',
+            'facebook_identifier' => 'id:20002',
             'status' => 'active',
         ]);
 
@@ -274,7 +288,17 @@ class QaGoogleDriveFacebookFlowTest extends TestCase
         File::put("{$ambiguousDir}/profile_information.json", json_encode([
             'profile_v2' => [
                 'name' => ['full_name' => 'Juan Perez Duplicado'],
-                'profile_uri' => 'https://facebook.com/juan.perez',
+                'profile_uri' => 'https://facebook.com/profile.php?id=20002',
+            ],
+        ]));
+        File::put("{$ambiguousDir}/comments.json", json_encode([
+            'comments_v2' => [
+                [
+                    'timestamp' => 1760000000,
+                    'data' => [
+                        ['comment' => ['comment' => 'Comentario duplicado', 'timestamp' => 1760000000]],
+                    ],
+                ],
             ],
         ]));
 
