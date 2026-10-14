@@ -285,4 +285,65 @@ class AdminProfileCrudTest extends TestCase
         $emailAccount->refresh();
         $this->assertSame('Admin Correo Editado Por Gestor', $emailAccount->alias);
     }
+
+    public function test_collaborator_only_sees_assigned_profiles_and_cannot_export_profiles(): void
+    {
+        $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+        $otherCollaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+        $account = EmailAccount::create(['email' => 'profiles@example.com', 'password' => 'private-secret', 'status' => 'active']);
+        $assignedProfile = Profile::create(['name' => 'Assigned profile', 'email_account_id' => $account->id, 'social_network' => 'Facebook', 'status' => 'active']);
+        $otherProfile = Profile::create(['name' => 'Other profile', 'email_account_id' => $account->id, 'social_network' => 'Facebook', 'status' => 'active']);
+        $assignedProfile->users()->attach($collaborator->id);
+        $otherProfile->users()->attach($otherCollaborator->id);
+
+        Livewire::actingAs($collaborator)
+            ->test(Index::class)
+            ->assertSee('Assigned profile')
+            ->assertDontSee('Other profile')
+            ->assertDontSee('exportCsv')
+            ->call('exportCsv')
+            ->assertStatus(403);
+
+        Livewire::actingAs($collaborator)
+            ->test(Index::class)
+            ->call('exportPdf')
+            ->assertStatus(403);
+    }
+
+    public function test_collaborator_cannot_export_email_accounts_and_admin_retains_catalog_access(): void
+    {
+        $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $gestor = User::factory()->create(['role' => 'cuentas', 'is_active' => true]);
+
+        Livewire::actingAs($collaborator)
+            ->test(\App\Livewire\Admin\Emails\Index::class)
+            ->assertDontSee('exportCsv')
+            ->call('exportCsv')
+            ->assertStatus(403);
+
+        Livewire::actingAs($collaborator)
+            ->test(\App\Livewire\Admin\Emails\Index::class)
+            ->call('exportPdf')
+            ->assertStatus(403);
+
+        Livewire::actingAs($admin)
+            ->test(\App\Livewire\Admin\Emails\Index::class)
+            ->call('exportCsv')
+            ->assertFileDownloaded();
+
+        Livewire::actingAs($gestor)
+            ->test(\App\Livewire\Admin\Emails\Index::class)
+            ->call('exportCsv')
+            ->assertFileDownloaded();
+
+        $this->actingAs($admin)
+            ->get(route('admin.evidence_types.index'))
+            ->assertOk()
+            ->assertSee('Catálogo');
+
+        $this->actingAs($collaborator)
+            ->get(route('admin.evidence_types.index'))
+            ->assertForbidden();
+    }
 }

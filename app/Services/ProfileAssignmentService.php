@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\EmailAccount;
 use App\Models\Evidence;
 use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
@@ -22,75 +21,33 @@ class ProfileAssignmentService
      */
     public function resolve(array $exportedProfile): array
     {
-        $name = trim((string) ($exportedProfile['nombre'] ?? ''));
         $identifier = FacebookProfileIdentifier::normalize($exportedProfile['identifier'] ?? null);
         $uriIdentifier = FacebookProfileIdentifier::normalize($exportedProfile['uri'] ?? null);
         $identifiers = array_values(array_unique(array_filter([$identifier, $uriIdentifier])));
-        $emails = array_values(array_unique(array_filter(array_map('strtolower', array_map('trim', (array) ($exportedProfile['emails'] ?? []))))));
 
         $facebookProfiles = Profile::query()
             ->with(['users' => function ($q) {
-                $q->where('is_active', true)->orderBy('users.id', 'asc');
-            }, 'creator', 'emailAccount.creator'])
+                $q->where('users.is_active', true)->where('users.role', 'user')->orderBy('users.id', 'asc');
+            }])
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
         $profile = null;
 
-        // 1. Resolution via Exported Emails matching Profile's EmailAccount
-        if ($emails !== []) {
-            $profilesByEmail = (clone $facebookProfiles)
-                ->whereHas('emailAccount', fn ($q) => $q->whereIn('email', $emails))
+        // Facebook's stable identifier is the only automatic profile matching key.
+        foreach ($identifiers as $candidateIdentifier) {
+            $profilesByIdentifier = (clone $facebookProfiles)
+                ->where('facebook_identifier', $candidateIdentifier)
                 ->limit(2)
                 ->get();
 
-            if ($profilesByEmail->count() > 1) {
+            if ($profilesByIdentifier->count() > 1) {
                 return ['profile' => null, 'user' => null];
             }
 
-            if ($profilesByEmail->count() === 1) {
-                $profile = $profilesByEmail->first();
+            if ($profilesByIdentifier->isNotEmpty()) {
+                $profile = $profilesByIdentifier->first();
+                break;
             }
-        }
-
-        // 2. Fallback Resolution via Facebook Identifier
-        if (! $profile) {
-            foreach ($identifiers as $candidateIdentifier) {
-                $profilesByIdentifier = (clone $facebookProfiles)
-                    ->where('facebook_identifier', $candidateIdentifier)
-                    ->limit(2)
-                    ->get();
-
-                if ($profilesByIdentifier->count() > 1) {
-                    return ['profile' => null, 'user' => null];
-                }
-
-                if ($profilesByIdentifier->isNotEmpty()) {
-                    $profile = $profilesByIdentifier->first();
-                    break;
-                }
-            }
-        }
-
-        // 3. Fallback Resolution via Profile Name
-        if (! $profile && $name !== '') {
-            $normalizedName = mb_strtolower($name, 'UTF-8');
-            $matchingProfiles = (clone $facebookProfiles)
-                ->whereRaw('LOWER(name) = ?', [$normalizedName])
-                ->limit(2)
-                ->get();
-
-            if ($matchingProfiles->count() !== 1) {
-                return ['profile' => null, 'user' => null];
-            }
-
-            $candidate = $matchingProfiles->first();
-            $storedIdentifier = FacebookProfileIdentifier::normalize($candidate->facebook_identifier);
-
-            if ($identifiers !== [] && $storedIdentifier !== null && ! in_array($storedIdentifier, $identifiers, true)) {
-                return ['profile' => null, 'user' => null];
-            }
-
-            $profile = $candidate;
         }
 
         // Si el perfil de Facebook no está registrado en el sistema, no se auto-crea ni asocia
@@ -99,31 +56,7 @@ class ProfileAssignmentService
             return ['profile' => null, 'user' => null];
         }
 
-        $storedIdentifier = FacebookProfileIdentifier::normalize($profile->facebook_identifier);
-        if ($identifiers !== [] && $storedIdentifier === null) {
-            $profile->facebook_identifier = $identifier ?? $uriIdentifier;
-            $profile->save();
-        }
-
-        // Resolve assigned collaborator (User):
-        // 1. First active assigned collaborator in profile_user
-        // 2. Direct matched user by email in system
-        // 3. Fallback: profile creator (created_by) or email account creator
         $user = $profile->users->first();
-
-        if (! $user && $emails !== []) {
-            $directUser = User::query()
-                ->whereIn('email', $emails)
-                ->where('is_active', true)
-                ->first();
-
-            if ($directUser) {
-                $user = $directUser;
-                $profile->users()->syncWithoutDetaching([$directUser->id]);
-            }
-        }
-
-        $user = $user ?? $profile->creator ?? $profile->emailAccount?->creator;
 
         return [
             'profile' => $profile,
