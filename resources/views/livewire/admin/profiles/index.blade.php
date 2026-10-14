@@ -341,7 +341,7 @@
     @if($showModal)
         <div x-data x-init="setTimeout(() => $refs.firstInput?.focus(), 50)" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showModal', false)"></div>
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
                 <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="save">
@@ -363,11 +363,24 @@
                                         $initialSelectedEmailText = $selectedEmailModel->email . ($selectedEmailModel->alias ? ' (' . $selectedEmailModel->alias . ')' : '');
                                     }
                                 }
+                                $emailOptions = $emails->map(fn($e) => [
+                                    'id' => (string) $e->id,
+                                    'email' => $e->email,
+                                    'alias' => $e->alias,
+                                    'displayText' => $e->email . ($e->alias ? ' (' . $e->alias . ')' : ''),
+                                ])->values();
                             @endphp
                             <div x-data="{
                                     search: '',
                                     open: false,
                                     selectedText: @js($initialSelectedEmailText),
+                                    accounts: @js($emailOptions),
+
+                                    get filteredAccounts() {
+                                        if (!this.search.trim()) return this.accounts;
+                                        const q = this.search.toLowerCase();
+                                        return this.accounts.filter(a => a.displayText.toLowerCase().includes(q));
+                                    },
 
                                     selectAccount(id, text) {
                                         $wire.set('email_account_id', id);
@@ -397,22 +410,17 @@
                                         <li @click="selectAccount('', 'Seleccione una cuenta...')" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
                                             <span class="block font-normal truncate">-- Seleccione --</span>
                                         </li>
-                                        @foreach($emails as $email)
-                                            @php
-                                                $displayText = $email->email . ($email->alias ? ' ('.$email->alias.')' : '');
-                                            @endphp
-                                            <li data-id="{{ $email->id }}" data-text="{{ addslashes($displayText) }}"
-                                                x-show="'{{ strtolower(addslashes($displayText)) }}'.includes(search.toLowerCase())"
-                                                @click="selectAccount('{{ $email->id }}', '{{ addslashes($displayText) }}')"
+                                        <template x-for="item in filteredAccounts" :key="item.id">
+                                            <li @click="selectAccount(item.id, item.displayText)"
                                                 class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white transition-colors">
                                                 <div class="flex items-center">
-                                                    <span class="font-normal block truncate">{{ $email->email }}</span>
-                                                    @if($email->alias)
-                                                        <span class="ml-2 text-xs text-white bg-indigo-600 rounded px-1">{{ $email->alias }}</span>
-                                                    @endif
+                                                    <span class="font-normal block truncate" x-text="item.email"></span>
+                                                    <template x-if="item.alias">
+                                                        <span class="ml-2 text-xs text-white bg-indigo-600 rounded px-1" x-text="item.alias"></span>
+                                                    </template>
                                                 </div>
                                             </li>
-                                        @endforeach
+                                        </template>
                                     </ul>
                                 </div>
                                 <x-input-error :messages="$errors->get('email_account_id')" class="mt-2" />
@@ -477,9 +485,9 @@
     @if($showPasswordModal)
         <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showPasswordModal', false)"></div>
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showPasswordModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-sm sm:w-full">
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-sm sm:w-full">
                     <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4 text-center">
                         <div class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-indigo-100 mb-4">
                             <svg class="h-6 w-6 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -503,9 +511,9 @@
     @if($showAssignModal && $assignProfile)
         <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showAssignModal', false)"></div>
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showAssignModal', false)"></div>
                 <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-                <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                     <form wire:submit="saveAssignments">
                         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                             <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
@@ -540,10 +548,10 @@
 
     <!-- Mass Assignment Modal -->
     @if($showMassAssignModal)
-        <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showMassAssignModal', false)"></div>
-                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showMassAssignModal', false)"></div>
+                <div class="relative z-10 bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
                     <form wire:submit.prevent="executeMassAssignment">
                         <div class="bg-indigo-600 px-6 py-4 flex justify-between items-center">
                             <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
@@ -643,10 +651,10 @@
 
     <!-- Colab Profiles View Modal -->
     @if($showColabProfilesModal)
-        <div class="fixed z-10 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
-                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showColabProfilesModal', false)"></div>
-                <div class="relative bg-white rounded-lg text-left overflow-visible shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showColabProfilesModal', false)"></div>
+                <div class="relative z-10 bg-white rounded-lg text-left overflow-visible shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
                     <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center rounded-t-lg">
                         <h3 class="text-xl leading-6 font-bold text-white flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
@@ -784,7 +792,7 @@
         <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="claim-import-title">
             <div class="flex min-h-screen items-center justify-center px-4 py-10">
                 <button type="button" class="fixed inset-0 bg-gray-900/50" wire:click="$set('showClaimImportModal', false)" aria-label="Cerrar modal"></button>
-                <div class="relative w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
+                <div class="relative z-10 w-full max-w-lg rounded-lg bg-white p-6 shadow-xl">
                     <h3 id="claim-import-title" class="text-lg font-semibold text-gray-900">Asignar importacion de Facebook</h3>
                     <p class="mt-1 text-sm text-gray-500">Selecciona el perfil social y el colaborador que recibira las evidencias.</p>
 
