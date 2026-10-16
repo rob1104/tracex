@@ -13,13 +13,35 @@
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         @if(auth()->user()->isAdmin())
-                            <label class="sr-only" for="collaboratorFilter">Filtrar por colaborador</label>
-                            <select id="collaboratorFilter" wire:model.live="collaboratorId" class="rounded-lg border-slate-200 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Todos los colaboradores</option>
-                                @foreach($collaborators as $collaborator)
-                                    <option value="{{ $collaborator->id }}">{{ $collaborator->name }}</option>
-                                @endforeach
-                            </select>
+                            <div x-data="{
+                                    open: false,
+                                    selectedId: @js((string) $collaboratorId),
+                                    collaborators: @js($collaborators->map(fn ($collaborator) => ['id' => (string) $collaborator->id, 'name' => $collaborator->name])->values()),
+                                    get selectedText() {
+                                        return this.collaborators.find((collaborator) => collaborator.id === this.selectedId)?.name || 'Todos los colaboradores';
+                                    },
+                                    selectCollaborator(id) {
+                                        this.selectedId = id;
+                                        this.open = false;
+                                        $wire.set('collaboratorId', id);
+                                    }
+                                }"
+                                class="relative w-full sm:w-64"
+                                @click.outside="open = false">
+                                <label class="sr-only" for="collaboratorFilter">Buscar o filtrar por colaborador</label>
+                                <button id="collaboratorFilter" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <span class="truncate" x-text="selectedText"></span>
+                                    <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                </button>
+                                <div x-cloak x-show="open" x-transition class="absolute right-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                    <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
+                                        <li><button type="button" role="option" :aria-selected="selectedId === ''" @click="selectCollaborator('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Todos los colaboradores</button></li>
+                                        <template x-for="collaborator in collaborators" :key="collaborator.id">
+                                            <li><button type="button" role="option" :aria-selected="selectedId === collaborator.id" @click="selectCollaborator(collaborator.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50" x-text="collaborator.name"></button></li>
+                                        </template>
+                                    </ul>
+                                </div>
+                            </div>
                         @endif
                         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
                             <span class="font-semibold text-slate-700">Google Drive:</span>
@@ -291,12 +313,40 @@
                         </div>
                         <div class="md:col-span-2">
                             <label for="monitorEmailAccountId" class="mb-1.5 block text-xs font-semibold text-slate-600">Cuenta de correo asociada</label>
-                            <select id="monitorEmailAccountId" wire:model="monitorEmailAccountId" class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
-                                <option value="">Selecciona una cuenta de correo</option>
-                                @foreach($emails as $email)
-                                    <option value="{{ $email->id }}">{{ $email->email }}{{ $email->alias ? ' · '.$email->alias : '' }}</option>
-                                @endforeach
-                            </select>
+                            <div x-data="{
+                                    search: '',
+                                    open: false,
+                                    selectedId: $wire.entangle('monitorEmailAccountId'),
+                                    emails: @js($emails->map(fn ($email) => ['id' => (string) $email->id, 'email' => $email->email, 'alias' => $email->alias])->values()),
+                                    get selectedText() {
+                                        const selected = this.emails.find((email) => email.id === String(this.selectedId));
+                                        return selected ? `${selected.email}${selected.alias ? ' · ' + selected.alias : ''}` : 'Selecciona una cuenta de correo';
+                                    },
+                                    selectEmail(id) {
+                                        this.selectedId = id;
+                                        this.search = '';
+                                        this.open = false;
+                                    }
+                                }"
+                                class="relative"
+                                @click.outside="open = false">
+                                <button id="monitorEmailAccountId" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-left text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <span class="truncate" x-text="selectedText"></span>
+                                    <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                </button>
+                                <div x-cloak x-show="open" x-transition class="absolute bottom-full z-50 mb-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                    <div class="border-b border-slate-100 p-2">
+                                        <input type="search" x-model="search" x-ref="emailSearch" @keydown.escape="open = false" placeholder="Buscar por correo o alias..." class="w-full rounded-md border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500" aria-label="Buscar cuenta por correo o alias">
+                                    </div>
+                                    <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
+                                        <li><button type="button" role="option" :aria-selected="!selectedId" @click="selectEmail('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Selecciona una cuenta de correo</button></li>
+                                        <template x-for="email in emails.filter((email) => `${email.email} ${email.alias || ''}`.toLowerCase().includes(search.toLowerCase()))" :key="email.id">
+                                            <li><button type="button" role="option" :aria-selected="String(selectedId) === email.id" @click="selectEmail(email.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50"><span x-text="email.email"></span><span x-show="email.alias" class="text-slate-500" x-text="email.alias ? ' · ' + email.alias : ''"></span></button></li>
+                                        </template>
+                                        <li x-show="!emails.some((email) => `${email.email} ${email.alias || ''}`.toLowerCase().includes(search.toLowerCase()))" class="px-3 py-2 text-sm text-slate-500">No se encontraron correos.</li>
+                                    </ul>
+                                </div>
+                            </div>
                             @error('monitorEmailAccountId')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
                             @if($emails->isEmpty())
                                 <p class="mt-2 text-xs text-amber-700">Primero <a href="{{ route('admin.emails.index') }}" wire:navigate class="font-semibold underline">registra una cuenta de correo</a>.</p>
