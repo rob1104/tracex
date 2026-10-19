@@ -28,34 +28,75 @@ class FacebookDriveSyncService
      * Execute the sync pipeline: scan Drive for export folders, and dispatch download jobs
      * or execute downloads synchronously.
      *
-     * @return array{scanned: int, dispatched: int, downloaded: int, deleted_from_drive: int, failed: int}
+     * @return array{scanned: int, skipped: int, dispatched: int, downloaded: int, deleted_from_drive: int, failed: int}
      */
     public function sync(bool $async = true): array
     {
         $metrics = [
             'scanned' => 0,
+            'skipped' => 0,
             'dispatched' => 0,
             'downloaded' => 0,
             'deleted_from_drive' => 0,
             'failed' => 0,
         ];
 
+        Log::info('[FacebookDriveSync] Scanning Google Drive for export folders...', [
+            'async' => $async,
+            'storage_directory' => $this->storageDirectory,
+        ]);
+
         try {
             $folders = $this->driveClient->listExportFolders();
         } catch (Exception $e) {
-            Log::error('Failed to list Google Drive export folders during sync', ['error' => $e->getMessage()]);
+            $metrics['error'] = $e->getMessage();
+
+            Log::error('[FacebookDriveSync] Failed to list Google Drive export folders during sync', [
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'configured_folder_id' => config('services.google.drive.folder_id', 'root'),
+            ]);
 
             return $metrics;
         }
 
         $metrics['scanned'] = count($folders);
 
+        if ($metrics['scanned'] === 0) {
+            Log::warning('[FacebookDriveSync] listExportFolders() returned 0 folders matching criteria.', [
+                'configured_folder_id' => config('services.google.drive.folder_id', 'root'),
+            ]);
+
+            return $metrics;
+        }
+
+        Log::info('[FacebookDriveSync] Export folders discovered in Google Drive', [
+            'count' => $metrics['scanned'],
+            'folders' => array_map(fn (array $f) => [
+                'id' => $f['id'] ?? null,
+                'name' => $f['name'] ?? null,
+                'createdTime' => $f['createdTime'] ?? null,
+            ], $folders),
+        ]);
+
         foreach ($folders as $folder) {
             $folderId = $folder['id'];
             $folderName = $folder['name'];
 
             // Idempotency: skip if already logged
-            if (FacebookImportLog::where('drive_file_id', $folderId)->exists()) {
+            $existingLog = FacebookImportLog::where('drive_file_id', $folderId)->first();
+            if ($existingLog) {
+                $metrics['skipped']++;
+                Log::info('[FacebookDriveSync] Skipping folder because drive_file_id already exists in facebook_import_logs', [
+                    'folder_id' => $folderId,
+                    'folder_name' => $folderName,
+                    'existing_log_id' => $existingLog->id,
+                    'existing_status' => $existingLog->status,
+                    'downloaded_at' => $existingLog->downloaded_at?->toDateTimeString(),
+                    'drive_deleted_at' => $existingLog->drive_deleted_at?->toDateTimeString(),
+                    'error_message' => $existingLog->error_message,
+                ]);
+
                 continue;
             }
 
@@ -74,6 +115,14 @@ class FacebookDriveSyncService
                 // Dispatch download of this folder to queue to prevent PHP execution timeouts
                 DownloadFacebookExportJob::dispatch($importLog->id, $localDir);
                 $metrics['dispatched']++;
+
+                Log::info('[FacebookDriveSync] Dispatched DownloadFacebookExportJob to queue', [
+                    'import_log_id' => $importLog->id,
+                    'folder_id' => $folderId,
+                    'folder_name' => $folderName,
+                    'local_dir' => $localDir,
+                    'queue_connection' => config('queue.default'),
+                ]);
             } else {
                 try {
                     $this->downloadFolder($importLog, $localDir);
@@ -103,6 +152,12 @@ class FacebookDriveSyncService
         $folderName = $importLog->file_name;
         $localDir = $localDir ?? "{$this->storageDirectory}/{$folderId}";
 
+        Log::info("[FacebookDriveSync] Starting download of export folder [{$folderName}]", [
+            'import_log_id' => $importLog->id,
+            'folder_id' => $folderId,
+            'local_dir' => $localDir,
+        ]);
+
         try {
             // 1. Download all JSON files in the export folder hierarchy
             $downloadedFiles = $this->driveClient->downloadExportFolder($folderId, $localDir);
@@ -121,16 +176,32 @@ class FacebookDriveSyncService
                 ],
             ]);
 
+            Log::info("[FacebookDriveSync] Successfully downloaded export folder [{$folderName}]", [
+                'import_log_id' => $importLog->id,
+                'folder_id' => $folderId,
+                'files_count' => count($downloadedFiles),
+                'total_bytes' => $totalBytes,
+                'files' => array_keys($downloadedFiles),
+            ]);
+
             // 2. Tarea 3.3: Regla de Cero-Retención (Eliminación inmediata de Drive)
             $this->cleanDriveFile($importLog);
 
             // 3. Dispatch async parsing job
             ProcessFacebookExportJob::dispatch($localDir, $importLog->id);
 
+            Log::info("[FacebookDriveSync] Dispatched ProcessFacebookExportJob for [{$folderName}]", [
+                'import_log_id' => $importLog->id,
+                'local_dir' => $localDir,
+                'queue_connection' => config('queue.default'),
+            ]);
+
             return $downloadedFiles;
         } catch (Exception $e) {
             Log::error("Failed processing export folder [{$folderName}] from Google Drive", [
+                'import_log_id' => $importLog->id,
                 'folder_id' => $folderId,
+                'local_dir' => $localDir,
                 'error' => $e->getMessage(),
             ]);
 
