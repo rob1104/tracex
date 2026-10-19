@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Carbon\Carbon;
 use FilesystemIterator;
+use Illuminate\Support\Facades\Log;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
@@ -52,8 +53,23 @@ class FacebookExportParser
             + count($archivosCompartidos);
 
         if ($totalArchivosReconocidos === 0) {
+            $todosLosArchivos = array_map('basename', $this->archivos('/.*/'));
+
+            Log::warning('[FacebookExportParser] No recognized Facebook JSON files found in export directory', [
+                'directory' => $this->directorio,
+                'all_files_present_in_directory' => $todosLosArchivos,
+            ]);
+
             throw new RuntimeException("Estructura de exportación inválida: no se encontraron archivos reconocidos de Facebook en {$this->directorio}.");
         }
+
+        Log::info('[FacebookExportParser] Validating recognized Facebook export files', [
+            'directory' => $this->directorio,
+            'profile_files' => array_map('basename', $archivosPerfil),
+            'comment_files' => array_map('basename', $archivosComentarios),
+            'reaction_files' => array_map('basename', $archivosReacciones),
+            'share_files' => array_map('basename', $archivosCompartidos),
+        ]);
 
         foreach ($archivosPerfil as $ruta) {
             $datos = $this->leer($ruta);

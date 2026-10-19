@@ -31,7 +31,8 @@ class GoogleDriveClient
         $this->clientId = $clientId ?? (string) config('services.google.drive.client_id');
         $this->clientSecret = $clientSecret ?? (string) config('services.google.drive.client_secret');
         $this->refreshToken = $refreshToken ?? (string) config('services.google.drive.refresh_token');
-        $this->folderId = $folderId ?? config('services.google.drive.folder_id', 'root');
+        $configuredFolderId = $folderId ?? config('services.google.drive.folder_id', 'root');
+        $this->folderId = filled($configuredFolderId) ? trim((string) $configuredFolderId) : 'root';
     }
 
     /**
@@ -45,6 +46,14 @@ class GoogleDriveClient
             return $this->accessToken;
         }
 
+        if (empty($this->clientId) || empty($this->clientSecret) || empty($this->refreshToken)) {
+            Log::warning('[GoogleDriveClient] Missing Google Drive OAuth2 credentials in configuration', [
+                'has_client_id' => filled($this->clientId),
+                'has_client_secret' => filled($this->clientSecret),
+                'has_refresh_token' => filled($this->refreshToken),
+            ]);
+        }
+
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
             'client_id' => $this->clientId,
             'client_secret' => $this->clientSecret,
@@ -53,9 +62,16 @@ class GoogleDriveClient
         ]);
 
         if (! $response->successful()) {
-            Log::error('Google Drive OAuth2 token refresh failed', [
+            $errorData = $response->json();
+            $hint = null;
+            if (is_array($errorData) && ($errorData['error'] ?? null) === 'invalid_grant') {
+                $hint = 'El GOOGLE_DRIVE_REFRESH_TOKEN ha expirado o fue revocado (en Google Cloud Console con estado "Testing", los refresh tokens expiran a los 7 días). Ejecuta "php artisan google:drive-auth" para renovar el token.';
+            }
+
+            Log::error('[GoogleDriveClient] Google Drive OAuth2 token refresh failed', [
                 'status' => $response->status(),
-                'body' => $response->json(),
+                'body' => $errorData ?? $response->body(),
+                'diagnostic_hint' => $hint,
             ]);
 
             throw new Exception('Failed to obtain Google Drive access token: '.$response->body());
@@ -63,6 +79,11 @@ class GoogleDriveClient
 
         $data = $response->json();
         $this->accessToken = $data['access_token'];
+
+        Log::info('[GoogleDriveClient] OAuth2 access token obtained successfully', [
+            'scope' => $data['scope'] ?? null,
+            'expires_in' => $data['expires_in'] ?? null,
+        ]);
 
         return $this->accessToken;
     }
@@ -76,13 +97,25 @@ class GoogleDriveClient
      */
     public function listExportFolders(?string $parentFolderId = null): array
     {
-        $targetFolder = $parentFolderId ?? $this->folderId ?? 'root';
+        $targetFolder = filled($parentFolderId) ? trim($parentFolderId) : ($this->folderId ?: 'root');
+
+        if (str_contains($targetFolder, '/') || str_contains($targetFolder, 'drive.google.com')) {
+            Log::warning('[GoogleDriveClient] Configured GOOGLE_DRIVE_FOLDER_ID looks like a URL or path instead of a folder ID', [
+                'target_folder' => $targetFolder,
+            ]);
+        }
+
         $token = $this->getAccessToken();
 
         $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains 'meta-'";
         if ($targetFolder) {
             $query .= " and '{$targetFolder}' in parents";
         }
+
+        Log::info('[GoogleDriveClient] Querying Google Drive for export folders', [
+            'target_folder' => $targetFolder,
+            'query' => $query,
+        ]);
 
         $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
             'q' => $query,
@@ -91,10 +124,91 @@ class GoogleDriveClient
         ]);
 
         if (! $response->successful()) {
+            Log::error('[GoogleDriveClient] Failed to list export folders from Google Drive', [
+                'status' => $response->status(),
+                'target_folder' => $targetFolder,
+                'query' => $query,
+                'body' => $response->json() ?? $response->body(),
+            ]);
+
             throw new Exception('Failed to list export folders from Google Drive: '.$response->body());
         }
 
-        return $response->json('files', []);
+        $files = $response->json('files', []);
+
+        if (empty($files)) {
+            $this->logEmptyExportFoldersDiagnostics($token, $targetFolder, $query);
+        } else {
+            Log::info('[GoogleDriveClient] Found export folders in Google Drive', [
+                'target_folder' => $targetFolder,
+                'count' => count($files),
+                'folders' => $files,
+            ]);
+        }
+
+        return $files;
+    }
+
+    /**
+     * Collect and log diagnostic information when no export folders match the primary query.
+     */
+    protected function logEmptyExportFoldersDiagnostics(string $token, string $targetFolder, string $originalQuery): void
+    {
+        try {
+            $aboutResponse = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/about', [
+                'fields' => 'user(emailAddress,displayName)',
+            ]);
+            $authenticatedUser = $aboutResponse->successful() ? $aboutResponse->json('user') : [
+                'error_status' => $aboutResponse->status(),
+            ];
+
+            $targetFolderInfo = ['id' => 'root'];
+            if ($targetFolder !== '' && $targetFolder !== 'root') {
+                $folderMetaResponse = Http::withToken($token)->get("https://www.googleapis.com/drive/v3/files/{$targetFolder}", [
+                    'fields' => 'id,name,mimeType,trashed',
+                ]);
+                $targetFolderInfo = $folderMetaResponse->successful()
+                    ? $folderMetaResponse->json()
+                    : [
+                        'id' => $targetFolder,
+                        'error_status' => $folderMetaResponse->status(),
+                        'error_body' => $folderMetaResponse->json() ?? $folderMetaResponse->body(),
+                    ];
+            }
+
+            $inFolderResponse = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
+                'q' => "'{$targetFolder}' in parents and trashed = false",
+                'fields' => 'files(id, name, mimeType, createdTime)',
+                'pageSize' => 25,
+            ]);
+            $itemsInTargetFolder = $inFolderResponse->successful() ? $inFolderResponse->json('files', []) : [
+                'error_status' => $inFolderResponse->status(),
+            ];
+
+            $globalCandidatesResponse = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
+                'q' => "trashed = false and (name contains 'meta-' or name contains 'facebook' or name = 'profile_information.json' or name contains 'comments')",
+                'fields' => 'files(id, name, mimeType, parents, shared, createdTime)',
+                'pageSize' => 25,
+            ]);
+            $globalCandidates = $globalCandidatesResponse->successful() ? $globalCandidatesResponse->json('files', []) : [
+                'error_status' => $globalCandidatesResponse->status(),
+            ];
+
+            Log::warning('[GoogleDriveClient] Diagnostics: 0 export folders matched query in Google Drive', [
+                'original_query' => $originalQuery,
+                'configured_target_folder' => $targetFolder,
+                'authenticated_google_account' => $authenticatedUser,
+                'target_folder_metadata' => $targetFolderInfo,
+                'items_inside_target_folder_count' => is_array($itemsInTargetFolder) ? count($itemsInTargetFolder) : null,
+                'items_inside_target_folder_sample' => $itemsInTargetFolder,
+                'matching_candidates_anywhere_in_drive_count' => is_array($globalCandidates) ? count($globalCandidates) : null,
+                'matching_candidates_anywhere_in_drive' => $globalCandidates,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('[GoogleDriveClient] Could not complete empty-folder diagnostics', [
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**
@@ -109,6 +223,8 @@ class GoogleDriveClient
         $token = $this->getAccessToken();
         $queue = [['id' => $folderId, 'subpath' => '']];
         $jsonFiles = [];
+        $subfoldersScanned = 0;
+        $nonJsonFiles = [];
 
         while (! empty($queue)) {
             $current = array_shift($queue);
@@ -122,6 +238,13 @@ class GoogleDriveClient
             ]);
 
             if (! $response->successful()) {
+                Log::error('[GoogleDriveClient] Failed to list contents of folder during JSON scan', [
+                    'folder_id' => $currentFolder,
+                    'subpath' => $currentSubpath,
+                    'status' => $response->status(),
+                    'body' => $response->json() ?? $response->body(),
+                ]);
+
                 throw new Exception("Failed to list contents of folder [{$currentFolder}] from Google Drive: ".$response->body());
             }
 
@@ -130,6 +253,7 @@ class GoogleDriveClient
                 $itemSubpath = $currentSubpath !== '' ? $currentSubpath.'/'.$item['name'] : $item['name'];
 
                 if ($item['mimeType'] === 'application/vnd.google-apps.folder') {
+                    $subfoldersScanned++;
                     $queue[] = [
                         'id' => $item['id'],
                         'subpath' => $itemSubpath,
@@ -141,8 +265,31 @@ class GoogleDriveClient
                         'size' => isset($item['size']) ? (int) $item['size'] : null,
                         'relative_path' => $itemSubpath,
                     ];
+                } else {
+                    $nonJsonFiles[] = [
+                        'id' => $item['id'] ?? null,
+                        'name' => $item['name'] ?? null,
+                        'mimeType' => $item['mimeType'] ?? null,
+                        'relative_path' => $itemSubpath,
+                    ];
                 }
             }
+        }
+
+        if (empty($jsonFiles)) {
+            Log::warning('[GoogleDriveClient] No JSON files found inside export folder hierarchy', [
+                'root_folder_id' => $folderId,
+                'subfolders_scanned' => $subfoldersScanned,
+                'non_json_files_count' => count($nonJsonFiles),
+                'non_json_files_sample' => array_slice($nonJsonFiles, 0, 25),
+            ]);
+        } else {
+            Log::info('[GoogleDriveClient] Completed JSON file scan for export folder', [
+                'root_folder_id' => $folderId,
+                'json_files_count' => count($jsonFiles),
+                'subfolders_scanned' => $subfoldersScanned,
+                'non_json_files_count' => count($nonJsonFiles),
+            ]);
         }
 
         return $jsonFiles;
@@ -234,6 +381,12 @@ class GoogleDriveClient
             ]);
 
         if (! $response->successful()) {
+            Log::error('[GoogleDriveClient] Failed to download file from Google Drive', [
+                'file_id' => $fileId,
+                'destination_path' => $destinationPath,
+                'status' => $response->status(),
+            ]);
+
             if (File::exists($destinationPath)) {
                 File::delete($destinationPath);
             }
@@ -251,21 +404,43 @@ class GoogleDriveClient
     public function verifyFileIntegrity(string $filePath, ?int $expectedBytes = null): bool
     {
         if (! File::exists($filePath) || ! File::isReadable($filePath)) {
+            Log::warning('[GoogleDriveClient] Integrity check failed: file does not exist or is not readable', [
+                'file_path' => $filePath,
+            ]);
+
             return false;
         }
 
         $actualSize = File::size($filePath);
         if ($actualSize <= 0) {
+            Log::warning('[GoogleDriveClient] Integrity check failed: file is empty (0 bytes)', [
+                'file_path' => $filePath,
+            ]);
+
             return false;
         }
 
         if ($expectedBytes !== null && $expectedBytes > 0 && $actualSize !== $expectedBytes) {
+            Log::warning('[GoogleDriveClient] Integrity check failed: file size mismatch', [
+                'file_path' => $filePath,
+                'expected_bytes' => $expectedBytes,
+                'actual_bytes' => $actualSize,
+            ]);
+
             return false;
         }
 
         $content = File::get($filePath);
+        $isValidJson = json_validate($content);
 
-        return json_validate($content);
+        if (! $isValidJson) {
+            Log::warning('[GoogleDriveClient] Integrity check failed: invalid JSON content', [
+                'file_path' => $filePath,
+                'actual_bytes' => $actualSize,
+            ]);
+        }
+
+        return $isValidJson;
     }
 
     /**
