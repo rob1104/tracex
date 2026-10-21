@@ -224,7 +224,7 @@ class FacebookImportIdsCommand extends Command
     private function resolveCollaboratorUser(string $collaboratorName, bool $createMissing, array &$createdUsersTracker): ?User
     {
         $cleanName = trim($collaboratorName);
-        if ($cleanName === '') {
+        if ($cleanName === '' || mb_strtolower($cleanName, 'UTF-8') === 'sin asignar') {
             return null;
         }
 
@@ -386,7 +386,7 @@ class FacebookImportIdsCommand extends Command
             $status = strtolower(trim($cells['L'] ?? 'active'));
 
             $fbNorm = FacebookProfileIdentifier::normalize($rawFb);
-            if (! $fbNorm || $collaborator === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (! $fbNorm || $collaborator === '' || mb_strtolower($collaborator, 'UTF-8') === 'sin asignar' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 continue;
             }
 
@@ -661,7 +661,7 @@ class FacebookImportIdsCommand extends Command
             $status = strtolower(trim($row[11] ?? 'active'));
 
             $fbNorm = FacebookProfileIdentifier::normalize($rawFb);
-            if (! $fbNorm || $collaborator === '' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            if (! $fbNorm || $collaborator === '' || mb_strtolower($collaborator, 'UTF-8') === 'sin asignar' || ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 continue;
             }
 
