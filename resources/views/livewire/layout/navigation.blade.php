@@ -18,7 +18,7 @@ new class extends Component
 
 <nav x-data="{ open: false }" class="bg-slate-900 border-b border-slate-800 shadow-lg relative z-50">
     <!-- Primary Navigation Menu -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
             <div class="flex">
                 <!-- Logo -->
@@ -35,7 +35,7 @@ new class extends Component
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                <div class="hidden min-w-0 sm:-my-px sm:ms-6 sm:flex sm:gap-x-4 xl:gap-x-5">
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')" wire:navigate>
                         Panel Principal
                     </x-nav-link>
@@ -44,8 +44,11 @@ new class extends Component
                         <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                             Monitoreo de Colaboradores
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                        <x-nav-link :href="route('admin.evidence-reports.index')" :active="request()->routeIs('admin.evidence-reports.index')" wire:navigate>
                             Reporte de Evidencias
+                        </x-nav-link>
+                        <x-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                            Gestión de Evidencias
                         </x-nav-link>
                         <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
                             Usuarios de Plataforma
@@ -60,6 +63,11 @@ new class extends Component
                             Perfiles de Facebook
                         </x-nav-link>
                     @elseif(auth()->user()->isCuentas() || auth()->user()->isUser())
+                        @if(auth()->user()->isCuentas())
+                            <x-nav-link :href="route('admin.evidence-reports.index')" :active="request()->routeIs('admin.evidence-reports.index')" wire:navigate>
+                                Reporte de Evidencias
+                            </x-nav-link>
+                        @endif
                         <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                             Monitoreo de Usuarios
                         </x-nav-link>
@@ -88,7 +96,7 @@ new class extends Component
             </div>
 
             <!-- Settings Dropdown -->
-            <div class="hidden sm:flex sm:items-center sm:ms-6">
+            <div class="hidden shrink-0 sm:flex sm:items-center sm:ms-4">
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-slate-300 bg-slate-800 hover:text-white hover:bg-slate-700 focus:outline-none transition ease-in-out duration-150">
@@ -154,8 +162,11 @@ new class extends Component
                 <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                     Monitoreo de Colaboradores
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                <x-responsive-nav-link :href="route('admin.evidence-reports.index')" :active="request()->routeIs('admin.evidence-reports.index')" wire:navigate>
                     Reporte de Evidencias
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
+                    Gestión de Evidencias
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
                     Usuarios de Plataforma
@@ -170,6 +181,11 @@ new class extends Component
                     Perfiles de Facebook
                 </x-responsive-nav-link>
             @elseif(auth()->user()->isCuentas() || auth()->user()->isUser())
+                @if(auth()->user()->isCuentas())
+                    <x-responsive-nav-link :href="route('admin.evidence-reports.index')" :active="request()->routeIs('admin.evidence-reports.index')" wire:navigate>
+                        Reporte de Evidencias
+                    </x-responsive-nav-link>
+                @endif
                 <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                     Monitoreo de Usuarios
                 </x-responsive-nav-link>

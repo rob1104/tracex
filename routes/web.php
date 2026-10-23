@@ -1,5 +1,6 @@
 <?php
 
+use App\Livewire\Admin\EvidenceReports\Index as EvidenceReport;
 use App\Livewire\Admin\Evidences\Index;
 use App\Livewire\User\EvidenceCreate;
 use App\Livewire\User\EvidenceCreateMultiple;
@@ -26,6 +27,10 @@ Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('ad
     Route::get('/evidencias', Index::class)->name('evidences.index');
     Route::get('/usuarios', App\Livewire\Admin\Users\Index::class)->name('users.index');
     Route::get('/tipos-evidencia', App\Livewire\Admin\EvidenceTypes\Index::class)->name('evidence_types.index');
+});
+
+Route::middleware(['auth', 'verified', 'role:admin,cuentas'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/reporte-evidencias', EvidenceReport::class)->name('evidence-reports.index');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin,cuentas,user'])->prefix('admin')->name('admin.')->group(function () {
