@@ -195,9 +195,9 @@
                         </div>
 
                         @if($activityTab === 'recent')
-                            <div class="overflow-x-auto">
+                            <div class="max-h-96 overflow-auto overscroll-contain">
                                 <table class="min-w-full divide-y divide-slate-100 text-left text-xs">
-                                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                                    <thead class="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
                                         <tr><th class="px-4 py-3 font-semibold">Fecha</th><th class="px-4 py-3 font-semibold">Perfil</th><th class="px-4 py-3 font-semibold">Tipo</th><th class="px-4 py-3 font-semibold">Descripción</th><th class="px-4 py-3 font-semibold">Estado</th></tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100">
@@ -207,7 +207,7 @@
                                                 <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ ($evidence->external_published_at ?? $evidence->created_at)?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
                                                 <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{{ $evidence->profile?->name ?? 'Perfil no asignado' }}</td>
                                                 <td class="whitespace-nowrap px-4 py-3"><span class="inline-flex items-center gap-1.5 text-slate-700"><span class="h-2 w-2 rounded-full {{ str_contains(mb_strtolower($typeName), 'coment') ? 'bg-blue-500' : (str_contains(mb_strtolower($typeName), 'compart') ? 'bg-emerald-500' : 'bg-rose-500') }}"></span>{{ $typeName }}</span></td>
-                                                <td class="max-w-sm px-4 py-3 text-slate-500"><div class="whitespace-pre-line">{{ \Illuminate\Support\Str::limit($evidence->comment, 150) }}</div></td>
+                                                <td class="max-w-sm break-words px-4 py-3 text-slate-500"><div class="whitespace-pre-line">{{ $evidence->comment }}</div></td>
                                                 <td class="px-4 py-3"><span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Procesado</span></td>
                                             </tr>
                                         @empty
@@ -216,10 +216,13 @@
                                     </tbody>
                                 </table>
                             </div>
+                            @if($activity->hasPages())
+                                <div class="border-t border-slate-100 px-4 py-3 sm:px-5">{{ $activity->links() }}</div>
+                            @endif
                         @else
-                            <div class="overflow-x-auto">
+                            <div class="max-h-96 overflow-auto overscroll-contain">
                                 <table class="min-w-full divide-y divide-slate-100 text-left text-xs">
-                                    <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3 font-semibold">Carpeta / archivo</th><th class="px-4 py-3 font-semibold">Perfil de Facebook detectado</th><th class="px-4 py-3 font-semibold">Estado</th><th class="px-4 py-3 font-semibold">Recibida</th></tr></thead>
+                                    <thead class="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500"><tr><th class="px-4 py-3 font-semibold">Carpeta / archivo</th><th class="px-4 py-3 font-semibold">Perfil de Facebook detectado</th><th class="px-4 py-3 font-semibold">Estado</th><th class="px-4 py-3 font-semibold">Recibida</th></tr></thead>
                                     <tbody class="divide-y divide-slate-100">
                                         @forelse($imports as $importLog)
                                             @php
@@ -230,7 +233,7 @@
                                                 };
                                             @endphp
                                             <tr class="hover:bg-slate-50/70">
-                                                <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 truncate text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
+                                                <td class="max-w-xs break-all px-4 py-3"><p class="font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
                                                 <td class="px-4 py-3 text-slate-600">{{ $importLog->profile?->name ?? ($metadata['name'] ?? 'Pendiente de coincidencia') }}</td>
                                                 <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $importLog->status === 'completed' ? 'bg-emerald-50 text-emerald-700' : ($importLog->status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800') }}">{{ $statusLabel }}</span></td>
                                                 <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
@@ -241,6 +244,9 @@
                                     </tbody>
                                 </table>
                             </div>
+                            @if($imports->hasPages())
+                                <div class="border-t border-slate-100 px-4 py-3 sm:px-5">{{ $imports->links() }}</div>
+                            @endif
                         @endif
                     </section>
 
