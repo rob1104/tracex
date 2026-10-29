@@ -225,13 +225,19 @@
                                             @php
                                                 $facebookUser = $importLog->facebookUsers->first();
                                                 $metadata = is_array($facebookUser?->metadata) ? $facebookUser->metadata : [];
+                                                $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'ID: '.$fbMatch[1] : null;
+                                                $detectedProfileLabel = $importLog->profile?->name
+                                                    ?? $metadata['name']
+                                                    ?? (! empty($metadata['export_identifier']) ? 'ID: '.str_replace('id:', '', (string) $metadata['export_identifier']) : null)
+                                                    ?? $folderFbId
+                                                    ?? 'Pendiente de coincidencia';
                                                 $statusLabel = match($importLog->status) {
                                                     'completed' => 'Procesado', 'processing' => 'Procesando', 'downloaded' => 'Descargado', 'pending_assignment' => 'Sin asignar', 'failed' => 'Error', default => ucfirst($importLog->status),
                                                 };
                                             @endphp
                                             <tr class="hover:bg-slate-50/70">
                                                 <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 truncate text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
-                                                <td class="px-4 py-3 text-slate-600">{{ $importLog->profile?->name ?? ($metadata['name'] ?? 'Pendiente de coincidencia') }}</td>
+                                                <td class="px-4 py-3 text-slate-600">{{ $detectedProfileLabel }}</td>
                                                 <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $importLog->status === 'completed' ? 'bg-emerald-50 text-emerald-700' : ($importLog->status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800') }}">{{ $statusLabel }}</span></td>
                                                 <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
                                             </tr>

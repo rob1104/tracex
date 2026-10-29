@@ -6,6 +6,8 @@ use App\Jobs\DeleteDriveFileJob;
 use App\Jobs\DownloadFacebookExportJob;
 use App\Jobs\ProcessFacebookExportJob;
 use App\Models\FacebookImportLog;
+use App\Services\FacebookProfileIdentifier;
+use App\Services\ProfileAssignmentService;
 use Exception;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -114,10 +116,22 @@ class FacebookDriveSyncService
 
             $localDir = "{$this->storageDirectory}/{$folderId}";
 
+            // Resolver perfil preliminarmente si el nombre de la carpeta contiene el Facebook ID (facebook-<id>-...)
+            $preliminaryIdentifier = FacebookProfileIdentifier::normalize(
+                preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', $folderName, $idMatch) ? "id:{$idMatch[1]}" : null
+            );
+            $preliminaryResolution = $preliminaryIdentifier !== null
+                ? app(ProfileAssignmentService::class)->resolve(['identifier' => $preliminaryIdentifier])
+                : ['profile' => null, 'user' => null];
+            $matchedProfile = $preliminaryResolution['profile'];
+            $assignedUser = $preliminaryResolution['user'];
+
             // 1. Reuse stuck pending-download record or create initial log record
             if ($existingLog !== null) {
                 $existingLog->update([
                     'file_name' => $folderName,
+                    'profile_id' => $existingLog->profile_id ?? $matchedProfile?->id,
+                    'user_id' => $existingLog->user_id ?? $assignedUser?->id,
                     'error_message' => null,
                 ]);
                 $importLog = $existingLog;
@@ -131,6 +145,8 @@ class FacebookDriveSyncService
                 $importLog = FacebookImportLog::create([
                     'drive_file_id' => $folderId,
                     'file_name' => $folderName,
+                    'profile_id' => $matchedProfile?->id,
+                    'user_id' => $assignedUser?->id,
                     'file_size_bytes' => 0,
                     'status' => 'downloaded',
                     'downloaded_at' => null,

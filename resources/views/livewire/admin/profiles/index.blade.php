@@ -299,6 +299,8 @@
                                         @php
                                             $facebookUser = $importLog->facebookUsers->first();
                                             $profileName = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['name'] ?? null) : null;
+                                            $exportIdentifier = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['export_identifier'] ?? null) : null;
+                                            $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'id:'.$fbMatch[1] : null;
                                         @endphp
                                         <tr>
                                             <td class="px-4 py-3 text-sm text-gray-900">
@@ -307,7 +309,12 @@
                                                     <div class="mt-1 max-w-sm text-xs text-amber-700">{{ $importLog->error_message }}</div>
                                                 @endif
                                             </td>
-                                            <td class="px-4 py-3 text-sm text-gray-700">{{ $importLog->profile?->name ?? $profileName ?? 'Sin coincidencia automatica' }}</td>
+                                            <td class="px-4 py-3 text-sm text-gray-700">
+                                                <div>{{ $importLog->profile?->name ?? $profileName ?? 'Sin coincidencia automatica' }}</div>
+                                                @if(! $importLog->profile_id && ($exportIdentifier || $folderFbId))
+                                                    <div class="mt-1 text-xs text-gray-500">ID detectado: {{ $exportIdentifier ?? $folderFbId }}</div>
+                                                @endif
+                                            </td>
                                             <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
                                                 {{ $importLog->comments_count }} comentarios<br>
                                                 {{ $importLog->reactions_count }} reacciones

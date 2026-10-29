@@ -339,4 +339,43 @@ class ProcessFacebookExportJobTest extends TestCase
             'comment' => "Reacción [LIKE] en: Jorge 'Tico' Garcia",
         ]);
     }
+
+    public function test_it_completes_daily_export_with_zero_activity_when_facebook_identifier_is_known(): void
+    {
+        $user = User::factory()->create(['role' => 'user', 'name' => 'Colaborador Diario']);
+        $email = EmailAccount::create([
+            'email' => 'diario@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+        $profile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Perfil Diario Sin Actividad',
+            'facebook_identifier' => 'id:61594553723083',
+            'social_network' => 'facebook',
+            'status' => 'active',
+        ]);
+        $profile->users()->attach($user->id);
+
+        $log = FacebookImportLog::create([
+            'drive_file_id' => '1ZzEw9zSGxVpdDZ9C3oSb0LXS6i5ocA4K',
+            'file_name' => 'meta-2026-Oct-26-10-20-17/facebook-61594553723083-2026-10-28-KzM5cb1q',
+            'status' => 'downloaded',
+        ]);
+
+        file_put_contents($this->testDirectory.'/the_ways_we_can_send_you_notifications.json', json_encode([
+            'label_values' => [],
+        ], JSON_THROW_ON_ERROR));
+
+        $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
+        $job->handle();
+
+        $log->refresh();
+        $this->assertSame('completed', $log->status);
+        $this->assertSame($profile->id, $log->profile_id);
+        $this->assertSame($user->id, $log->user_id);
+        $this->assertSame(0, $log->total_comments_extracted);
+        $this->assertSame(0, $log->total_reactions_extracted);
+        $this->assertDirectoryDoesNotExist($this->testDirectory);
+    }
 }
