@@ -89,9 +89,11 @@ class GoogleDriveClient
     }
 
     /**
-     * List Facebook export folders (matching 'meta-') in the configured or specified parent folder.
+     * List Facebook export folders (matching 'meta-' or 'facebook-') in the configured or specified parent folder.
+     * When a 'meta-' folder contains daily 'facebook-' subfolders, each 'facebook-' subfolder is returned as an
+     * individual export unit so daily recurring exports inside the same 'meta-' folder are processed independently.
      *
-     * @return array<int, array{id: string, name: string, createdTime?: string}>
+     * @return array<int, array{id: string, name: string, createdTime?: string, parent_id?: string}>
      *
      * @throws Exception
      */
@@ -107,7 +109,7 @@ class GoogleDriveClient
 
         $token = $this->getAccessToken();
 
-        $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and name contains 'meta-'";
+        $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and (name contains 'meta-' or name contains 'facebook-')";
         if ($targetFolder) {
             $query .= " and '{$targetFolder}' in parents";
         }
@@ -117,36 +119,154 @@ class GoogleDriveClient
             'query' => $query,
         ]);
 
-        $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
-            'q' => $query,
-            'fields' => 'files(id, name, createdTime)',
-            'pageSize' => 100,
-        ]);
+        $files = [];
+        $pageToken = null;
 
-        if (! $response->successful()) {
-            Log::error('[GoogleDriveClient] Failed to list export folders from Google Drive', [
-                'status' => $response->status(),
-                'target_folder' => $targetFolder,
-                'query' => $query,
-                'body' => $response->json() ?? $response->body(),
-            ]);
+        do {
+            $params = [
+                'q' => $query,
+                'fields' => 'nextPageToken, files(id, name, createdTime)',
+                'pageSize' => 100,
+            ];
 
-            throw new Exception('Failed to list export folders from Google Drive: '.$response->body());
-        }
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
 
-        $files = $response->json('files', []);
+            $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', $params);
+
+            if (! $response->successful()) {
+                Log::error('[GoogleDriveClient] Failed to list export folders from Google Drive', [
+                    'status' => $response->status(),
+                    'target_folder' => $targetFolder,
+                    'query' => $query,
+                    'body' => $response->json() ?? $response->body(),
+                ]);
+
+                throw new Exception('Failed to list export folders from Google Drive: '.$response->body());
+            }
+
+            foreach ($response->json('files', []) as $file) {
+                $files[] = $file;
+            }
+
+            $nextToken = $response->json('nextPageToken');
+            $pageToken = is_string($nextToken) && $nextToken !== '' ? $nextToken : null;
+        } while ($pageToken !== null);
 
         if (empty($files)) {
             $this->logEmptyExportFoldersDiagnostics($token, $targetFolder, $query);
-        } else {
-            Log::info('[GoogleDriveClient] Found export folders in Google Drive', [
-                'target_folder' => $targetFolder,
-                'count' => count($files),
-                'folders' => $files,
-            ]);
+
+            return [];
         }
 
-        return $files;
+        $expandedFiles = $this->expandMetaExportFolders($files, $token);
+
+        Log::info('[GoogleDriveClient] Found export folders in Google Drive', [
+            'target_folder' => $targetFolder,
+            'root_folders_count' => count($files),
+            'count' => count($expandedFiles),
+            'folders' => $expandedFiles,
+        ]);
+
+        return $expandedFiles;
+    }
+
+    /**
+     * Expand 'meta-' parent folders into their child 'facebook-' daily export subfolders when present.
+     *
+     * @param  array<int, array{id: string, name: string, createdTime?: string}>  $folders
+     * @return array<int, array{id: string, name: string, createdTime?: string, parent_id?: string}>
+     */
+    protected function expandMetaExportFolders(array $folders, string $token): array
+    {
+        $expanded = [];
+
+        foreach ($folders as $folder) {
+            $folderId = (string) ($folder['id'] ?? '');
+            $folderName = (string) ($folder['name'] ?? '');
+
+            if ($folderId !== '' && str_starts_with(strtolower($folderName), 'meta-')) {
+                $children = $this->listChildExportFolders($folderId, $token);
+
+                if (! empty($children)) {
+                    foreach ($children as $child) {
+                        $expandedItem = [
+                            'id' => $child['id'],
+                            'name' => $folderName.'/'.$child['name'],
+                            'parent_id' => $folderId,
+                        ];
+
+                        if (isset($child['createdTime']) || isset($folder['createdTime'])) {
+                            $expandedItem['createdTime'] = $child['createdTime'] ?? $folder['createdTime'];
+                        }
+
+                        $expanded[] = $expandedItem;
+                    }
+
+                    continue;
+                }
+            }
+
+            $expanded[] = $folder;
+        }
+
+        return $expanded;
+    }
+
+    /**
+     * List direct child 'facebook-' export folders inside a 'meta-' parent folder.
+     *
+     * @return array<int, array{id: string, name: string, createdTime?: string}>
+     */
+    protected function listChildExportFolders(string $parentFolderId, string $token): array
+    {
+        $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and '{$parentFolderId}' in parents and name contains 'facebook-'";
+        $children = [];
+        $pageToken = null;
+
+        do {
+            $params = [
+                'q' => $query,
+                'fields' => 'nextPageToken, files(id, name, createdTime)',
+                'pageSize' => 100,
+            ];
+
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', $params);
+
+            if (! $response->successful()) {
+                Log::warning('[GoogleDriveClient] Failed to list child facebook- folders inside meta- folder', [
+                    'parent_folder_id' => $parentFolderId,
+                    'status' => $response->status(),
+                ]);
+
+                return [];
+            }
+
+            foreach ($response->json('files', []) as $item) {
+                $itemId = (string) ($item['id'] ?? '');
+                $itemName = (string) ($item['name'] ?? '');
+
+                if ($itemId === '' || $itemId === $parentFolderId) {
+                    continue;
+                }
+
+                if (! str_contains(strtolower($itemName), 'facebook-')) {
+                    continue;
+                }
+
+                $children[] = $item;
+            }
+
+            $nextToken = $response->json('nextPageToken');
+            $pageToken = is_string($nextToken) && $nextToken !== '' ? $nextToken : null;
+        } while ($pageToken !== null);
+
+        return $children;
     }
 
     /**
@@ -230,50 +350,62 @@ class GoogleDriveClient
             $current = array_shift($queue);
             $currentFolder = $current['id'];
             $currentSubpath = $current['subpath'];
+            $pageToken = null;
 
-            $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', [
-                'q' => "'{$currentFolder}' in parents and trashed = false",
-                'fields' => 'files(id, name, mimeType, size)',
-                'pageSize' => 100,
-            ]);
+            do {
+                $params = [
+                    'q' => "'{$currentFolder}' in parents and trashed = false",
+                    'fields' => 'nextPageToken, files(id, name, mimeType, size)',
+                    'pageSize' => 100,
+                ];
 
-            if (! $response->successful()) {
-                Log::error('[GoogleDriveClient] Failed to list contents of folder during JSON scan', [
-                    'folder_id' => $currentFolder,
-                    'subpath' => $currentSubpath,
-                    'status' => $response->status(),
-                    'body' => $response->json() ?? $response->body(),
-                ]);
-
-                throw new Exception("Failed to list contents of folder [{$currentFolder}] from Google Drive: ".$response->body());
-            }
-
-            $items = $response->json('files', []);
-            foreach ($items as $item) {
-                $itemSubpath = $currentSubpath !== '' ? $currentSubpath.'/'.$item['name'] : $item['name'];
-
-                if ($item['mimeType'] === 'application/vnd.google-apps.folder') {
-                    $subfoldersScanned++;
-                    $queue[] = [
-                        'id' => $item['id'],
-                        'subpath' => $itemSubpath,
-                    ];
-                } elseif (str_ends_with(strtolower($item['name']), '.json') || ($item['mimeType'] ?? '') === 'application/json') {
-                    $jsonFiles[] = [
-                        'id' => $item['id'],
-                        'name' => $item['name'],
-                        'size' => isset($item['size']) ? (int) $item['size'] : null,
-                        'relative_path' => $itemSubpath,
-                    ];
-                } else {
-                    $nonJsonFiles[] = [
-                        'id' => $item['id'] ?? null,
-                        'name' => $item['name'] ?? null,
-                        'mimeType' => $item['mimeType'] ?? null,
-                        'relative_path' => $itemSubpath,
-                    ];
+                if ($pageToken !== null) {
+                    $params['pageToken'] = $pageToken;
                 }
-            }
+
+                $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', $params);
+
+                if (! $response->successful()) {
+                    Log::error('[GoogleDriveClient] Failed to list contents of folder during JSON scan', [
+                        'folder_id' => $currentFolder,
+                        'subpath' => $currentSubpath,
+                        'status' => $response->status(),
+                        'body' => $response->json() ?? $response->body(),
+                    ]);
+
+                    throw new Exception("Failed to list contents of folder [{$currentFolder}] from Google Drive: ".$response->body());
+                }
+
+                $items = $response->json('files', []);
+                foreach ($items as $item) {
+                    $itemSubpath = $currentSubpath !== '' ? $currentSubpath.'/'.$item['name'] : $item['name'];
+
+                    if ($item['mimeType'] === 'application/vnd.google-apps.folder') {
+                        $subfoldersScanned++;
+                        $queue[] = [
+                            'id' => $item['id'],
+                            'subpath' => $itemSubpath,
+                        ];
+                    } elseif (str_ends_with(strtolower($item['name']), '.json') || ($item['mimeType'] ?? '') === 'application/json') {
+                        $jsonFiles[] = [
+                            'id' => $item['id'],
+                            'name' => $item['name'],
+                            'size' => isset($item['size']) ? (int) $item['size'] : null,
+                            'relative_path' => $itemSubpath,
+                        ];
+                    } else {
+                        $nonJsonFiles[] = [
+                            'id' => $item['id'] ?? null,
+                            'name' => $item['name'] ?? null,
+                            'mimeType' => $item['mimeType'] ?? null,
+                            'relative_path' => $itemSubpath,
+                        ];
+                    }
+                }
+
+                $nextToken = $response->json('nextPageToken');
+                $pageToken = is_string($nextToken) && $nextToken !== '' ? $nextToken : null;
+            } while ($pageToken !== null);
         }
 
         if (empty($jsonFiles)) {

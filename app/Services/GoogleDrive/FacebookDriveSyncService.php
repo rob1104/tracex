@@ -82,10 +82,22 @@ class FacebookDriveSyncService
         foreach ($folders as $folder) {
             $folderId = $folder['id'];
             $folderName = $folder['name'];
+            $parentId = $folder['parent_id'] ?? null;
 
-            // Idempotency: skip if already logged
+            if (is_string($parentId) && $parentId !== '') {
+                FacebookImportLog::where('drive_file_id', $parentId)
+                    ->where('status', 'downloaded')
+                    ->whereNull('downloaded_at')
+                    ->delete();
+            }
+
+            // Idempotency: skip if already logged and downloaded/processed, but retry records stuck before download
             $existingLog = FacebookImportLog::where('drive_file_id', $folderId)->first();
-            if ($existingLog) {
+            $isStuckPendingDownload = $existingLog !== null
+                && $existingLog->status === 'downloaded'
+                && $existingLog->downloaded_at === null;
+
+            if ($existingLog && ! $isStuckPendingDownload) {
                 $metrics['skipped']++;
                 Log::info('[FacebookDriveSync] Skipping folder because drive_file_id already exists in facebook_import_logs', [
                     'folder_id' => $folderId,
@@ -102,14 +114,28 @@ class FacebookDriveSyncService
 
             $localDir = "{$this->storageDirectory}/{$folderId}";
 
-            // 1. Create initial log record
-            $importLog = FacebookImportLog::create([
-                'drive_file_id' => $folderId,
-                'file_name' => $folderName,
-                'file_size_bytes' => 0,
-                'status' => 'downloaded',
-                'downloaded_at' => null,
-            ]);
+            // 1. Reuse stuck pending-download record or create initial log record
+            if ($existingLog !== null) {
+                $existingLog->update([
+                    'file_name' => $folderName,
+                    'error_message' => null,
+                ]);
+                $importLog = $existingLog;
+
+                Log::info('[FacebookDriveSync] Retrying folder stuck with downloaded_at = null', [
+                    'import_log_id' => $importLog->id,
+                    'folder_id' => $folderId,
+                    'folder_name' => $folderName,
+                ]);
+            } else {
+                $importLog = FacebookImportLog::create([
+                    'drive_file_id' => $folderId,
+                    'file_name' => $folderName,
+                    'file_size_bytes' => 0,
+                    'status' => 'downloaded',
+                    'downloaded_at' => null,
+                ]);
+            }
 
             if ($async) {
                 // Dispatch download of this folder to queue to prevent PHP execution timeouts
