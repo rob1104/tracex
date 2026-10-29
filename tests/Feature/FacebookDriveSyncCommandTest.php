@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Services\GoogleDrive\FacebookDriveSyncService;
+use Illuminate\Console\Scheduling\Schedule;
 use Mockery;
 use Tests\TestCase;
 
@@ -12,6 +13,20 @@ class FacebookDriveSyncCommandTest extends TestCase
     {
         Mockery::close();
         parent::tearDown();
+    }
+
+    public function test_it_schedules_sync_drive_and_queue_work_commands(): void
+    {
+        $schedule = app(Schedule::class);
+        $events = collect($schedule->events());
+
+        $hasSyncCommand = $events->contains(fn ($event) => str_contains((string) $event->command, 'facebook:sync-drive'));
+        $queueWorkerEvent = $events->first(fn ($event) => str_contains((string) $event->command, 'queue:work --stop-when-empty'));
+
+        $this->assertTrue($hasSyncCommand, 'Expected facebook:sync-drive to be registered in scheduler.');
+        $this->assertNotNull($queueWorkerEvent, 'Expected queue:work --stop-when-empty to be registered in scheduler.');
+        $this->assertSame(storage_path('logs/laravel.log'), $queueWorkerEvent->output);
+        $this->assertTrue($queueWorkerEvent->shouldAppendOutput);
     }
 
     public function test_it_executes_facebook_sync_drive_command(): void
