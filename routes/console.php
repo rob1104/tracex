@@ -33,6 +33,21 @@ if (method_exists($syncSchedule, $frequency)) {
 
 /*
 |--------------------------------------------------------------------------
+| Background Queue Worker (Scheduler Managed)
+|--------------------------------------------------------------------------
+|
+| Ensures queued jobs (DownloadFacebookExportJob, ProcessFacebookExportJob,
+| DeleteDriveFileJob) are processed every minute even in hosting environments
+| without a dedicated Supervisor daemon.
+|
+*/
+Schedule::command('queue:work --stop-when-empty --max-time=240 --tries=3')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->runInBackground();
+
+/*
+|--------------------------------------------------------------------------
 | Pruning Old Audit Logs
 |--------------------------------------------------------------------------
 | Automatically purges import logs older than 30 days via MassPrunable.

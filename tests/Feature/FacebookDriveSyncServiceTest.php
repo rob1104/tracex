@@ -249,4 +249,37 @@ class FacebookDriveSyncServiceTest extends TestCase
             return $job->importLogId === $stuckLog->id;
         });
     }
+
+    public function test_it_does_not_push_duplicate_download_jobs_for_same_import_log(): void
+    {
+        Queue::fake();
+
+        $stuckLog = FacebookImportLog::create([
+            'drive_file_id' => '1NRWzl-duplicate-test',
+            'file_name' => 'meta-2026-Oct-24-09-51-11/facebook-61593018723655-2026-10-28-AAA',
+            'file_size_bytes' => 0,
+            'status' => 'downloaded',
+            'downloaded_at' => null,
+            'drive_deleted_at' => null,
+        ]);
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
+        $mockClient->shouldReceive('listExportFolders')
+            ->twice()
+            ->andReturn([
+                [
+                    'id' => '1NRWzl-duplicate-test',
+                    'name' => 'meta-2026-Oct-24-09-51-11/facebook-61593018723655-2026-10-28-AAA',
+                ],
+            ]);
+
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $service->sync();
+        $service->sync();
+
+        Queue::assertPushed(DownloadFacebookExportJob::class, 1);
+        Queue::assertPushed(DownloadFacebookExportJob::class, function (DownloadFacebookExportJob $job) use ($stuckLog) {
+            return $job->uniqueId() === (string) $stuckLog->id;
+        });
+    }
 }
