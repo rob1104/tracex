@@ -140,7 +140,6 @@ class Dashboard extends Component
                 }
             }])
             ->orderBy('evidences_count', 'desc')
-            ->limit(5)
             ->get()
             ->map(fn ($u) => ['name' => $u->name, 'count' => $u->evidences_count])
             ->toArray();
@@ -203,7 +202,6 @@ class Dashboard extends Component
                 }
             }])
             ->orderBy('email_accounts_count', 'desc')
-            ->limit(5)
             ->get()
             ->map(fn ($u) => ['name' => $u->name, 'count' => $u->email_accounts_count])
             ->toArray();
