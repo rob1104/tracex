@@ -64,7 +64,7 @@ class ProcessFacebookExportJob implements ShouldQueue
 
         try {
             // Validate and parse before deleting data from a previous processing attempt.
-            $parser = new FacebookExportParser($this->localPath);
+            $parser = new FacebookExportParser($this->localPath, $importLog->file_name);
             $parser->validarEstructura();
             $profileDetails = $parser->perfil();
             $exportIdentifier = FacebookProfileIdentifier::normalize($parser->identificador());
@@ -82,7 +82,13 @@ class ProcessFacebookExportJob implements ShouldQueue
                 break;
             }
 
-            if (! $hasComments && ! $hasReactions) {
+            $hasShares = false;
+            foreach ($parser->compartidos() as $_) {
+                $hasShares = true;
+                break;
+            }
+
+            if (! $hasComments && ! $hasReactions && ! $hasShares) {
                 throw new RuntimeException('Estructura de exportación inválida: no se extrajeron comentarios ni reacciones válidas para importar.');
             }
 
@@ -110,6 +116,21 @@ class ProcessFacebookExportJob implements ShouldQueue
                 $importLog->reactions()->delete();
                 $importLog->facebookUsers()->delete();
                 $importLog->evidences()->delete();
+
+                $existingEvidenceKeys = [];
+                if ($assignedUser && $matchedProfile) {
+                    Evidence::query()
+                        ->where('profile_id', $matchedProfile->id)
+                        ->where('origin', 'google_drive')
+                        ->select(['evidence_type_id', 'external_published_at', 'comment'])
+                        ->get()
+                        ->each(function (Evidence $evidence) use (&$existingEvidenceKeys): void {
+                            $publishedKey = $evidence->external_published_at instanceof \DateTimeInterface
+                                ? $evidence->external_published_at->format('Y-m-d H:i:s')
+                                : (string) $evidence->external_published_at;
+                            $existingEvidenceKeys["{$evidence->evidence_type_id}|{$publishedKey}|{$evidence->comment}"] = true;
+                        });
+                }
 
                 $facebookUser = FacebookUser::create([
                     'profile_id' => $matchedProfile?->id,
@@ -159,20 +180,26 @@ class ProcessFacebookExportJob implements ShouldQueue
 
                     // Option A: Ingest into evidence table if user & profile resolved
                     if ($assignedUser && $matchedProfile) {
-                        $evidences[] = [
-                            'user_id' => $assignedUser->id,
-                            'profile_id' => $matchedProfile->id,
-                            'evidence_type_id' => $commentTypeId,
-                            'facebook_import_log_id' => $importLog->id,
-                            'origin' => 'google_drive',
-                            'social_network' => 'Facebook',
-                            'comment' => ! empty($comment['contexto']) ? "{$comment['contexto']}: {$content}" : $content,
-                            'external_published_at' => $comment['fecha'],
-                            'ip_address' => null,
-                            'user_agent' => 'Google Drive Sync',
-                            'created_at' => $comment['fecha'],
-                            'updated_at' => $timestamp,
-                        ];
+                        $evidenceComment = ! empty($comment['contexto']) ? "{$comment['contexto']}: {$content}" : $content;
+                        $evidenceKey = "{$commentTypeId}|{$comment['fecha']}|{$evidenceComment}";
+
+                        if (! isset($existingEvidenceKeys[$evidenceKey])) {
+                            $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidences[] = [
+                                'user_id' => $assignedUser->id,
+                                'profile_id' => $matchedProfile->id,
+                                'evidence_type_id' => $commentTypeId,
+                                'facebook_import_log_id' => $importLog->id,
+                                'origin' => 'google_drive',
+                                'social_network' => 'Facebook',
+                                'comment' => $evidenceComment,
+                                'external_published_at' => $comment['fecha'],
+                                'ip_address' => null,
+                                'user_agent' => 'Google Drive Sync',
+                                'created_at' => $comment['fecha'],
+                                'updated_at' => $timestamp,
+                            ];
+                        }
                     }
 
                     $commentCount++;
@@ -205,7 +232,7 @@ class ProcessFacebookExportJob implements ShouldQueue
                         'reaction_type' => $type,
                         'published_at' => $reaction['fecha'],
                         'title' => $reaction['objetivo'] ?? null,
-                        'target_url' => null,
+                        'target_url' => $reaction['url'] ?? null,
                         'metadata' => '[]',
                         'created_at' => $timestamp,
                         'updated_at' => $timestamp,
@@ -213,20 +240,26 @@ class ProcessFacebookExportJob implements ShouldQueue
 
                     // Option A: Ingest into evidence table if user & profile resolved
                     if ($assignedUser && $matchedProfile) {
-                        $evidences[] = [
-                            'user_id' => $assignedUser->id,
-                            'profile_id' => $matchedProfile->id,
-                            'evidence_type_id' => $reactionTypeId,
-                            'facebook_import_log_id' => $importLog->id,
-                            'origin' => 'google_drive',
-                            'social_network' => 'Facebook',
-                            'comment' => "Reacción [{$type}]".(! empty($reaction['objetivo']) ? " en: {$reaction['objetivo']}" : ''),
-                            'external_published_at' => $reaction['fecha'],
-                            'ip_address' => null,
-                            'user_agent' => 'Google Drive Sync',
-                            'created_at' => $reaction['fecha'],
-                            'updated_at' => $timestamp,
-                        ];
+                        $evidenceComment = "Reacción [{$type}]".(! empty($reaction['objetivo']) ? " en: {$reaction['objetivo']}" : '');
+                        $evidenceKey = "{$reactionTypeId}|{$reaction['fecha']}|{$evidenceComment}";
+
+                        if (! isset($existingEvidenceKeys[$evidenceKey])) {
+                            $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidences[] = [
+                                'user_id' => $assignedUser->id,
+                                'profile_id' => $matchedProfile->id,
+                                'evidence_type_id' => $reactionTypeId,
+                                'facebook_import_log_id' => $importLog->id,
+                                'origin' => 'google_drive',
+                                'social_network' => 'Facebook',
+                                'comment' => $evidenceComment,
+                                'external_published_at' => $reaction['fecha'],
+                                'ip_address' => null,
+                                'user_agent' => 'Google Drive Sync',
+                                'created_at' => $reaction['fecha'],
+                                'updated_at' => $timestamp,
+                            ];
+                        }
                     }
 
                     $reactionCount++;
@@ -268,20 +301,28 @@ class ProcessFacebookExportJob implements ShouldQueue
                             $shareDescription .= "\n".$url;
                         }
 
-                        $evidences[] = [
-                            'user_id' => $assignedUser->id,
-                            'profile_id' => $matchedProfile->id,
-                            'evidence_type_id' => $shareTypeId,
-                            'facebook_import_log_id' => $importLog->id,
-                            'origin' => 'google_drive',
-                            'social_network' => 'Facebook',
-                            'comment' => $shareDescription,
-                            'external_published_at' => $publishedAt,
-                            'ip_address' => null,
-                            'user_agent' => 'Google Drive Sync',
-                            'created_at' => $publishedAt,
-                            'updated_at' => $timestamp,
-                        ];
+                        $publishedKey = $publishedAt instanceof \DateTimeInterface
+                            ? $publishedAt->format('Y-m-d H:i:s')
+                            : (string) $publishedAt;
+                        $evidenceKey = "{$shareTypeId}|{$publishedKey}|{$shareDescription}";
+
+                        if (! isset($existingEvidenceKeys[$evidenceKey])) {
+                            $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidences[] = [
+                                'user_id' => $assignedUser->id,
+                                'profile_id' => $matchedProfile->id,
+                                'evidence_type_id' => $shareTypeId,
+                                'facebook_import_log_id' => $importLog->id,
+                                'origin' => 'google_drive',
+                                'social_network' => 'Facebook',
+                                'comment' => $shareDescription,
+                                'external_published_at' => $publishedAt,
+                                'ip_address' => null,
+                                'user_agent' => 'Google Drive Sync',
+                                'created_at' => $publishedAt,
+                                'updated_at' => $timestamp,
+                            ];
+                        }
                     }
 
                     $shareCount++;

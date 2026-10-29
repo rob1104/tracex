@@ -135,4 +135,121 @@ class FacebookExportParserTest extends TestCase
         $this->assertContains('juana.rogj69@gmail.com', $perfil['emails']);
         $this->assertContains('juana.ads@gmail.com', $perfil['emails']);
     }
+
+    public function test_reacciones_extracts_new_meta_label_values_format(): void
+    {
+        file_put_contents($this->testDirectory.'/likes_and_reactions.json', json_encode([
+            [
+                'timestamp' => 1791298925,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me gusta'],
+                    [
+                        'label' => 'URL',
+                        'value' => 'https://www.facebook.com/61593018723655/posts/pfbid0123',
+                        'href' => 'https://www.facebook.com/61593018723655/posts/pfbid0123',
+                    ],
+                    ['label' => 'Título', 'value' => ''],
+                    ['label' => 'Nombre', 'value' => "Jorge 'Tico' Garcia"],
+                ],
+                'fbid' => '122101189879368972',
+            ],
+            [
+                'timestamp' => 1791299000,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me encanta'],
+                    ['label' => 'Título', 'value' => 'Publicación destacada'],
+                    ['label' => 'Nombre', 'value' => 'Autor Secundario'],
+                ],
+                'fbid' => '122101189879368973',
+            ],
+            [
+                'timestamp' => 1791299100,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me asombra'],
+                    ['label' => 'Nombre', 'value' => 'Noticias Locales'],
+                ],
+                'fbid' => '122101189879368974',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $parser->validarEstructura();
+        $reacciones = iterator_to_array($parser->reacciones());
+
+        $this->assertCount(3, $reacciones);
+        $this->assertSame('LIKE', $reacciones[0]['tipo']);
+        $this->assertSame("Jorge 'Tico' Garcia", $reacciones[0]['objetivo']);
+        $this->assertSame('https://www.facebook.com/61593018723655/posts/pfbid0123', $reacciones[0]['url']);
+
+        $this->assertSame('LOVE', $reacciones[1]['tipo']);
+        $this->assertSame('Publicación destacada', $reacciones[1]['objetivo']);
+
+        $this->assertSame('WOW', $reacciones[2]['tipo']);
+        $this->assertSame('Noticias Locales', $reacciones[2]['objetivo']);
+    }
+
+    public function test_identificador_extracts_numeric_id_from_facebook_subfolder_or_active_days(): void
+    {
+        $subfolder = $this->testDirectory.'/facebook-61593018723655-2026-10-06-0DJRGNSZ/your_facebook_activity/comments_and_reactions';
+        File::makeDirectory($subfolder, 0755, true);
+
+        file_put_contents($subfolder.'/your_comment_active_days.json', json_encode([
+            [
+                'timestamp' => 1791298925,
+                'label_values' => [
+                    ['label' => 'Recuento de días activos de comentarios en los últimos 28 días', 'value' => '3'],
+                ],
+                'fbid' => '61593018723655',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $parser->validarEstructura();
+
+        $this->assertSame('id:61593018723655', $parser->identificador());
+    }
+
+    public function test_parser_deduplicates_items_across_multiple_daily_facebook_subfolders(): void
+    {
+        $day1 = $this->testDirectory.'/facebook-61593018723655-2026-10-05-AAA/your_facebook_activity/comments_and_reactions';
+        $day2 = $this->testDirectory.'/facebook-61593018723655-2026-10-06-BBB/your_facebook_activity/comments_and_reactions';
+        File::makeDirectory($day1, 0755, true);
+        File::makeDirectory($day2, 0755, true);
+
+        $sharedComment = [
+            'timestamp' => 1791000000,
+            'title' => 'Juana comentó una publicación.',
+            'data' => [
+                ['comment' => ['timestamp' => 1791000000, 'comment' => 'Excelente noticia']],
+            ],
+        ];
+        $newComment = [
+            'timestamp' => 1791086400,
+            'title' => 'Juana comentó otra publicación.',
+            'data' => [
+                ['comment' => ['timestamp' => 1791086400, 'comment' => 'Comentario del día siguiente']],
+            ],
+        ];
+
+        file_put_contents($day1.'/comments.json', json_encode(['comments_v2' => [$sharedComment]], JSON_THROW_ON_ERROR));
+        file_put_contents($day2.'/comments.json', json_encode(['comments_v2' => [$sharedComment, $newComment]], JSON_THROW_ON_ERROR));
+
+        $sharedReaction = [
+            'timestamp' => 1791000100,
+            'label_values' => [
+                ['label' => 'Reacción', 'value' => 'Me gusta'],
+                ['label' => 'Nombre', 'value' => 'Página Oficial'],
+            ],
+            'fbid' => '999001',
+        ];
+        file_put_contents($day1.'/likes_and_reactions.json', json_encode([$sharedReaction], JSON_THROW_ON_ERROR));
+        file_put_contents($day2.'/likes_and_reactions.json', json_encode([$sharedReaction], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $comentarios = iterator_to_array($parser->comentarios());
+        $reacciones = iterator_to_array($parser->reacciones());
+
+        $this->assertCount(2, $comentarios);
+        $this->assertCount(1, $reacciones);
+    }
 }

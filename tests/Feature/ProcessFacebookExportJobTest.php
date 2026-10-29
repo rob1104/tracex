@@ -77,6 +77,7 @@ class ProcessFacebookExportJobTest extends TestCase
         $profile = Profile::create([
             'email_account_id' => $email->id,
             'name' => 'Ana Garcia',
+            'facebook_identifier' => 'id:100001234567890',
             'social_network' => 'facebook',
             'status' => 'active',
         ]);
@@ -89,7 +90,10 @@ class ProcessFacebookExportJobTest extends TestCase
         ]);
 
         file_put_contents($this->testDirectory.'/profile_information.json', json_encode([
-            'profile_v2' => ['name' => ['full_name' => 'Ana Garcia']],
+            'profile_v2' => [
+                'name' => ['full_name' => 'Ana Garcia'],
+                'profile_uri' => 'https://www.facebook.com/profile.php?id=100001234567890',
+            ],
         ], JSON_THROW_ON_ERROR));
 
         file_put_contents($this->testDirectory.'/comments.json', json_encode([
@@ -261,6 +265,78 @@ class ProcessFacebookExportJobTest extends TestCase
         $this->assertDatabaseMissing('facebook_reactions', [
             'import_log_id' => $log->id,
             'reaction_type' => 'LIKE',
+        ]);
+    }
+
+    public function test_it_processes_meta_2026_with_multiple_daily_facebook_subfolders_and_label_values_reactions(): void
+    {
+        $user = User::factory()->create(['role' => 'user', 'name' => 'Colaborador Asignado']);
+        $email = EmailAccount::create([
+            'email' => 'perfil6159@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+        $profile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Perfil 61593018723655',
+            'facebook_identifier' => 'id:61593018723655',
+            'social_network' => 'facebook',
+            'status' => 'active',
+        ]);
+        $profile->users()->attach($user->id);
+
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'folder_meta_daily',
+            'file_name' => 'meta-2026-Oct-24-09-51-11/facebook-61593018723655-2026-10-25-BBB',
+            'status' => 'downloaded',
+        ]);
+
+        $day1 = $this->testDirectory.'/facebook-61593018723655-2026-10-24-AAA/your_facebook_activity/comments_and_reactions';
+        $day2 = $this->testDirectory.'/facebook-61593018723655-2026-10-25-BBB/your_facebook_activity/comments_and_reactions';
+        File::makeDirectory($day1, 0755, true);
+        File::makeDirectory($day2, 0755, true);
+
+        $reactionPayload = [
+            [
+                'timestamp' => 1791298925,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me gusta'],
+                    [
+                        'label' => 'URL',
+                        'value' => 'https://www.facebook.com/61593018723655/posts/pfbid01',
+                        'href' => 'https://www.facebook.com/61593018723655/posts/pfbid01',
+                    ],
+                    ['label' => 'Título', 'value' => ''],
+                    ['label' => 'Nombre', 'value' => "Jorge 'Tico' Garcia"],
+                ],
+                'fbid' => '122101189879368972',
+            ],
+        ];
+
+        file_put_contents($day1.'/likes_and_reactions.json', json_encode($reactionPayload, JSON_THROW_ON_ERROR));
+        file_put_contents($day2.'/likes_and_reactions.json', json_encode($reactionPayload, JSON_THROW_ON_ERROR));
+
+        $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
+        $job->handle();
+
+        $log->refresh();
+        $this->assertSame('completed', $log->status);
+        $this->assertSame($profile->id, $log->profile_id);
+        $this->assertSame($user->id, $log->user_id);
+        $this->assertSame(1, $log->total_reactions_extracted);
+
+        $this->assertDatabaseHas('facebook_reactions', [
+            'import_log_id' => $log->id,
+            'reaction_type' => 'LIKE',
+            'title' => "Jorge 'Tico' Garcia",
+            'target_url' => 'https://www.facebook.com/61593018723655/posts/pfbid01',
+        ]);
+
+        $this->assertDatabaseHas('evidence', [
+            'profile_id' => $profile->id,
+            'user_id' => $user->id,
+            'origin' => 'google_drive',
+            'comment' => "Reacción [LIKE] en: Jorge 'Tico' Garcia",
         ]);
     }
 }

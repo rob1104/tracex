@@ -20,15 +20,27 @@ class FacebookExportParser
 
     private const REACCIONES = [
         'LIKE' => 'LIKE',
+        'ME GUSTA' => 'LIKE',
         'LOVE' => 'LOVE',
+        'ME ENCANTA' => 'LOVE',
         'CARE' => 'CARE',
+        'ME IMPORTA' => 'CARE',
         'HAHA' => 'HAHA',
+        'ME DIVIERTE' => 'HAHA',
         'WOW' => 'WOW',
+        'ME ASOMBRA' => 'WOW',
         'SORRY' => 'SORRY',
+        'SAD' => 'SORRY',
+        'ME ENTRISTECE' => 'SORRY',
         'ANGER' => 'ANGER',
+        'ANGRY' => 'ANGER',
+        'ME ENOJA' => 'ANGER',
     ];
 
-    public function __construct(private string $directorio) {}
+    public function __construct(
+        private string $directorio,
+        private ?string $nombreExportacion = null
+    ) {}
 
     /**
      * Valida que la estructura del directorio de exportación de Facebook sea válida y reconocida.
@@ -46,11 +58,13 @@ class FacebookExportParser
         $archivosComentarios = $this->archivos('/^comments.*\.json$/');
         $archivosReacciones = $this->archivos('/^(likes_and_reactions|reactions).*\.json$/');
         $archivosCompartidos = $this->archivos('/^(your_posts|posts).*\.json$/');
+        $archivosActividad = $this->archivos('/^your_comment_active_days\.json$/');
 
         $totalArchivosReconocidos = count($archivosPerfil)
             + count($archivosComentarios)
             + count($archivosReacciones)
-            + count($archivosCompartidos);
+            + count($archivosCompartidos)
+            + count($archivosActividad);
 
         if ($totalArchivosReconocidos === 0) {
             $todosLosArchivos = array_map('basename', $this->archivos('/.*/'));
@@ -77,7 +91,9 @@ class FacebookExportParser
                 || isset($datos['profile'])
                 || isset($datos['name'])
                 || isset($datos['profile_uri'])
-                || isset($datos['registration_timestamp']);
+                || isset($datos['registration_timestamp'])
+                || isset($datos['label_values'])
+                || isset($datos['fbid']);
 
             if (! $tienePerfil) {
                 throw new RuntimeException('Formato JSON no reconocido en el archivo de perfil: '.basename($ruta));
@@ -88,6 +104,7 @@ class FacebookExportParser
             $datos = $this->leer($ruta);
             $esValido = isset($datos['comments_v2'])
                 || isset($datos['comments'])
+                || isset($datos['label_values'])
                 || array_is_list($datos);
 
             if (! $esValido) {
@@ -99,6 +116,7 @@ class FacebookExportParser
             $datos = $this->leer($ruta);
             $esValido = isset($datos['reactions_v2'])
                 || isset($datos['reactions'])
+                || isset($datos['label_values'])
                 || array_is_list($datos);
 
             if (! $esValido) {
@@ -110,6 +128,7 @@ class FacebookExportParser
             $datos = $this->leer($ruta);
             $esValido = isset($datos['status_updates_v2'])
                 || isset($datos['posts'])
+                || isset($datos['label_values'])
                 || array_is_list($datos);
 
             if (! $esValido) {
@@ -174,8 +193,9 @@ class FacebookExportParser
      * Identificador estable de la cuenta, sacado de adentro del export
      * (el nombre de la carpeta "meta-..." solo trae la fecha).
      *  1. ID numérico, si la URL del perfil es profile.php?id=...
-     *  2. Fecha de creación de la cuenta (no cambia aunque cambie el usuario o el nombre)
-     *  3. URL del perfil, como último recurso
+     *  2. ID numérico extraído de la carpeta facebook-<id>-... o del fbid de actividad
+     *  3. Fecha de creación de la cuenta (no cambia aunque cambie el usuario o el nombre)
+     *  4. URL del perfil, como último recurso
      * Regresa null si el export no incluye la información del perfil.
      */
     public function identificador(): ?string
@@ -187,11 +207,42 @@ class FacebookExportParser
             return "id:{$m[1]}";
         }
 
+        $idEstructura = $this->extraerIdDesdeEstructura();
+        if ($idEstructura !== null) {
+            return "id:{$idEstructura}";
+        }
+
         if (! empty($p['registration_timestamp'])) {
             return "registro:{$p['registration_timestamp']}";
         }
 
         return $uri ? "uri:{$uri}" : null;
+    }
+
+    private function extraerIdDesdeEstructura(): ?string
+    {
+        $fuentes = array_filter([
+            $this->nombreExportacion,
+            $this->directorio,
+            ...$this->archivos('/\.json$/'),
+        ]);
+
+        foreach ($fuentes as $fuente) {
+            if (preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $fuente, $m)) {
+                return $m[1];
+            }
+        }
+
+        foreach ($this->archivos('/^your_comment_active_days\.json$/') as $ruta) {
+            foreach ($this->lista($this->leer($ruta), ['comment_active_days']) as $item) {
+                $fbid = trim((string) ($item['fbid'] ?? ''));
+                if ($fbid !== '' && ctype_digit($fbid)) {
+                    return $fbid;
+                }
+            }
+        }
+
+        return null;
     }
 
     private ?array $perfilCache = null;
@@ -202,7 +253,7 @@ class FacebookExportParser
             return $this->perfilCache;
         }
 
-        foreach ($this->archivos('/^profile_information\.json$/') as $ruta) {
+        foreach (array_reverse($this->archivos('/^profile_information\.json$/')) as $ruta) {
             $datos = $this->leer($ruta);
 
             return $this->perfilCache = $datos['profile_v2'] ?? $datos['profile'] ?? [];
@@ -213,19 +264,31 @@ class FacebookExportParser
 
     public function comentarios(): iterable
     {
+        $vistos = [];
+
         foreach ($this->archivos('/^comments.*\.json$/') as $ruta) {
             foreach ($this->lista($this->leer($ruta), ['comments_v2', 'comments']) as $c) {
                 $comentario = $this->primero($c['data'] ?? [], 'comment');
-                $texto = $comentario['comment'] ?? null;
+                $texto = $comentario['comment']
+                    ?? $this->valorDeEtiquetas($c['label_values'] ?? [], ['Comentario', 'Comment']);
                 $ts = $comentario['timestamp'] ?? $c['timestamp'] ?? null;
 
-                if ($texto === null || $ts === null) {
+                if ($texto === null || trim((string) $texto) === '' || $ts === null) {
                     continue; // comentarios solo con foto o sticker
                 }
 
+                $contexto = $c['title']
+                    ?? $this->valorDeEtiquetas($c['label_values'] ?? [], ['Título', 'Titulo', 'Title', 'Nombre', 'Name']);
+
+                $llave = "{$ts}|{$texto}|".($contexto ?? '');
+                if (isset($vistos[$llave])) {
+                    continue;
+                }
+                $vistos[$llave] = true;
+
                 yield [
                     'texto' => $texto,
-                    'contexto' => $c['title'] ?? null,
+                    'contexto' => $contexto,
                     'fecha' => $this->fecha($ts),
                 ];
             }
@@ -234,6 +297,8 @@ class FacebookExportParser
 
     public function reacciones(): iterable
     {
+        $vistos = [];
+
         foreach ($this->archivos('/^(likes_and_reactions|reactions).*\.json$/') as $ruta) {
             foreach ($this->lista($this->leer($ruta), ['reactions_v2', 'reactions']) as $r) {
                 if (! isset($r['timestamp'])) {
@@ -241,7 +306,10 @@ class FacebookExportParser
                 }
 
                 $reactionItem = $this->primero($r['data'] ?? [], 'reaction');
-                $codigo = $reactionItem['reaction'] ?? null;
+                $etiquetas = is_array($r['label_values'] ?? null) ? $r['label_values'] : [];
+
+                $codigo = $reactionItem['reaction']
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Reacción', 'Reaccion', 'Reaction']);
 
                 // Omitir registros incompletos cuando falta el tipo de reacción (no asignar LIKE por defecto)
                 if (! is_string($codigo) || trim($codigo) === '') {
@@ -249,15 +317,31 @@ class FacebookExportParser
                 }
 
                 $codigoLimpio = trim($codigo);
-                $tipo = self::REACCIONES[strtoupper($codigoLimpio)] ?? $codigoLimpio;
+                $claveReaccion = mb_strtoupper($codigoLimpio, 'UTF-8');
+                $tipo = self::REACCIONES[$claveReaccion] ?? self::REACCIONES[strtoupper($codigoLimpio)] ?? $codigoLimpio;
 
                 if ($tipo === '') {
                     continue;
                 }
 
+                $objetivo = $r['title'] ?? null;
+                if (! is_string($objetivo) || trim($objetivo) === '') {
+                    $objetivo = $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title'])
+                        ?? $this->valorDeEtiquetas($etiquetas, ['Nombre', 'Name', 'Autor', 'Author']);
+                }
+
+                $url = $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link'], incluirHref: true);
+
+                $llave = "{$r['timestamp']}|{$tipo}";
+                if (isset($vistos[$llave])) {
+                    continue;
+                }
+                $vistos[$llave] = true;
+
                 yield [
                     'tipo' => $tipo,
-                    'objetivo' => $r['title'] ?? null,
+                    'objetivo' => $objetivo,
+                    'url' => $url,
                     'fecha' => $this->fecha($r['timestamp']),
                 ];
             }
@@ -266,26 +350,79 @@ class FacebookExportParser
 
     public function compartidos(): iterable
     {
+        $vistos = [];
+
         foreach ($this->archivos('/^(your_posts|posts).*\.json$/') as $ruta) {
             foreach ($this->lista($this->leer($ruta), ['status_updates_v2', 'posts']) as $p) {
                 if (! isset($p['timestamp'])) {
                     continue;
                 }
-                $enlace = $this->buscarEnlace($p['attachments'] ?? []);
-                $titulo = $p['title'] ?? '';
+
+                $etiquetas = is_array($p['label_values'] ?? null) ? $p['label_values'] : [];
+                $enlace = $this->buscarEnlace($p['attachments'] ?? [])
+                    ?? $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link'], incluirHref: true);
+                $titulo = $p['title']
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title'])
+                    ?? '';
 
                 // Solo lo que es compartido (enlace externo o título "compartió")
-                if (! $enlace && ! preg_match('/compart|shared/iu', $titulo)) {
+                if (! $enlace && ! preg_match('/compart|shared/iu', (string) $titulo)) {
                     continue;
                 }
 
+                $descripcion = $this->primero($p['data'] ?? [], 'post')['post']
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Publicación', 'Publicacion', 'Post', 'Descripción', 'Descripcion'])
+                    ?? ($titulo !== '' ? $titulo : null);
+
+                $llave = "{$p['timestamp']}|".($enlace ?? '').'|'.($descripcion ?? '');
+                if (isset($vistos[$llave])) {
+                    continue;
+                }
+                $vistos[$llave] = true;
+
                 yield [
-                    'descripcion' => $this->primero($p['data'] ?? [], 'post')['post'] ?? ($titulo ?: null),
+                    'descripcion' => $descripcion,
                     'enlace' => $enlace,
                     'fecha' => $this->fecha($p['timestamp']),
                 ];
             }
         }
+    }
+
+    /**
+     * Extrae el primer valor no vacío de una estructura label_values de Meta.
+     *
+     * @param  array<int, mixed>  $etiquetas
+     * @param  array<int, string>  $nombresBuscados
+     */
+    private function valorDeEtiquetas(array $etiquetas, array $nombresBuscados, bool $incluirHref = false): ?string
+    {
+        $buscadosNormalizados = array_map(
+            fn (string $nombre): string => mb_strtolower(trim($nombre), 'UTF-8'),
+            $nombresBuscados
+        );
+
+        foreach ($etiquetas as $item) {
+            if (! is_array($item)) {
+                continue;
+            }
+
+            $etiqueta = mb_strtolower(trim((string) ($item['label'] ?? '')), 'UTF-8');
+            if (! in_array($etiqueta, $buscadosNormalizados, true)) {
+                continue;
+            }
+
+            $valor = isset($item['value']) && is_string($item['value']) ? trim($item['value']) : '';
+            if ($valor !== '') {
+                return $valor;
+            }
+
+            if ($incluirHref && isset($item['href']) && is_string($item['href']) && trim($item['href']) !== '') {
+                return trim($item['href']);
+            }
+        }
+
+        return null;
     }
 
     private function archivos(string $patron): array

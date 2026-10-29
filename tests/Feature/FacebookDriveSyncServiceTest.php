@@ -213,4 +213,40 @@ class FacebookDriveSyncServiceTest extends TestCase
             return $job->driveFileId === 'folder_retry_delete' && $job->importLogId === $log->id;
         });
     }
+
+    public function test_it_retries_folders_stuck_with_downloaded_status_and_null_downloaded_at(): void
+    {
+        Queue::fake();
+
+        $stuckLog = FacebookImportLog::create([
+            'drive_file_id' => '1NRWzl-nRJuuYvHuVywuc4WVYwxJBTd',
+            'file_name' => 'meta-2026-Oct-24-09-51-11',
+            'file_size_bytes' => 0,
+            'status' => 'downloaded',
+            'downloaded_at' => null,
+            'drive_deleted_at' => null,
+        ]);
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
+        $mockClient->shouldReceive('listExportFolders')
+            ->once()
+            ->andReturn([
+                [
+                    'id' => '1NRWzl-nRJuuYvHuVywuc4WVYwxJBTd',
+                    'name' => 'meta-2026-Oct-24-09-51-11',
+                ],
+            ]);
+
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $metrics = $service->sync();
+
+        $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(0, $metrics['skipped']);
+        $this->assertSame(1, $metrics['dispatched']);
+        $this->assertSame(1, FacebookImportLog::where('drive_file_id', '1NRWzl-nRJuuYvHuVywuc4WVYwxJBTd')->count());
+
+        Queue::assertPushed(DownloadFacebookExportJob::class, function ($job) use ($stuckLog) {
+            return $job->importLogId === $stuckLog->id;
+        });
+    }
 }
