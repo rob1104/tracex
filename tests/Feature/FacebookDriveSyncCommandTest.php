@@ -21,10 +21,12 @@ class FacebookDriveSyncCommandTest extends TestCase
         $events = collect($schedule->events());
 
         $hasSyncCommand = $events->contains(fn ($event) => str_contains((string) $event->command, 'facebook:sync-drive'));
-        $hasQueueWorker = $events->contains(fn ($event) => str_contains((string) $event->command, 'queue:work --stop-when-empty'));
+        $queueWorkerEvent = $events->first(fn ($event) => str_contains((string) $event->command, 'queue:work --stop-when-empty'));
 
         $this->assertTrue($hasSyncCommand, 'Expected facebook:sync-drive to be registered in scheduler.');
-        $this->assertTrue($hasQueueWorker, 'Expected queue:work --stop-when-empty to be registered in scheduler.');
+        $this->assertNotNull($queueWorkerEvent, 'Expected queue:work --stop-when-empty to be registered in scheduler.');
+        $this->assertSame(storage_path('logs/laravel.log'), $queueWorkerEvent->output);
+        $this->assertTrue($queueWorkerEvent->shouldAppendOutput);
     }
 
     public function test_it_executes_facebook_sync_drive_command(): void

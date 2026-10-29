@@ -44,7 +44,8 @@ if (method_exists($syncSchedule, $frequency)) {
 Schedule::command('queue:work --stop-when-empty --max-time=240 --tries=3')
     ->everyMinute()
     ->withoutOverlapping(5)
-    ->runInBackground();
+    ->runInBackground()
+    ->appendOutputTo(storage_path('logs/laravel.log'));
 
 /*
 |--------------------------------------------------------------------------
