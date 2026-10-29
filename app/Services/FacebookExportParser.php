@@ -59,22 +59,33 @@ class FacebookExportParser
         $archivosReacciones = $this->archivos('/^(likes_and_reactions|reactions).*\.json$/');
         $archivosCompartidos = $this->archivos('/^(your_posts|posts).*\.json$/');
         $archivosActividad = $this->archivos('/^your_comment_active_days\.json$/');
+        $archivosAuxiliaresMeta = $this->archivos('/^(profile_update_history|your_devices|the_ways_we_can_send_you_notifications|permissions_you_have_granted_to_apps|rising_fan_badges.*|account_activity|login_protection_data|recently_viewed|time_spent)\.json$/');
+        $archivosJsonTotales = $this->archivos('/\.json$/');
+        $tieneIdEnEstructura = $this->extraerIdDesdeEstructura() !== null;
 
         $totalArchivosReconocidos = count($archivosPerfil)
             + count($archivosComentarios)
             + count($archivosReacciones)
             + count($archivosCompartidos)
-            + count($archivosActividad);
+            + count($archivosActividad)
+            + count($archivosAuxiliaresMeta);
 
-        if ($totalArchivosReconocidos === 0) {
+        if ($totalArchivosReconocidos === 0 && ! ($tieneIdEnEstructura && count($archivosJsonTotales) > 0)) {
             $todosLosArchivos = array_map('basename', $this->archivos('/.*/'));
 
             Log::warning('[FacebookExportParser] No recognized Facebook JSON files found in export directory', [
                 'directory' => $this->directorio,
+                'export_name' => $this->nombreExportacion,
                 'all_files_present_in_directory' => $todosLosArchivos,
             ]);
 
             throw new RuntimeException("Estructura de exportación inválida: no se encontraron archivos reconocidos de Facebook en {$this->directorio}.");
+        }
+
+        if ($totalArchivosReconocidos === 0) {
+            foreach ($archivosJsonTotales as $ruta) {
+                $this->leer($ruta);
+            }
         }
 
         Log::info('[FacebookExportParser] Validating recognized Facebook export files', [
