@@ -358,7 +358,12 @@ class Index extends Component
         $chartHasActivity = $chart->sum(fn ($day) => $day['comments'] + $day['reactions'] + $day['shares']) > 0;
 
         return view('livewire.admin.facebook-monitoring.index', [
-            'profiles' => $profilesQuery->latest()->paginate(6),
+            'profiles' => $profilesQuery
+                ->orderByRaw('CASE WHEN latest_facebook_export_at IS NULL THEN 1 ELSE 0 END')
+                ->orderByDesc('latest_facebook_export_at')
+                ->orderByDesc('profiles.created_at')
+                ->orderByDesc('profiles.id')
+                ->paginate(6),
             'collaborators' => auth()->user()->isAdmin()
                 ? User::query()->where('role', 'user')->where('is_active', true)->orderBy('name')->get()
                 : collect(),
