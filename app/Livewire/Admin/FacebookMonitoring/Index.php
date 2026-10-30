@@ -38,11 +38,15 @@ class Index extends Component
     public function updatingSearch(): void
     {
         $this->resetPage();
+        $this->resetPage('activityPage');
+        $this->resetPage('importsPage');
     }
 
     public function updatedCollaboratorId(): void
     {
         $this->resetPage();
+        $this->resetPage('activityPage');
+        $this->resetPage('importsPage');
     }
 
     public function registerMonitoredFacebookProfile(): void
@@ -110,6 +114,8 @@ class Index extends Component
     {
         if (in_array($tab, ['recent', 'imports', 'pending', 'unassigned'], true)) {
             $this->activityTab = $tab;
+            $this->resetPage('activityPage');
+            $this->resetPage('importsPage');
         }
     }
 
@@ -117,12 +123,14 @@ class Index extends Component
     {
         $this->activityProfileId = (string) $profileId;
         $this->activityTab = 'recent';
+        $this->resetPage('activityPage');
     }
 
     public function showAllActivity(): void
     {
         $this->activityProfileId = '';
         $this->activityTab = 'recent';
+        $this->resetPage('activityPage');
     }
 
     private function restrictToManageableProfiles($query)
@@ -276,8 +284,7 @@ class Index extends Component
             $activity = $this->activityQuery()
                 ->with(['profile', 'evidenceType'])
                 ->orderByRaw('COALESCE(external_published_at, created_at) DESC')
-                ->limit(8)
-                ->get();
+                ->paginate(50, pageName: 'activityPage');
         } else {
             $logQuery = $this->importsQuery()->with(['profile', 'facebookUsers']);
             if ($this->activityTab === 'pending') {
@@ -285,7 +292,7 @@ class Index extends Component
             } elseif ($this->activityTab === 'unassigned') {
                 $logQuery->where('status', 'pending_assignment');
             }
-            $imports = $logQuery->latest('downloaded_at')->limit(8)->get();
+            $imports = $logQuery->latest('downloaded_at')->paginate(50, pageName: 'importsPage');
         }
 
         if (! in_array($this->chartPeriod, ['7', '14', '30'], true)) {
