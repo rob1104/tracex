@@ -234,18 +234,43 @@
                                                     ?? (! empty($metadata['export_identifier']) ? 'ID: '.str_replace('id:', '', (string) $metadata['export_identifier']) : null)
                                                     ?? $folderFbId
                                                     ?? 'Pendiente de coincidencia';
+                                                $importMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
+                                                $commentCount = (int) ($importLog->total_comments_extracted ?? 0);
+                                                $reactionCount = (int) ($importLog->total_reactions_extracted ?? 0);
+                                                $shareCount = (int) ($importMetadata['facebook_shares_count'] ?? (is_array($importMetadata['facebook_shares'] ?? null) ? count($importMetadata['facebook_shares']) : 0));
+                                                $hasExtractedActivity = $commentCount + $reactionCount + $shareCount > 0;
                                                 $statusLabel = match($importLog->status) {
                                                     'completed' => 'Procesado', 'processing' => 'Procesando', 'downloaded' => 'Descargado', 'pending_assignment' => 'Sin asignar', 'failed' => 'Error', default => ucfirst($importLog->status),
+                                                };
+                                                $emptyActivityLabel = match($importLog->status) {
+                                                    'processing' => 'Extrayendo actividad',
+                                                    'downloaded' => 'Pendiente de extracción',
+                                                    'failed' => 'No se pudo extraer',
+                                                    default => 'Sin actividad detectada',
                                                 };
                                             @endphp
                                             <tr class="hover:bg-slate-50/70">
                                                 <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 truncate text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
                                                 <td class="px-4 py-3 text-slate-600">{{ $detectedProfileLabel }}</td>
                                                 <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $importLog->status === 'completed' ? 'bg-emerald-50 text-emerald-700' : ($importLog->status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800') }}">{{ $statusLabel }}</span></td>
+                                                <td class="min-w-[280px] px-4 py-3">
+                                                    @if($hasExtractedActivity)
+                                                        <div class="flex flex-wrap gap-1.5">
+                                                            <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700">Comentarios: {{ $commentCount }}</span>
+                                                            <span class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-medium text-rose-700">Reacciones: {{ $reactionCount }}</span>
+                                                            <span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700">Compartidos: {{ $shareCount }}</span>
+                                                        </div>
+                                                        @if($importLog->status === 'failed')
+                                                            <p class="mt-1 text-[10px] text-rose-600">Extracción incompleta</p>
+                                                        @endif
+                                                    @else
+                                                        <span class="text-slate-500">{{ $emptyActivityLabel }}</span>
+                                                    @endif
+                                                </td>
                                                 <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
                                             </tr>
                                         @empty
-                                            <tr><td colspan="4" class="px-4 py-10 text-center text-slate-500">No hay importaciones en esta sección.</td></tr>
+                                            <tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">No hay importaciones en esta sección.</td></tr>
                                         @endforelse
                                     </tbody>
                                 </table>
