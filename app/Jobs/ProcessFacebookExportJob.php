@@ -96,7 +96,7 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 break;
             }
 
-            if (! $hasComments && ! $hasReactions && ! $hasShares) {
+            if (! $hasComments && ! $hasReactions && ! $hasShares && $exportIdentifier === null) {
                 throw new RuntimeException('Estructura de exportación inválida: no se extrajeron comentarios ni reacciones válidas para importar.');
             }
 

@@ -252,4 +252,20 @@ class FacebookExportParserTest extends TestCase
         $this->assertCount(2, $comentarios);
         $this->assertCount(1, $reacciones);
     }
+
+    public function test_validar_estructura_accepts_daily_export_with_auxiliary_files_and_facebook_id_folder_name(): void
+    {
+        file_put_contents($this->testDirectory.'/profile_update_history.json', json_encode([
+            'profile_updates_v2' => [],
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser(
+            $this->testDirectory,
+            'meta-2026-Oct-26-10-20-17/facebook-61594553723083-2026-10-28-KzM5cb1q'
+        );
+
+        $parser->validarEstructura();
+
+        $this->assertSame('id:61594553723083', $parser->identificador());
+    }
 }
