@@ -58,6 +58,15 @@ class GoogleDriveProfilesSeeder extends Seeder
                 'fb_id' => '61592991939900',
                 'folder' => 'meta-2026-Oct-09-17-31-01',
             ],
+            [
+                'name' => 'Camila Montoya',
+                'email' => 'vcfw32@outlook.com',
+                'login_email' => 'camila.montoya@evidencias.local',
+                'social_network' => 'Facebook',
+                'profile_uri' => 'https://www.facebook.com/profile.php?id=61595130636530',
+                'fb_id' => '61595130636530',
+                'folder' => 'meta-2026-Oct-30-14-55-56',
+            ],
         ];
 
         foreach ($driveProfiles as $item) {

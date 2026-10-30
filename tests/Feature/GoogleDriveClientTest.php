@@ -71,57 +71,35 @@ class GoogleDriveClientTest extends TestCase
         $this->assertSame('meta-2026-Oct-06-11-05-44', $folders[0]['name']);
     }
 
-    public function test_it_expands_meta_folder_with_multiple_daily_facebook_subfolders(): void
+    public function test_it_lists_top_level_meta_and_facebook_export_folders_without_expanding_subfolders(): void
     {
         Http::fake([
             'https://oauth2.googleapis.com/token' => Http::response(['access_token' => 'mock_token'], 200),
-            'https://www.googleapis.com/drive/v3/files*' => function (Request $request) {
-                $query = (string) ($request->data()['q'] ?? '');
-
-                if (str_contains($query, "'root' in parents")) {
-                    return Http::response([
-                        'files' => [
-                            [
-                                'id' => 'meta_folder_parent',
-                                'name' => 'meta-2026-Oct-24-09-51-11',
-                                'createdTime' => '2026-10-24T09:51:11.000Z',
-                            ],
-                        ],
-                    ], 200);
-                }
-
-                if (str_contains($query, "'meta_folder_parent' in parents")) {
-                    return Http::response([
-                        'files' => [
-                            [
-                                'id' => 'fb_day_1',
-                                'name' => 'facebook-61593018723655-2026-10-24-AAA',
-                                'createdTime' => '2026-10-24T10:00:00.000Z',
-                            ],
-                            [
-                                'id' => 'fb_day_2',
-                                'name' => 'facebook-61593018723655-2026-10-25-BBB',
-                                'createdTime' => '2026-10-25T10:00:00.000Z',
-                            ],
-                        ],
-                    ], 200);
-                }
-
-                return Http::response(['files' => []], 200);
-            },
+            'https://www.googleapis.com/drive/v3/files*' => Http::response([
+                'files' => [
+                    [
+                        'id' => 'meta_folder_parent',
+                        'name' => 'meta-2026-Oct-24-09-51-11',
+                        'createdTime' => '2026-10-24T09:51:11.000Z',
+                    ],
+                    [
+                        'id' => 'fb_direct_folder',
+                        'name' => 'facebook-61593018723655-2026-10-25-BBB',
+                        'createdTime' => '2026-10-25T10:00:00.000Z',
+                    ],
+                ],
+            ], 200),
         ]);
 
         $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token', 'root');
         $folders = $client->listExportFolders();
 
         $this->assertCount(2, $folders);
-        $this->assertSame('fb_day_1', $folders[0]['id']);
-        $this->assertSame('meta-2026-Oct-24-09-51-11/facebook-61593018723655-2026-10-24-AAA', $folders[0]['name']);
-        $this->assertSame('meta_folder_parent', $folders[0]['parent_id']);
+        $this->assertSame('meta_folder_parent', $folders[0]['id']);
+        $this->assertSame('meta-2026-Oct-24-09-51-11', $folders[0]['name']);
 
-        $this->assertSame('fb_day_2', $folders[1]['id']);
-        $this->assertSame('meta-2026-Oct-24-09-51-11/facebook-61593018723655-2026-10-25-BBB', $folders[1]['name']);
-        $this->assertSame('meta_folder_parent', $folders[1]['parent_id']);
+        $this->assertSame('fb_direct_folder', $folders[1]['id']);
+        $this->assertSame('facebook-61593018723655-2026-10-25-BBB', $folders[1]['name']);
     }
 
     public function test_it_gets_folder_json_files_hierarchically(): void
