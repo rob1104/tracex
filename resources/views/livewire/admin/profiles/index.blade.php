@@ -300,7 +300,8 @@
                                             $facebookUser = $importLog->facebookUsers->first();
                                             $profileName = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['name'] ?? null) : null;
                                             $exportIdentifier = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['export_identifier'] ?? null) : null;
-                                            $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'id:'.$fbMatch[1] : null;
+                                            $importFiles = is_array($importLog->metadata['files'] ?? null) ? $importLog->metadata['files'] : [];
+                                            $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', implode(' ', [$importLog->file_name, ...$importFiles]), $fbMatch) ? 'id:'.$fbMatch[1] : null;
                                         @endphp
                                         <tr>
                                             <td class="px-4 py-3 text-sm text-gray-900">

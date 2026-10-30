@@ -84,14 +84,6 @@ class FacebookDriveSyncService
         foreach ($folders as $folder) {
             $folderId = $folder['id'];
             $folderName = $folder['name'];
-            $parentId = $folder['parent_id'] ?? null;
-
-            if (is_string($parentId) && $parentId !== '') {
-                FacebookImportLog::where('drive_file_id', $parentId)
-                    ->where('status', 'downloaded')
-                    ->whereNull('downloaded_at')
-                    ->delete();
-            }
 
             // Idempotency: skip if already logged and downloaded/processed, but retry records stuck before download
             $existingLog = FacebookImportLog::where('drive_file_id', $folderId)->first();
@@ -209,12 +201,36 @@ class FacebookDriveSyncService
             }
 
             $totalBytes = array_sum($downloadedFiles);
+            $filePaths = array_keys($downloadedFiles);
+
+            $matchedProfileId = $importLog->profile_id;
+            $assignedUserId = $importLog->user_id;
+
+            if ($matchedProfileId === null) {
+                $detectedId = null;
+                foreach ([$folderName, ...$filePaths] as $candidatePath) {
+                    if (preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $candidatePath, $idMatch)) {
+                        $detectedId = "id:{$idMatch[1]}";
+                        break;
+                    }
+                }
+
+                $preliminaryIdentifier = FacebookProfileIdentifier::normalize($detectedId);
+                if ($preliminaryIdentifier !== null) {
+                    $resolution = app(ProfileAssignmentService::class)->resolve(['identifier' => $preliminaryIdentifier]);
+                    $matchedProfileId = $resolution['profile']?->id;
+                    $assignedUserId = $assignedUserId ?? $resolution['user']?->id;
+                }
+            }
+
             $importLog->update([
+                'profile_id' => $matchedProfileId,
+                'user_id' => $assignedUserId,
                 'file_size_bytes' => $totalBytes,
                 'status' => 'downloaded',
                 'downloaded_at' => now(),
                 'metadata' => [
-                    'files' => array_keys($downloadedFiles),
+                    'files' => $filePaths,
                 ],
             ]);
 

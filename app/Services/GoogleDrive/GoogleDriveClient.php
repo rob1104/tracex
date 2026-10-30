@@ -90,10 +90,8 @@ class GoogleDriveClient
 
     /**
      * List Facebook export folders (matching 'meta-' or 'facebook-') in the configured or specified parent folder.
-     * When a 'meta-' folder contains daily 'facebook-' subfolders, each 'facebook-' subfolder is returned as an
-     * individual export unit so daily recurring exports inside the same 'meta-' folder are processed independently.
      *
-     * @return array<int, array{id: string, name: string, createdTime?: string, parent_id?: string}>
+     * @return array<int, array{id: string, name: string, createdTime?: string}>
      *
      * @throws Exception
      */
@@ -160,113 +158,13 @@ class GoogleDriveClient
             return [];
         }
 
-        $expandedFiles = $this->expandMetaExportFolders($files, $token);
-
         Log::info('[GoogleDriveClient] Found export folders in Google Drive', [
             'target_folder' => $targetFolder,
-            'root_folders_count' => count($files),
-            'count' => count($expandedFiles),
-            'folders' => $expandedFiles,
+            'count' => count($files),
+            'folders' => $files,
         ]);
 
-        return $expandedFiles;
-    }
-
-    /**
-     * Expand 'meta-' parent folders into their child 'facebook-' daily export subfolders when present.
-     *
-     * @param  array<int, array{id: string, name: string, createdTime?: string}>  $folders
-     * @return array<int, array{id: string, name: string, createdTime?: string, parent_id?: string}>
-     */
-    protected function expandMetaExportFolders(array $folders, string $token): array
-    {
-        $expanded = [];
-
-        foreach ($folders as $folder) {
-            $folderId = (string) ($folder['id'] ?? '');
-            $folderName = (string) ($folder['name'] ?? '');
-
-            if ($folderId !== '' && str_starts_with(strtolower($folderName), 'meta-')) {
-                $children = $this->listChildExportFolders($folderId, $token);
-
-                if (! empty($children)) {
-                    foreach ($children as $child) {
-                        $expandedItem = [
-                            'id' => $child['id'],
-                            'name' => $folderName.'/'.$child['name'],
-                            'parent_id' => $folderId,
-                        ];
-
-                        if (isset($child['createdTime']) || isset($folder['createdTime'])) {
-                            $expandedItem['createdTime'] = $child['createdTime'] ?? $folder['createdTime'];
-                        }
-
-                        $expanded[] = $expandedItem;
-                    }
-
-                    continue;
-                }
-            }
-
-            $expanded[] = $folder;
-        }
-
-        return $expanded;
-    }
-
-    /**
-     * List direct child 'facebook-' export folders inside a 'meta-' parent folder.
-     *
-     * @return array<int, array{id: string, name: string, createdTime?: string}>
-     */
-    protected function listChildExportFolders(string $parentFolderId, string $token): array
-    {
-        $query = "mimeType = 'application/vnd.google-apps.folder' and trashed = false and '{$parentFolderId}' in parents and name contains 'facebook-'";
-        $children = [];
-        $pageToken = null;
-
-        do {
-            $params = [
-                'q' => $query,
-                'fields' => 'nextPageToken, files(id, name, createdTime)',
-                'pageSize' => 100,
-            ];
-
-            if ($pageToken !== null) {
-                $params['pageToken'] = $pageToken;
-            }
-
-            $response = Http::withToken($token)->get('https://www.googleapis.com/drive/v3/files', $params);
-
-            if (! $response->successful()) {
-                Log::warning('[GoogleDriveClient] Failed to list child facebook- folders inside meta- folder', [
-                    'parent_folder_id' => $parentFolderId,
-                    'status' => $response->status(),
-                ]);
-
-                return [];
-            }
-
-            foreach ($response->json('files', []) as $item) {
-                $itemId = (string) ($item['id'] ?? '');
-                $itemName = (string) ($item['name'] ?? '');
-
-                if ($itemId === '' || $itemId === $parentFolderId) {
-                    continue;
-                }
-
-                if (! str_contains(strtolower($itemName), 'facebook-')) {
-                    continue;
-                }
-
-                $children[] = $item;
-            }
-
-            $nextToken = $response->json('nextPageToken');
-            $pageToken = is_string($nextToken) && $nextToken !== '' ? $nextToken : null;
-        } while ($pageToken !== null);
-
-        return $children;
+        return $files;
     }
 
     /**

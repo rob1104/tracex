@@ -228,13 +228,14 @@
                                             @php
                                                 $facebookUser = $importLog->facebookUsers->first();
                                                 $metadata = is_array($facebookUser?->metadata) ? $facebookUser->metadata : [];
-                                                $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'ID: '.$fbMatch[1] : null;
+                                                $importMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
+                                                $candidatePaths = implode(' ', [$importLog->file_name, ...(is_array($importMetadata['files'] ?? null) ? $importMetadata['files'] : [])]);
+                                                $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', $candidatePaths, $fbMatch) ? 'ID: '.$fbMatch[1] : null;
                                                 $detectedProfileLabel = $importLog->profile?->name
                                                     ?? $metadata['name']
                                                     ?? (! empty($metadata['export_identifier']) ? 'ID: '.str_replace('id:', '', (string) $metadata['export_identifier']) : null)
                                                     ?? $folderFbId
                                                     ?? 'Pendiente de coincidencia';
-                                                $importMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
                                                 $commentCount = (int) ($importLog->total_comments_extracted ?? 0);
                                                 $reactionCount = (int) ($importLog->total_reactions_extracted ?? 0);
                                                 $shareCount = (int) ($importMetadata['facebook_shares_count'] ?? (is_array($importMetadata['facebook_shares'] ?? null) ? count($importMetadata['facebook_shares']) : 0));
