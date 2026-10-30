@@ -5,7 +5,9 @@ namespace App\Livewire\Admin\Evidences;
 use App\Models\Evidence;
 use App\Models\EvidenceImage;
 use App\Models\EvidenceType;
+use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Database\Eloquent\Builder;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -13,9 +15,9 @@ class Index extends Component
 {
     use WithPagination;
 
-    public $searchUser = '';
-
     public $filterType = '';
+
+    public $filterCollaborator = '';
 
     public $filterOrigin = '';
 
@@ -101,15 +103,19 @@ class Index extends Component
 
     private function buildQuery()
     {
-        $query = Evidence::with(['user', 'evidenceType', 'images', 'profile'])->latest();
+        $query = $this->applyFilters(Evidence::query()->with(['user', 'evidenceType', 'images', 'profile']));
 
-        if ($this->searchUser) {
-            $query->whereHas('user', function ($q) {
-                $q->where('name', 'like', '%'.$this->searchUser.'%')
-                    ->orWhere('email', 'like', '%'.$this->searchUser.'%');
-            });
+        if ($this->filterCollaborator) {
+            $query->where('user_id', $this->filterCollaborator);
         }
 
+        return $query
+            ->orderByRaw('COALESCE(external_published_at, created_at) DESC')
+            ->orderByDesc('id');
+    }
+
+    private function applyFilters(Builder $query): Builder
+    {
         if ($this->filterType) {
             $query->where('evidence_type_id', $this->filterType);
         }
@@ -165,7 +171,9 @@ class Index extends Component
         $evidences = $this->buildQuery()->get();
 
         $filters = [
-            'searchUser' => $this->searchUser,
+            'collaborators' => $this->filterCollaborator
+                ? User::find($this->filterCollaborator)?->name ?? 'Todos'
+                : 'Todos',
             'filterType' => $this->filterType ? EvidenceType::find($this->filterType)?->name : null,
             'filterDateFrom' => $this->filterDateFrom,
             'filterDateTo' => $this->filterDateTo,
@@ -186,6 +194,7 @@ class Index extends Component
     public function render()
     {
         return view('livewire.admin.evidences.index', [
+            'collaborators' => User::query()->where('role', 'user')->orderBy('name')->orderBy('id')->get(),
             'evidences' => $this->buildQuery()->paginate(15),
             'types' => EvidenceType::all(),
         ])->layout('layouts.app');
