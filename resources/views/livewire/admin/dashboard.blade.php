@@ -113,9 +113,11 @@
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Top 5 Creadores de Evidencias</h4>
-                <div class="relative h-64 w-full" wire:ignore>
-                    <canvas id="chartUsers"></canvas>
+                <h4 class="text-sm font-bold text-indigo-500 uppercase mb-4">Evidencias por Colaborador</h4>
+                <div class="relative h-64 w-full overflow-x-auto" wire:ignore>
+                    <div id="chartUsersContainer" class="relative h-full">
+                        <canvas id="chartUsers"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -142,9 +144,11 @@
             </div>
 
             <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                <h4 class="text-sm font-bold text-cyan-600 uppercase mb-4">Top 5 Creadores de Cuentas</h4>
-                <div class="relative h-64 w-full" wire:ignore>
-                    <canvas id="chartTopAccountCreators"></canvas>
+                <h4 class="text-sm font-bold text-cyan-600 uppercase mb-4">Cuentas por Creador</h4>
+                <div class="relative h-64 w-full overflow-x-auto" wire:ignore>
+                    <div id="chartTopAccountCreatorsContainer" class="relative h-full">
+                        <canvas id="chartTopAccountCreators"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -184,6 +188,13 @@
                         const dAccGestor = Object.values(this.$wire.accountsByGestor || {});
                         const dTopCreators = Object.values(this.$wire.topAccountCreators || {});
 
+                        const userChartContainer = document.getElementById('chartUsersContainer');
+                        const userChartViewport = userChartContainer.parentElement;
+                        userChartContainer.style.width = `${Math.max(userChartViewport.clientWidth, dUser.length * 96)}px`;
+                        const accountCreatorsContainer = document.getElementById('chartTopAccountCreatorsContainer');
+                        const accountCreatorsViewport = accountCreatorsContainer.parentElement;
+                        accountCreatorsContainer.style.width = `${Math.max(accountCreatorsViewport.clientWidth, dTopCreators.length * 96)}px`;
+
                         // Chart 1: Growth (Line)
                         charts.growth = new Chart(document.getElementById('chartGrowth'), {
                             type: 'line',
@@ -202,7 +213,7 @@
                             options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
 
-                        // Chart 2: Top Users (Bar)
+                        // Chart 2: Evidence counts by collaborator (Bar)
                         charts.users = new Chart(document.getElementById('chartUsers'), { plugins: [ChartDataLabels],
                             type: 'bar',
                             data: {
@@ -214,7 +225,11 @@
                                     borderRadius: 4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } } }
+                            options: {
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } },
+                                scales: { x: { ticks: { autoSkip: false, maxRotation: 55, minRotation: 35 } } }
+                            }
                         });
 
                         // Chart 3: By Type (Doughnut)
@@ -261,7 +276,7 @@
                             options: { maintainAspectRatio: false, plugins: { legend: { display: false } } }
                         });
 
-                        // Chart 6: Top Account Creators (Bar)
+                        // Chart 6: All account creators (Bar)
                         charts.topCreators = new Chart(document.getElementById('chartTopAccountCreators'), { plugins: [ChartDataLabels],
                             type: 'bar',
                             data: {
@@ -273,7 +288,11 @@
                                     borderRadius: 4
                                 }]
                             },
-                            options: { maintainAspectRatio: false, plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } } }
+                            options: {
+                                maintainAspectRatio: false,
+                                plugins: { legend: { display: false }, datalabels: { color: '#ffffff', font: { weight: 'bold' } } },
+                                scales: { x: { ticks: { autoSkip: false, maxRotation: 55, minRotation: 35 } } }
+                            }
                         });
 
                         // Chart 7: Accounts by Gestor (Bar)
@@ -303,6 +322,13 @@
                     const dAccDate = Object.values(newData.dataAccountDate || {});
                     const dAccGestor = Object.values(newData.dataAccountGestor || {});
                     const dTopCreators = Object.values(newData.dataTopCreators || {});
+
+                    const userChartContainer = document.getElementById('chartUsersContainer');
+                    const userChartViewport = userChartContainer.parentElement;
+                    userChartContainer.style.width = `${Math.max(userChartViewport.clientWidth, dUser.length * 96)}px`;
+                    const accountCreatorsContainer = document.getElementById('chartTopAccountCreatorsContainer');
+                    const accountCreatorsViewport = accountCreatorsContainer.parentElement;
+                    accountCreatorsContainer.style.width = `${Math.max(accountCreatorsViewport.clientWidth, dTopCreators.length * 96)}px`;
 
                     charts.growth.data.labels = dDate.map(d => d.date);
                     charts.growth.data.datasets[0].data = dDate.map(d => d.count);
