@@ -17,8 +17,6 @@ class Index extends Component
 {
     use WithPagination;
 
-    public $search = '';
-
     public $showModal = false;
 
     public $showPasswordModal = false;
@@ -52,7 +50,7 @@ class Index extends Component
 
     public $filter_status = '';
 
-    public $filter_gestor = '';
+    public $filter_user_id = '';
 
     public $filter_network = '';
 
@@ -76,13 +74,6 @@ class Index extends Component
 
     public $selectedProfiles = [];
 
-    // For Colab Profiles View Modal
-    public $showColabProfilesModal = false;
-
-    public $selectedColabViewId = '';
-
-    public $viewingColabProfiles = [];
-
     public $showClaimImportModal = false;
 
     public $claimImportId = null;
@@ -90,37 +81,6 @@ class Index extends Component
     public $claimProfileId = '';
 
     public $claimUserId = '';
-
-    public function updatedSelectedColabViewId($value)
-    {
-        $this->authorizeProfileManagement();
-
-        if ($value) {
-            $query = Profile::whereHas('users', function ($q) use ($value) {
-                $q->where('users.id', $value);
-            })->with('emailAccount')->orderBy('name', 'asc');
-
-            if (auth()->user()->isCuentas()) {
-                $query->where(function ($q) {
-                    $q->where('created_by', auth()->id())
-                        ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
-                        ->orWhereNull('created_by')
-                        ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
-                });
-            }
-
-            $this->viewingColabProfiles = $query->get();
-        } else {
-            $this->viewingColabProfiles = [];
-        }
-    }
-
-    public function openColabProfilesModal()
-    {
-        $this->authorizeProfileManagement();
-        $this->reset(['selectedColabViewId', 'viewingColabProfiles']);
-        $this->showColabProfilesModal = true;
-    }
 
     public function updatedSourceColabId($value)
     {
@@ -355,7 +315,7 @@ class Index extends Component
         $this->resetPage();
     }
 
-    public function updatingFilterGestor()
+    public function updatingFilterUserId()
     {
         $this->resetPage();
     }
@@ -511,8 +471,8 @@ class Index extends Component
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
-        } elseif ($this->filter_gestor) {
-            $query->where('created_by', $this->filter_gestor);
+        } elseif ($this->filter_user_id) {
+            $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', $this->filter_user_id));
         }
 
         if ($this->filter_email_account_id) {
@@ -534,14 +494,6 @@ class Index extends Component
             $query->whereDate('created_at', '<=', $this->filterDateTo);
         }
 
-        if ($this->search) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%'.$this->search.'%')
-                    ->orWhere('social_network', 'like', '%'.$this->search.'%')
-                    ->orWhere('facebook_identifier', 'like', '%'.$this->search.'%');
-            });
-        }
-
         return $query->latest();
     }
 
@@ -553,7 +505,7 @@ class Index extends Component
         return response()->streamDownload(function () use ($profiles) {
             $file = fopen('php://output', 'w');
             fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
-            fputcsv($file, ['ID', 'Nombre', 'Red Social', 'Cuenta de Correo', 'Gestor Asignado', 'Colaboradores Asignados', 'Estatus', 'Fecha de Creación']);
+            fputcsv($file, ['ID', 'Nombre', 'Red Social', 'Cuenta de Correo', 'Usuario creador', 'Colaboradores asignados', 'Estatus', 'Fecha de creación']);
 
             foreach ($profiles as $p) {
                 fputcsv($file, [
@@ -577,16 +529,16 @@ class Index extends Component
         $profiles = $this->buildQuery()->get();
 
         $filters = [
-            'search' => $this->search,
             'status' => $this->filter_status ?: 'Todos',
             'network' => $this->filter_network ?: 'Todas',
             'filterDateFrom' => $this->filterDateFrom,
             'filterDateTo' => $this->filterDateTo,
+            'user' => 'Todos',
         ];
 
-        if ($this->filter_gestor) {
-            $gestor = User::find($this->filter_gestor);
-            $filters['gestor'] = $gestor ? $gestor->name : null;
+        if ($this->filter_user_id) {
+            $user = User::find($this->filter_user_id);
+            $filters['user'] = $user ? $user->name : 'Todos';
         }
 
         if ($this->filter_email_account_id) {
@@ -699,6 +651,10 @@ class Index extends Component
             }
         }
 
+        $usersList = auth()->user()->isAdmin() || auth()->user()->isCuentas()
+            ? User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get()
+            : collect();
+
         return view('livewire.admin.profiles.index', [
             'profiles' => $profiles,
             'facebookProfilesByUser' => $facebookProfilesByUser,
@@ -707,9 +663,7 @@ class Index extends Component
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
             'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
-            'usersList' => auth()->user()->isAdmin() || auth()->user()->isCuentas()
-                ? User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get()
-                : collect(),
+            'usersList' => $usersList,
         ])->layout('layouts.app');
     }
 }

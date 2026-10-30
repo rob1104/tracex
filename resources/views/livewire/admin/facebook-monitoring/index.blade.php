@@ -7,7 +7,7 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Módulo de monitoreo</p>
                         <h1 class="mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                            <span class="text-3xl" aria-hidden="true">👥</span> {{ auth()->user()->isAdmin() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
+                            {{ auth()->user()->isAdmin() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
                         </h1>
                         <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida mediante exportaciones oficiales y Google Drive.' }}</p>
                     </div>
@@ -47,11 +47,7 @@
                             <span class="font-semibold text-slate-700">Google Drive:</span>
                             <span class="{{ $driveConfigured ? 'text-emerald-700' : 'text-amber-700' }}">{{ $driveConfigured ? 'Configurado' : 'Pendiente de configurar' }}</span>
                         </div>
-                        @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
-                            <a href="#register-facebook-profile" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700">
-                                <span class="text-lg leading-none" aria-hidden="true">＋</span> Agregar usuario
-                            </a>
-                        @endif
+
                     </div>
                 </header>
 
@@ -59,26 +55,23 @@
                     <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('status') }}</div>
                 @endif
 
-                <section class="mb-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4" aria-label="Resumen del sistema">
-                    <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xl text-blue-600">♟</span>
+                <section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Resumen del sistema">
+                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">♟</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Perfiles registrados</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalProfiles }}</p><p class="mt-1 text-xs text-slate-400">Facebook vinculado</p></div>
                     </article>
-                    <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xl text-blue-600">↓</span>
+                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">↓</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Importaciones</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalImports }}</p><p class="mt-1 text-xs text-slate-400">Exportaciones recibidas</p></div>
                     </article>
-                    <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-emerald-50 text-xl text-emerald-600">✓</span>
+                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg text-emerald-600">✓</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Procesamiento</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $processingCount > 0 ? 'En proceso' : 'Al día' }}</p><p class="mt-1 text-xs text-slate-400">{{ $processingCount }} cargas pendientes</p></div>
                     </article>
-                    <article class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 text-xl text-blue-600">▤</span>
-                        <div class="min-w-0"><p class="text-xs text-slate-500">Base de datos local</p><p class="mt-0.5 truncate text-lg font-bold text-slate-900">{{ $databaseName }}</p><p class="mt-1 text-xs text-slate-400">Conexión disponible</p></div>
-                    </article>
+
                 </section>
 
-                <div class="mb-5 grid gap-4 2xl:grid-cols-[minmax(0,2fr)_minmax(290px,0.85fr)]">
+                <div class="mb-5">
                     <section id="monitored-profiles" class="rounded-xl border border-slate-200 bg-white shadow-sm">
                         <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -93,13 +86,13 @@
                                 <span class="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">{{ $profiles->total() }} perfiles</span>
                             </div>
                         </div>
-                        <div class="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+                        <div class="grid gap-2 p-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
                             @forelse($profiles as $profile)
                                 @php
                                     $identifier = (string) $profile->facebook_identifier;
                                     $facebookUrl = str_starts_with($identifier, 'uri:') ? substr($identifier, 4) : (str_starts_with($identifier, 'http') ? $identifier : null);
                                 @endphp
-                                <article wire:key="family-profile-{{ $profile->id }}" class="flex min-w-0 flex-col rounded-lg border border-slate-200 p-4 transition hover:border-blue-200 hover:shadow-sm">
+                                <article wire:key="family-profile-{{ $profile->id }}" class="flex min-w-0 flex-col rounded-lg border border-slate-200 p-3 transition hover:border-blue-200 hover:shadow-sm">
                                     <div class="flex items-start gap-3">
                                         <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-lg font-bold text-blue-700">{{ mb_strtoupper(mb_substr($profile->name, 0, 1)) }}</span>
                                         <div class="min-w-0 flex-1">
@@ -118,16 +111,16 @@
                                     @else
                                         <p class="mt-2 text-xs text-amber-700">Falta asociar un ID de Facebook</p>
                                     @endif
-                                    <div class="my-3 grid grid-cols-3 gap-2 border-y border-slate-100 py-3 text-xs">
+                                    <div class="my-2 grid grid-cols-3 gap-1.5 border-y border-slate-100 py-2 text-[11px]">
                                         <div><p class="text-slate-500">Comentarios</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_comments_count ?? 0) }}</p></div>
                                         <div><p class="text-slate-500">Reacciones</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_reactions_count ?? 0) }}</p></div>
                                         <div><p class="text-slate-500">Compartidos</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_shares_count ?? 0) }}</p></div>
                                     </div>
-                                    <div class="mb-3 flex items-center justify-between text-xs text-slate-500">
+                                    <div class="mb-2 flex items-center justify-between text-[11px] text-slate-500">
                                         <span>{{ $profile->facebook_exports_count ?? 0 }} exportaciones</span>
                                         <span>{{ $profile->latest_facebook_export_at ? \Illuminate\Support\Carbon::parse($profile->latest_facebook_export_at)->format('d/m/Y') : 'Sin exportaciones' }}</span>
                                     </div>
-                                    <a href="#recent-activity" wire:click="showProfileActivity({{ $profile->id }})" class="mt-auto flex w-full items-center justify-center gap-2 rounded-md border border-blue-100 bg-blue-50/70 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                                    <a href="#recent-activity" wire:click="showProfileActivity({{ $profile->id }})" class="mt-auto flex w-full items-center justify-center gap-2 rounded-md border border-blue-100 bg-blue-50/70 px-2 py-1.5 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100">
                                         <span aria-hidden="true">◉</span> Ver actividad
                                     </a>
                                 </article>
@@ -143,36 +136,7 @@
                         @endif
                     </section>
 
-                    <section id="drive-import" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-center gap-3">
-                            <span class="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-xl text-blue-600">☁</span>
-                            <div><h2 class="font-bold text-slate-900">Importación desde Google Drive</h2><p class="text-xs text-slate-500">Exportaciones oficiales de Meta</p></div>
-                        </div>
-                        <p class="mt-4 text-sm leading-6 text-slate-500">TraceX detecta las carpetas de exportación, procesa sus datos y guarda la actividad en la base local.</p>
-                        <ul class="mt-4 space-y-3 text-xs text-slate-600">
-                            <li class="flex gap-2"><span class="font-bold {{ $driveConfigured ? 'text-emerald-600' : 'text-amber-500' }}">●</span> Conexión con Google Drive {{ $driveConfigured ? 'configurada' : 'pendiente' }}</li>
-                            <li class="flex gap-2"><span class="font-bold text-emerald-600">●</span> Detección de carpetas de Meta</li>
-                            <li class="flex gap-2"><span class="font-bold text-emerald-600">●</span> Descarga y verificación de archivos</li>
-                            <li class="flex gap-2"><span class="font-bold text-emerald-600">●</span> Eliminación del archivo remoto tras descargarlo</li>
-                            <li class="flex gap-2"><span class="font-bold text-emerald-600">●</span> Procesamiento en cola y almacenamiento local</li>
-                        </ul>
-                        <div class="mt-5 rounded-lg bg-slate-50 px-3 py-3 text-xs leading-5 text-slate-500">
-                            @if($driveConfigured)
-                                La conexión está configurada. El estado de las últimas cargas aparece en Actividad e importaciones.
-                            @else
-                                Para autorizar Drive, configura las credenciales del servidor y ejecuta <code class="font-semibold text-slate-700">php artisan google:token</code> en la terminal.
-                            @endif
-                        </div>
-                        @if(auth()->user()->isAdmin())
-                            <a href="{{ route('admin.evidence_types.index') }}#facebook-exports" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
-                                <span aria-hidden="true">↓</span> Ver importaciones sin asignar
-                            </a>
-                        @else
-                            <a href="{{ route('admin.profiles.index') }}#facebook-pending-imports" class="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
-                                <span aria-hidden="true">↓</span> Ver importaciones
-                            </a>
-                        @endif
-                    </section>
+
                 </div>
 
                 <div class="grid gap-4 2xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">

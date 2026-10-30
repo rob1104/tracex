@@ -189,8 +189,7 @@
             <div class="filters-title">Criterios del Reporte (Filtros Aplicados)</div>
             <div class="filters-list">
                 <div class="filter-item">
-                    <strong>Búsqueda:</strong> {{ $filters['search'] ?: 'Todas' }}<br>
-                    <strong>Gestor Asignado:</strong> {{ $filters['gestor'] ?? 'Todos' }}
+                    <strong>Usuarios:</strong> {{ $filters['user'] ?? 'Todos' }}
                 </div>
                 <div class="filter-item">
                     <strong>Cuenta de Correo:</strong> {{ $filters['email'] ?? 'Todas' }}<br>
@@ -214,7 +213,7 @@
                     <th class="col-name">Nombre</th>
                     <th class="col-net">Red Social</th>
                     <th class="col-email">Cuenta Origen</th>
-                    <th class="col-gestor">Gestor</th>
+                    <th class="col-gestor">Usuario creador</th>
                     <th class="col-users">Colaboradores</th>
                     <th class="col-date">Fecha Reg.</th>
                     <th class="col-status">Estatus</th>

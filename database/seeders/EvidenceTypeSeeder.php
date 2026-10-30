@@ -16,7 +16,9 @@ class EvidenceTypeSeeder extends Seeder
             ['name' => 'Like / Reacción'],
             ['name' => 'Comentario'],
             ['name' => 'Creación de perfil'],
+            ['name' => 'Mantenimiento'],
             ['name' => 'Otro'],
+            ['name' => 'Compartido'],
         ];
 
         foreach ($types as $type) {

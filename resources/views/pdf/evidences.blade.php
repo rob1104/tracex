@@ -186,7 +186,7 @@
             <div class="filters-title">Criterios del Reporte (Filtros Aplicados)</div>
             <div class="filters-list">
                 <div class="filter-item">
-                    <strong>Búsqueda (Usuario):</strong> {{ $filters['searchUser'] ?: 'Todos' }}<br>
+                    <strong>Colaboradores:</strong> {{ $filters['collaborators'] ?: 'Todos' }}<br>
                     <strong>Tipo de Evidencia:</strong> {{ $filters['filterType'] ?: 'Todos' }}
                 </div>
                 <div class="filter-item">
