@@ -9,6 +9,7 @@ use App\Models\FacebookImportLog;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\ProfileAssignmentService;
 use Exception;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 
@@ -81,17 +82,45 @@ class FacebookDriveSyncService
             ], $folders),
         ]);
 
+        $minFolderAgeSeconds = (int) config('services.google.drive.min_folder_age_seconds', 120);
+
         foreach ($folders as $folder) {
             $folderId = $folder['id'];
             $folderName = $folder['name'];
+
+            if ($minFolderAgeSeconds > 0 && ! empty($folder['createdTime'])) {
+                try {
+                    $createdAt = Carbon::parse($folder['createdTime']);
+                    $ageSeconds = $createdAt->diffInSeconds(now(), false);
+
+                    if ($ageSeconds >= 0 && $ageSeconds < $minFolderAgeSeconds) {
+                        $metrics['skipped']++;
+                        Log::info('[FacebookDriveSync] Skipping recently created folder to allow Meta to finish uploading files', [
+                            'folder_id' => $folderId,
+                            'folder_name' => $folderName,
+                            'created_time' => $folder['createdTime'],
+                            'age_seconds' => $ageSeconds,
+                            'min_folder_age_seconds' => $minFolderAgeSeconds,
+                        ]);
+
+                        continue;
+                    }
+                } catch (\Throwable) {
+                    // Ignore invalid timestamp format and proceed with normal sync
+                }
+            }
 
             // Idempotency: skip if already logged and downloaded/processed, but retry records stuck before download
             $existingLog = FacebookImportLog::where('drive_file_id', $folderId)->first();
             $isStuckPendingDownload = $existingLog !== null
                 && $existingLog->status === 'downloaded'
                 && $existingLog->downloaded_at === null;
+            $isRetryableIncompleteFolder = $existingLog !== null
+                && $existingLog->status === 'failed'
+                && $existingLog->drive_deleted_at === null
+                && str_contains((string) $existingLog->error_message, 'No JSON files found');
 
-            if ($existingLog && ! $isStuckPendingDownload) {
+            if ($existingLog && ! $isStuckPendingDownload && ! $isRetryableIncompleteFolder) {
                 $metrics['skipped']++;
                 Log::info('[FacebookDriveSync] Skipping folder because drive_file_id already exists in facebook_import_logs', [
                     'folder_id' => $folderId,
@@ -124,6 +153,8 @@ class FacebookDriveSyncService
                     'file_name' => $folderName,
                     'profile_id' => $existingLog->profile_id ?? $matchedProfile?->id,
                     'user_id' => $existingLog->user_id ?? $assignedUser?->id,
+                    'status' => 'downloaded',
+                    'downloaded_at' => null,
                     'error_message' => null,
                 ]);
                 $importLog = $existingLog;

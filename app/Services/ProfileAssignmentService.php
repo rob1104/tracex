@@ -107,6 +107,19 @@ class ProfileAssignmentService
 
             $importLog->evidences()->delete();
 
+            $existingEvidenceKeys = [];
+            Evidence::query()
+                ->where('profile_id', $profile->id)
+                ->where('origin', 'google_drive')
+                ->select(['evidence_type_id', 'external_published_at', 'comment'])
+                ->get()
+                ->each(function (Evidence $evidence) use (&$existingEvidenceKeys): void {
+                    $publishedKey = $evidence->external_published_at instanceof \DateTimeInterface
+                        ? $evidence->external_published_at->format('Y-m-d H:i:s')
+                        : (string) $evidence->external_published_at;
+                    $existingEvidenceKeys["{$evidence->evidence_type_id}|{$publishedKey}|{$evidence->comment}"] = true;
+                });
+
             $evidences = [];
             $count = 0;
             $shareCount = 0;
@@ -118,6 +131,17 @@ class ProfileAssignmentService
                     $context = $comment->metadata['context'];
                 }
 
+                $evidenceComment = $context ? "{$context}: {$comment->content}" : $comment->content;
+                $publishedKey = $comment->published_at instanceof \DateTimeInterface
+                    ? $comment->published_at->format('Y-m-d H:i:s')
+                    : (string) $comment->published_at;
+                $evidenceKey = "{$commentTypeId}|{$publishedKey}|{$evidenceComment}";
+
+                if (isset($existingEvidenceKeys[$evidenceKey])) {
+                    continue;
+                }
+                $existingEvidenceKeys[$evidenceKey] = true;
+
                 $evidences[] = [
                     'user_id' => $user->id,
                     'profile_id' => $profile->id,
@@ -125,7 +149,7 @@ class ProfileAssignmentService
                     'facebook_import_log_id' => $importLog->id,
                     'origin' => 'google_drive',
                     'social_network' => 'Facebook',
-                    'comment' => $context ? "{$context}: {$comment->content}" : $comment->content,
+                    'comment' => $evidenceComment,
                     'external_published_at' => $comment->published_at,
                     'ip_address' => null,
                     'user_agent' => 'Google Drive Sync Manual Claim',
@@ -141,6 +165,18 @@ class ProfileAssignmentService
             }
 
             foreach ($importLog->reactions as $reaction) {
+                $targetLabel = $reaction->title ?: $reaction->target_url;
+                $evidenceComment = "Reacción [{$reaction->reaction_type}]".($targetLabel ? " en: {$targetLabel}" : '');
+                $publishedKey = $reaction->published_at instanceof \DateTimeInterface
+                    ? $reaction->published_at->format('Y-m-d H:i:s')
+                    : (string) $reaction->published_at;
+                $evidenceKey = "{$reactionTypeId}|{$publishedKey}|{$evidenceComment}";
+
+                if (isset($existingEvidenceKeys[$evidenceKey])) {
+                    continue;
+                }
+                $existingEvidenceKeys[$evidenceKey] = true;
+
                 $evidences[] = [
                     'user_id' => $user->id,
                     'profile_id' => $profile->id,
@@ -148,7 +184,7 @@ class ProfileAssignmentService
                     'facebook_import_log_id' => $importLog->id,
                     'origin' => 'google_drive',
                     'social_network' => 'Facebook',
-                    'comment' => "Reacción [{$reaction->reaction_type}]".($reaction->title ? " en: {$reaction->title}" : ''),
+                    'comment' => $evidenceComment,
                     'external_published_at' => $reaction->published_at,
                     'ip_address' => null,
                     'user_agent' => 'Google Drive Sync Manual Claim',
@@ -184,6 +220,17 @@ class ProfileAssignmentService
                         $shareDescription .= "\n".$url;
                     }
                     $publishedAt = $share['fecha'] ?? $timestamp;
+                    $publishedKey = $publishedAt instanceof \DateTimeInterface
+                        ? $publishedAt->format('Y-m-d H:i:s')
+                        : (string) $publishedAt;
+                    $evidenceKey = "{$shareTypeId}|{$publishedKey}|{$shareDescription}";
+
+                    $shareCount++;
+
+                    if (isset($existingEvidenceKeys[$evidenceKey])) {
+                        continue;
+                    }
+                    $existingEvidenceKeys[$evidenceKey] = true;
 
                     $evidences[] = [
                         'user_id' => $user->id,
@@ -200,7 +247,6 @@ class ProfileAssignmentService
                         'updated_at' => $timestamp,
                     ];
                     $count++;
-                    $shareCount++;
 
                     if (count($evidences) === 500) {
                         Evidence::insert($evidences);

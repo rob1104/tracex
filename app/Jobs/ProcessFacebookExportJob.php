@@ -27,6 +27,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 3;
 
+    public int $timeout = 300;
+
     public int $uniqueFor = 3600;
 
     /** @var array<int, int> */
@@ -96,7 +98,12 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 break;
             }
 
-            if (! $hasComments && ! $hasReactions && ! $hasShares && $exportIdentifier === null) {
+            $hasProfileData = $exportIdentifier !== null
+                || ! empty($profileDetails['nombre'])
+                || ! empty($profileDetails['emails'])
+                || $importLog->profile_id !== null;
+
+            if (! $hasComments && ! $hasReactions && ! $hasShares && ! $hasProfileData) {
                 throw new RuntimeException('Estructura de exportación inválida: no se extrajeron comentarios ni reacciones válidas para importar.');
             }
 
@@ -105,8 +112,14 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 // 1. Resolve Profile and Collaborator User
                 $assignmentService = app(ProfileAssignmentService::class);
                 $resolution = $assignmentService->resolve($profileDetails);
-                $matchedProfile = $resolution['profile'];
-                $assignedUser = $resolution['user'];
+                $matchedProfile = $resolution['profile'] ?? $importLog->profile;
+                $assignedUser = $resolution['user']
+                    ?? $importLog->user
+                    ?? $matchedProfile?->users()
+                        ->where('users.is_active', true)
+                        ->where('users.role', 'user')
+                        ->orderBy('users.id', 'asc')
+                        ->first();
 
                 // 2. Fetch EvidenceType IDs for Comentario and Reaccion
                 $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
@@ -248,7 +261,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
                     // Option A: Ingest into evidence table if user & profile resolved
                     if ($assignedUser && $matchedProfile) {
-                        $evidenceComment = "Reacción [{$type}]".(! empty($reaction['objetivo']) ? " en: {$reaction['objetivo']}" : '');
+                        $targetLabel = ! empty($reaction['objetivo']) ? $reaction['objetivo'] : ($reaction['url'] ?? null);
+                        $evidenceComment = "Reacción [{$type}]".(! empty($targetLabel) ? " en: {$targetLabel}" : '');
                         $evidenceKey = "{$reactionTypeId}|{$reaction['fecha']}|{$evidenceComment}";
 
                         if (! isset($existingEvidenceKeys[$evidenceKey])) {
