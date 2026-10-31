@@ -22,6 +22,11 @@ class DownloadFacebookExportJob implements ShouldBeUnique, ShouldQueue
     public int $tries = 3;
 
     /**
+     * The number of seconds the job can run before timing out.
+     */
+    public int $timeout = 300;
+
+    /**
      * The number of seconds after which the job's unique lock will be released.
      */
     public int $uniqueFor = 3600;

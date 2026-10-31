@@ -268,4 +268,77 @@ class FacebookExportParserTest extends TestCase
 
         $this->assertSame('id:61594553723083', $parser->identificador());
     }
+
+    public function test_parser_extracts_group_comments_attachment_comments_and_same_second_reactions(): void
+    {
+        file_put_contents($this->testDirectory.'/group_comments_1.json', json_encode([
+            'group_comments_v2' => [
+                [
+                    'timestamp' => 1791300000,
+                    'title' => 'Juana comentó en el grupo Vecinos Unidos.',
+                    'data' => [
+                        ['comment' => ['timestamp' => 1791300000, 'comment' => 'Presente en la reunión']],
+                    ],
+                ],
+                [
+                    'timestamp' => 1791300005,
+                    'title' => 'Juana comentó en el grupo Vecinos Unidos.',
+                    'attachments' => [
+                        ['data' => [['media' => ['uri' => 'photos/sticker.png']]]],
+                    ],
+                    'data' => [
+                        ['comment' => ['timestamp' => 1791300005, 'comment' => '']],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/likes_and_reactions.json', json_encode([
+            [
+                'timestamp' => 1791300100,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me gusta'],
+                    ['label' => 'Nombre', 'value' => 'Publicación Uno'],
+                ],
+                'fbid' => '111',
+            ],
+            [
+                'timestamp' => 1791300100,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me gusta'],
+                    ['label' => 'Nombre', 'value' => 'Publicación Dos'],
+                ],
+                'fbid' => '222',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/your_posts_in_groups.json', json_encode([
+            [
+                'timestamp' => 1791300200,
+                'label_values' => [
+                    ['label' => 'Publicación', 'value' => 'Aviso importante para la comunidad'],
+                    ['label' => 'Grupo', 'value' => 'Vecinos Unidos'],
+                ],
+                'fbid' => '333',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $parser->validarEstructura();
+
+        $comentarios = iterator_to_array($parser->comentarios());
+        $reacciones = iterator_to_array($parser->reacciones());
+        $compartidos = iterator_to_array($parser->compartidos());
+
+        $this->assertCount(2, $comentarios);
+        $this->assertSame('Presente en la reunión', $comentarios[0]['texto']);
+        $this->assertSame('[Comentario con imagen o sticker]', $comentarios[1]['texto']);
+
+        $this->assertCount(2, $reacciones);
+        $this->assertSame('Publicación Uno', $reacciones[0]['objetivo']);
+        $this->assertSame('Publicación Dos', $reacciones[1]['objetivo']);
+
+        $this->assertCount(1, $compartidos);
+        $this->assertSame('Aviso importante para la comunidad', $compartidos[0]['descripcion']);
+    }
 }
