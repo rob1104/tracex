@@ -18,6 +18,18 @@ class FacebookExportParser
 {
     private const ZONA = 'America/Mexico_City';
 
+    private const PATRON_PERFIL = '/^profile_information\.json$/i';
+
+    private const PATRON_COMENTARIOS = '/^(comments|group_comments|your_comments_in_groups).*\.json$/i';
+
+    private const PATRON_REACCIONES = '/^(likes_and_reactions|reactions).*\.json$/i';
+
+    private const PATRON_COMPARTIDOS = '/^(your_posts|posts|group_posts|your_posts_in_groups|shared_memories).*\.json$/i';
+
+    private const PATRON_ACTIVIDAD = '/^your_comment_active_days\.json$/i';
+
+    private const PATRON_AUXILIARES = '/^(profile_update_history|your_devices|the_ways_we_can_send_you_notifications|permissions_you_have_granted_to_apps|rising_fan_badges.*|account_activity|login_protection_data|recently_viewed|time_spent|content_that_has_been_shown_to_you_in_your_feed|your_notifications_tab_activity|your_post_audiences|suggested_friends|your_facebook_activity_history|device_login_cookies|information_about_your_last_login)\.json$/i';
+
     private const REACCIONES = [
         'LIKE' => 'LIKE',
         'ME GUSTA' => 'LIKE',
@@ -54,12 +66,12 @@ class FacebookExportParser
             throw new RuntimeException("El directorio de exportación no existe: {$this->directorio}");
         }
 
-        $archivosPerfil = $this->archivos('/^profile_information\.json$/');
-        $archivosComentarios = $this->archivos('/^comments.*\.json$/');
-        $archivosReacciones = $this->archivos('/^(likes_and_reactions|reactions).*\.json$/');
-        $archivosCompartidos = $this->archivos('/^(your_posts|posts).*\.json$/');
-        $archivosActividad = $this->archivos('/^your_comment_active_days\.json$/');
-        $archivosAuxiliaresMeta = $this->archivos('/^(profile_update_history|your_devices|the_ways_we_can_send_you_notifications|permissions_you_have_granted_to_apps|rising_fan_badges.*|account_activity|login_protection_data|recently_viewed|time_spent)\.json$/');
+        $archivosPerfil = $this->archivos(self::PATRON_PERFIL);
+        $archivosComentarios = $this->archivos(self::PATRON_COMENTARIOS);
+        $archivosReacciones = $this->archivos(self::PATRON_REACCIONES);
+        $archivosCompartidos = $this->archivos(self::PATRON_COMPARTIDOS);
+        $archivosActividad = $this->archivos(self::PATRON_ACTIVIDAD);
+        $archivosAuxiliaresMeta = $this->archivos(self::PATRON_AUXILIARES);
         $archivosJsonTotales = $this->archivos('/\.json$/');
         $tieneIdEnEstructura = $this->extraerIdDesdeEstructura() !== null;
 
@@ -115,6 +127,8 @@ class FacebookExportParser
             $datos = $this->leer($ruta);
             $esValido = isset($datos['comments_v2'])
                 || isset($datos['comments'])
+                || isset($datos['group_comments_v2'])
+                || isset($datos['group_comments'])
                 || isset($datos['label_values'])
                 || array_is_list($datos);
 
@@ -139,6 +153,10 @@ class FacebookExportParser
             $datos = $this->leer($ruta);
             $esValido = isset($datos['status_updates_v2'])
                 || isset($datos['posts'])
+                || isset($datos['group_posts_v2'])
+                || isset($datos['group_posts'])
+                || isset($datos['shared_memories_v2'])
+                || isset($datos['shared_memories'])
                 || isset($datos['label_values'])
                 || array_is_list($datos);
 
@@ -244,7 +262,7 @@ class FacebookExportParser
             }
         }
 
-        foreach ($this->archivos('/^your_comment_active_days\.json$/') as $ruta) {
+        foreach ($this->archivos(self::PATRON_ACTIVIDAD) as $ruta) {
             foreach ($this->lista($this->leer($ruta), ['comment_active_days']) as $item) {
                 $fbid = trim((string) ($item['fbid'] ?? ''));
                 if ($fbid !== '' && ctype_digit($fbid)) {
@@ -264,7 +282,7 @@ class FacebookExportParser
             return $this->perfilCache;
         }
 
-        foreach (array_reverse($this->archivos('/^profile_information\.json$/')) as $ruta) {
+        foreach (array_reverse($this->archivos(self::PATRON_PERFIL)) as $ruta) {
             $datos = $this->leer($ruta);
 
             return $this->perfilCache = $datos['profile_v2'] ?? $datos['profile'] ?? [];
@@ -277,21 +295,37 @@ class FacebookExportParser
     {
         $vistos = [];
 
-        foreach ($this->archivos('/^comments.*\.json$/') as $ruta) {
-            foreach ($this->lista($this->leer($ruta), ['comments_v2', 'comments']) as $c) {
+        foreach ($this->archivos(self::PATRON_COMENTARIOS) as $ruta) {
+            foreach ($this->lista($this->leer($ruta), ['comments_v2', 'comments', 'group_comments_v2', 'group_comments']) as $c) {
                 $comentario = $this->primero($c['data'] ?? [], 'comment');
+                $etiquetas = is_array($c['label_values'] ?? null) ? $c['label_values'] : [];
                 $texto = $comentario['comment']
-                    ?? $this->valorDeEtiquetas($c['label_values'] ?? [], ['Comentario', 'Comment']);
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Comentario', 'Comment', 'Texto', 'Text']);
                 $ts = $comentario['timestamp'] ?? $c['timestamp'] ?? null;
 
-                if ($texto === null || trim((string) $texto) === '' || $ts === null) {
-                    continue; // comentarios solo con foto o sticker
+                if ($ts === null) {
+                    continue;
+                }
+
+                $urlAdjunto = $this->buscarEnlace($c['attachments'] ?? [])
+                    ?? $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link', 'Media', 'Adjunto'], incluirHref: true);
+                $tieneAdjunto = ! empty($c['attachments']) || ! empty($comentario['media']) || $urlAdjunto !== null;
+
+                if ($texto === null || trim((string) $texto) === '') {
+                    if (! $tieneAdjunto) {
+                        continue;
+                    }
+
+                    $texto = $urlAdjunto !== null
+                        ? "[Comentario multimedia / enlace] {$urlAdjunto}"
+                        : '[Comentario con imagen o sticker]';
                 }
 
                 $contexto = $c['title']
-                    ?? $this->valorDeEtiquetas($c['label_values'] ?? [], ['Título', 'Titulo', 'Title', 'Nombre', 'Name']);
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title', 'Grupo', 'Group', 'Nombre', 'Name']);
 
-                $llave = "{$ts}|{$texto}|".($contexto ?? '');
+                $fbid = trim((string) ($c['fbid'] ?? ''));
+                $llave = "{$ts}|{$texto}|".($contexto ?? '')."|{$fbid}";
                 if (isset($vistos[$llave])) {
                     continue;
                 }
@@ -310,7 +344,7 @@ class FacebookExportParser
     {
         $vistos = [];
 
-        foreach ($this->archivos('/^(likes_and_reactions|reactions).*\.json$/') as $ruta) {
+        foreach ($this->archivos(self::PATRON_REACCIONES) as $ruta) {
             foreach ($this->lista($this->leer($ruta), ['reactions_v2', 'reactions']) as $r) {
                 if (! isset($r['timestamp'])) {
                     continue;
@@ -338,12 +372,13 @@ class FacebookExportParser
                 $objetivo = $r['title'] ?? null;
                 if (! is_string($objetivo) || trim($objetivo) === '') {
                     $objetivo = $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title'])
-                        ?? $this->valorDeEtiquetas($etiquetas, ['Nombre', 'Name', 'Autor', 'Author']);
+                        ?? $this->valorDeEtiquetas($etiquetas, ['Nombre', 'Name', 'Autor', 'Author', 'Grupo', 'Group']);
                 }
 
                 $url = $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link'], incluirHref: true);
+                $fbid = trim((string) ($r['fbid'] ?? ''));
 
-                $llave = "{$r['timestamp']}|{$tipo}";
+                $llave = "{$r['timestamp']}|{$tipo}|".($objetivo ?? '').'|'.($url ?? '')."|{$fbid}";
                 if (isset($vistos[$llave])) {
                     continue;
                 }
@@ -363,29 +398,36 @@ class FacebookExportParser
     {
         $vistos = [];
 
-        foreach ($this->archivos('/^(your_posts|posts).*\.json$/') as $ruta) {
-            foreach ($this->lista($this->leer($ruta), ['status_updates_v2', 'posts']) as $p) {
+        foreach ($this->archivos(self::PATRON_COMPARTIDOS) as $ruta) {
+            foreach ($this->lista($this->leer($ruta), ['status_updates_v2', 'posts', 'group_posts_v2', 'group_posts', 'shared_memories_v2', 'shared_memories']) as $p) {
                 if (! isset($p['timestamp'])) {
                     continue;
                 }
 
                 $etiquetas = is_array($p['label_values'] ?? null) ? $p['label_values'] : [];
                 $enlace = $this->buscarEnlace($p['attachments'] ?? [])
-                    ?? $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link'], incluirHref: true);
+                    ?? $this->valorDeEtiquetas($etiquetas, ['URL', 'Enlace', 'Link', 'URI'], incluirHref: true);
                 $titulo = $p['title']
-                    ?? $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title'])
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Título', 'Titulo', 'Title', 'Grupo', 'Group', 'Nombre', 'Name'])
                     ?? '';
+                $textoPost = $this->primero($p['data'] ?? [], 'post')['post']
+                    ?? $this->valorDeEtiquetas($etiquetas, ['Publicación', 'Publicacion', 'Post', 'Descripción', 'Descripcion', 'Texto', 'Text']);
 
-                // Solo lo que es compartido (enlace externo o título "compartió")
-                if (! $enlace && ! preg_match('/compart|shared/iu', (string) $titulo)) {
+                $tieneContenido = ($textoPost !== null && trim((string) $textoPost) !== '')
+                    || ! empty($p['attachments'])
+                    || ! empty($p['fbid']);
+
+                // Capturar enlaces compartidos, publicaciones con título de compartido o publicaciones con contenido/adjuntos
+                if (! $enlace && ! preg_match('/compart|shared/iu', (string) $titulo) && ! $tieneContenido) {
                     continue;
                 }
 
-                $descripcion = $this->primero($p['data'] ?? [], 'post')['post']
-                    ?? $this->valorDeEtiquetas($etiquetas, ['Publicación', 'Publicacion', 'Post', 'Descripción', 'Descripcion'])
-                    ?? ($titulo !== '' ? $titulo : null);
+                $descripcion = ($textoPost !== null && trim((string) $textoPost) !== '')
+                    ? trim((string) $textoPost)
+                    : ($titulo !== '' ? $titulo : null);
 
-                $llave = "{$p['timestamp']}|".($enlace ?? '').'|'.($descripcion ?? '');
+                $fbid = trim((string) ($p['fbid'] ?? ''));
+                $llave = "{$p['timestamp']}|".($enlace ?? '').'|'.($descripcion ?? '')."|{$fbid}";
                 if (isset($vistos[$llave])) {
                     continue;
                 }
