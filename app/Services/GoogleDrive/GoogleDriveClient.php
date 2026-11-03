@@ -20,6 +20,11 @@ class GoogleDriveClient
     protected ?string $accessToken = null;
 
     /**
+     * @var array<string, array<int, array{id: ?string, name: ?string, mimeType: ?string, relative_path: string}>>
+     */
+    protected array $lastScanNonJsonFiles = [];
+
+    /**
      * Create a new Google Drive client instance.
      */
     public function __construct(
@@ -306,6 +311,8 @@ class GoogleDriveClient
             } while ($pageToken !== null);
         }
 
+        $this->lastScanNonJsonFiles[$folderId] = $nonJsonFiles;
+
         if (empty($jsonFiles)) {
             Log::warning('[GoogleDriveClient] No JSON files found inside export folder hierarchy', [
                 'root_folder_id' => $folderId,
@@ -326,6 +333,16 @@ class GoogleDriveClient
     }
 
     /**
+     * Return non-JSON files observed during the last scan of a given folder.
+     *
+     * @return array<int, array{id: ?string, name: ?string, mimeType: ?string, relative_path: string}>
+     */
+    public function getLastScanNonJsonFiles(string $folderId): array
+    {
+        return $this->lastScanNonJsonFiles[$folderId] ?? [];
+    }
+
+    /**
      * Download all JSON files contained within an export folder into a local destination directory.
      * Preserves relative paths and verifies integrity for each downloaded file.
      *
@@ -336,6 +353,26 @@ class GoogleDriveClient
     public function downloadExportFolder(string $folderId, string $destinationDir): array
     {
         $jsonFiles = $this->getFolderJsonFiles($folderId);
+
+        if (empty($jsonFiles)) {
+            $nonJsonFiles = $this->getLastScanNonJsonFiles($folderId);
+            $hasHtmlFiles = false;
+
+            foreach ($nonJsonFiles as $nonJsonFile) {
+                $name = strtolower((string) ($nonJsonFile['name'] ?? ''));
+                $mimeType = strtolower((string) ($nonJsonFile['mimeType'] ?? ''));
+
+                if (str_ends_with($name, '.html') || $mimeType === 'text/html') {
+                    $hasHtmlFiles = true;
+                    break;
+                }
+            }
+
+            if ($hasHtmlFiles) {
+                throw new Exception('Exportación en formato HTML detectada en Google Drive (se encontraron archivos .html en lugar de .json). Configura la exportación de Meta en formato JSON.');
+            }
+        }
+
         $downloaded = [];
 
         try {

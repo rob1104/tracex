@@ -347,4 +347,73 @@ class FacebookDriveSyncServiceTest extends TestCase
             return $job->importLogId === $incompleteLog->id;
         });
     }
+
+    public function test_it_stops_retrying_incomplete_folder_after_retry_window_expires(): void
+    {
+        Queue::fake();
+        config(['services.google.drive.incomplete_upload_retry_window_minutes' => 60]);
+
+        FacebookImportLog::create([
+            'drive_file_id' => 'folder_expired_incomplete',
+            'file_name' => 'meta-2026-Oct-28-09-00-00',
+            'file_size_bytes' => 0,
+            'status' => 'failed',
+            'downloaded_at' => null,
+            'drive_deleted_at' => null,
+            'error_message' => 'No JSON files found in export folder [meta-2026-Oct-28-09-00-00]',
+        ]);
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
+        $mockClient->shouldReceive('listExportFolders')
+            ->once()
+            ->andReturn([
+                [
+                    'id' => 'folder_expired_incomplete',
+                    'name' => 'meta-2026-Oct-28-09-00-00',
+                    'createdTime' => now()->subMinutes(120)->toIso8601String(),
+                ],
+            ]);
+
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $metrics = $service->sync();
+
+        $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(1, $metrics['skipped']);
+        $this->assertSame(0, $metrics['dispatched']);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_it_does_not_retry_folder_that_failed_due_to_html_format(): void
+    {
+        Queue::fake();
+
+        FacebookImportLog::create([
+            'drive_file_id' => 'folder_html_export',
+            'file_name' => 'meta-2026-Nov-01-09-00-00',
+            'file_size_bytes' => 0,
+            'status' => 'failed',
+            'downloaded_at' => null,
+            'drive_deleted_at' => null,
+            'error_message' => 'Exportación en formato HTML detectada en Google Drive (se encontraron archivos .html en lugar de .json).',
+        ]);
+
+        $mockClient = Mockery::mock(GoogleDriveClient::class);
+        $mockClient->shouldReceive('listExportFolders')
+            ->once()
+            ->andReturn([
+                [
+                    'id' => 'folder_html_export',
+                    'name' => 'meta-2026-Nov-01-09-00-00',
+                    'createdTime' => now()->subMinutes(10)->toIso8601String(),
+                ],
+            ]);
+
+        $service = new FacebookDriveSyncService($mockClient, $this->testStorageDir);
+        $metrics = $service->sync();
+
+        $this->assertSame(1, $metrics['scanned']);
+        $this->assertSame(1, $metrics['skipped']);
+        $this->assertSame(0, $metrics['dispatched']);
+        Queue::assertNothingPushed();
+    }
 }

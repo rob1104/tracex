@@ -341,4 +341,55 @@ class FacebookExportParserTest extends TestCase
         $this->assertCount(1, $compartidos);
         $this->assertSame('Aviso importante para la comunidad', $compartidos[0]['descripcion']);
     }
+
+    public function test_it_recognizes_no_data_json_and_extracts_root_fbid_from_active_days(): void
+    {
+        File::makeDirectory($this->testDirectory.'/no_data', 0755, true);
+        file_put_contents($this->testDirectory.'/no_data/no_data.json', json_encode([
+            'data' => 'No data found matching inquiry',
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/your_comment_active_days.json', json_encode([
+            'media' => [],
+            'label_values' => [
+                ['label' => 'Recuento de días activos de comentarios en los últimos 28 días', 'value' => '0'],
+            ],
+            'fbid' => '61593106918446',
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $parser->validarEstructura();
+
+        $this->assertSame('id:61593106918446', $parser->identificador());
+
+        $diagnostico = $parser->diagnostico(0);
+        $this->assertTrue($diagnostico['has_no_data_marker']);
+        $this->assertFalse($diagnostico['has_activity_files']);
+        $this->assertSame('meta_no_data', $diagnostico['empty_reason']);
+    }
+
+    public function test_it_ignores_secondary_unrecognized_reaction_file_when_primary_files_are_valid(): void
+    {
+        file_put_contents($this->testDirectory.'/likes_and_reactions.json', json_encode([
+            [
+                'timestamp' => 1791300100,
+                'label_values' => [
+                    ['label' => 'Reacción', 'value' => 'Me gusta'],
+                    ['label' => 'Nombre', 'value' => 'Publicación Principal'],
+                ],
+                'fbid' => '111',
+            ],
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/likes_and_reactions_1.json', json_encode([
+            'unexpected_secondary_key' => 'metadata_only',
+        ], JSON_THROW_ON_ERROR));
+
+        $parser = new FacebookExportParser($this->testDirectory);
+        $parser->validarEstructura();
+
+        $reacciones = iterator_to_array($parser->reacciones());
+        $this->assertCount(1, $reacciones);
+        $this->assertSame('Publicación Principal', $reacciones[0]['objetivo']);
+    }
 }

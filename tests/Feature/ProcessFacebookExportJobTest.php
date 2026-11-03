@@ -376,6 +376,52 @@ class ProcessFacebookExportJobTest extends TestCase
         $this->assertSame($user->id, $log->user_id);
         $this->assertSame(0, $log->total_comments_extracted);
         $this->assertSame(0, $log->total_reactions_extracted);
+        $this->assertSame('only_profile_or_auxiliary_files', $log->metadata['diagnostics']['empty_reason'] ?? null);
         $this->assertDirectoryDoesNotExist($this->testDirectory);
+    }
+
+    public function test_it_completes_export_with_no_data_json_and_records_diagnostics(): void
+    {
+        $user = User::factory()->create(['role' => 'user', 'name' => 'Colaborador NoData']);
+        $email = EmailAccount::create([
+            'email' => 'nodata@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+        $profile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Perfil Con NoData',
+            'facebook_identifier' => 'id:61593106918446',
+            'social_network' => 'facebook',
+            'status' => 'active',
+        ]);
+        $profile->users()->attach($user->id);
+
+        $log = FacebookImportLog::create([
+            'drive_file_id' => 'drive_no_data_test',
+            'file_name' => 'meta-2026-Nov-02-05-00-00',
+            'status' => 'downloaded',
+        ]);
+
+        File::makeDirectory($this->testDirectory.'/no_data', 0755, true);
+        file_put_contents($this->testDirectory.'/no_data/no_data.json', json_encode([
+            'data' => 'No data found matching inquiry',
+        ], JSON_THROW_ON_ERROR));
+
+        file_put_contents($this->testDirectory.'/your_comment_active_days.json', json_encode([
+            'media' => [],
+            'label_values' => [],
+            'fbid' => '61593106918446',
+        ], JSON_THROW_ON_ERROR));
+
+        $job = new ProcessFacebookExportJob($this->testDirectory, $log->id);
+        $job->handle();
+
+        $log->refresh();
+        $this->assertSame('completed', $log->status);
+        $this->assertSame($profile->id, $log->profile_id);
+        $this->assertSame($user->id, $log->user_id);
+        $this->assertSame('meta_no_data', $log->metadata['diagnostics']['empty_reason'] ?? null);
+        $this->assertTrue($log->metadata['diagnostics']['has_no_data_marker'] ?? false);
     }
 }

@@ -232,4 +232,32 @@ class GoogleDriveClientTest extends TestCase
 
         $this->assertFalse($client->verifyFileIntegrity($filePath, strlen($payload) + 10));
     }
+
+    public function test_it_throws_descriptive_exception_when_export_folder_contains_html_instead_of_json(): void
+    {
+        Http::fake([
+            'https://oauth2.googleapis.com/token' => Http::response(['access_token' => 'mock_token']),
+            'https://www.googleapis.com/drive/v3/files*' => Http::response([
+                'files' => [
+                    [
+                        'id' => 'html_file_1',
+                        'name' => 'start_here.html',
+                        'mimeType' => 'text/html',
+                    ],
+                    [
+                        'id' => 'html_file_2',
+                        'name' => 'likes_and_reactions.html',
+                        'mimeType' => 'text/html',
+                    ],
+                ],
+            ]),
+        ]);
+
+        $client = new GoogleDriveClient('mock_client_id', 'mock_secret', 'mock_refresh_token');
+
+        $this->expectException(\Exception::class);
+        $this->expectExceptionMessage('Exportación en formato HTML detectada en Google Drive');
+
+        $client->downloadExportFolder('folder_html_only', $this->testStorageDir.'/folder_html_only');
+    }
 }

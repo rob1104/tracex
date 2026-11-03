@@ -44,6 +44,8 @@ return [
             'redirect_uri' => env('GOOGLE_DRIVE_REDIRECT_URI', 'https://developers.google.com/oauthplayground'),
             'folder_id' => env('GOOGLE_DRIVE_FOLDER_ID', 'root'),
             'schedule_frequency' => env('GOOGLE_DRIVE_SCHEDULE_FREQUENCY', 'everyFifteenMinutes'),
+            'min_folder_age_seconds' => (int) env('GOOGLE_DRIVE_MIN_FOLDER_AGE_SECONDS', 120),
+            'incomplete_upload_retry_window_minutes' => (int) env('GOOGLE_DRIVE_INCOMPLETE_UPLOAD_RETRY_MINUTES', 60),
         ],
     ],
 

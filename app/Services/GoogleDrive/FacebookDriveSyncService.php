@@ -83,6 +83,7 @@ class FacebookDriveSyncService
         ]);
 
         $minFolderAgeSeconds = (int) config('services.google.drive.min_folder_age_seconds', 120);
+        $retryWindowMinutes = (int) config('services.google.drive.incomplete_upload_retry_window_minutes', 60);
 
         foreach ($folders as $folder) {
             $folderId = $folder['id'];
@@ -115,10 +116,29 @@ class FacebookDriveSyncService
             $isStuckPendingDownload = $existingLog !== null
                 && $existingLog->status === 'downloaded'
                 && $existingLog->downloaded_at === null;
+
+            $isWithinRetryWindow = true;
+            if ($retryWindowMinutes > 0 && $existingLog !== null) {
+                $referenceTime = $existingLog->created_at;
+                if (! empty($folder['createdTime'])) {
+                    try {
+                        $referenceTime = Carbon::parse($folder['createdTime']);
+                    } catch (\Throwable) {
+                        $referenceTime = $existingLog->created_at;
+                    }
+                }
+
+                if ($referenceTime !== null) {
+                    $ageMinutes = $referenceTime->diffInMinutes(now(), false);
+                    $isWithinRetryWindow = $ageMinutes < $retryWindowMinutes;
+                }
+            }
+
             $isRetryableIncompleteFolder = $existingLog !== null
                 && $existingLog->status === 'failed'
                 && $existingLog->drive_deleted_at === null
-                && str_contains((string) $existingLog->error_message, 'No JSON files found');
+                && str_contains((string) $existingLog->error_message, 'No JSON files found')
+                && $isWithinRetryWindow;
 
             if ($existingLog && ! $isStuckPendingDownload && ! $isRetryableIncompleteFolder) {
                 $metrics['skipped']++;
@@ -262,6 +282,8 @@ class FacebookDriveSyncService
                 'downloaded_at' => now(),
                 'metadata' => [
                     'files' => $filePaths,
+                    'has_activity_files' => $this->containsActivityFiles($filePaths),
+                    'has_no_data_marker' => $this->containsNoDataFile($filePaths),
                 ],
             ]);
 
@@ -294,9 +316,22 @@ class FacebookDriveSyncService
                 'error' => $e->getMessage(),
             ]);
 
+            $failureMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
+            if (str_contains($e->getMessage(), 'formato HTML')) {
+                $failureMetadata['diagnostics'] = [
+                    'empty_reason' => 'html_export_format',
+                    'empty_reason_label' => 'Exportación en formato HTML (se requiere JSON)',
+                    'non_json_files' => array_values(array_filter(array_map(
+                        fn (array $f): ?string => $f['relative_path'] ?? $f['name'] ?? null,
+                        $this->driveClient->getLastScanNonJsonFiles($folderId)
+                    ))),
+                ];
+            }
+
             $importLog->update([
                 'status' => 'failed',
                 'error_message' => $e->getMessage(),
+                'metadata' => $failureMetadata !== [] ? $failureMetadata : $importLog->metadata,
             ]);
 
             // Clean corrupt local directory if needed
@@ -340,5 +375,38 @@ class FacebookDriveSyncService
 
             return false;
         }
+    }
+
+    /**
+     * Determine whether the downloaded file list includes any comment, reaction, or post JSON files.
+     *
+     * @param  array<int, string>  $filePaths
+     */
+    protected function containsActivityFiles(array $filePaths): bool
+    {
+        foreach ($filePaths as $path) {
+            $base = basename((string) $path);
+            if (preg_match('/^(comments|group_comments|your_comments_in_groups|likes_and_reactions|reactions|your_posts|posts|group_posts|your_posts_in_groups|shared_memories).*\.json$/i', $base)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Determine whether the downloaded file list includes Meta's no_data.json marker.
+     *
+     * @param  array<int, string>  $filePaths
+     */
+    protected function containsNoDataFile(array $filePaths): bool
+    {
+        foreach ($filePaths as $path) {
+            if (strtolower(basename((string) $path)) === 'no_data.json') {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

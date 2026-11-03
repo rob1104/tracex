@@ -213,6 +213,20 @@
                                                     'failed' => 'No se pudo extraer',
                                                     default => 'Sin actividad detectada',
                                                 };
+                                                $importFiles = is_array($importMetadata['files'] ?? null) ? $importMetadata['files'] : [];
+                                                $importDiagnostics = is_array($importMetadata['diagnostics'] ?? null) ? $importMetadata['diagnostics'] : [];
+                                                $diagnosticDetail = $importDiagnostics['empty_reason_label'] ?? null;
+                                                if ($diagnosticDetail === null && ! $hasExtractedActivity) {
+                                                    $errorText = (string) ($importLog->error_message ?? '');
+                                                    $basenames = array_map(fn ($p) => strtolower(basename((string) $p)), $importFiles);
+                                                    if (str_contains($errorText, 'formato HTML')) {
+                                                        $diagnosticDetail = 'Exportación en formato HTML (se requiere JSON)';
+                                                    } elseif (in_array('no_data.json', $basenames, true)) {
+                                                        $diagnosticDetail = 'Meta sin actividad en el periodo (no_data.json)';
+                                                    } elseif ($basenames !== [] && ! collect($basenames)->contains(fn ($b) => (bool) preg_match('/^(comments|group_comments|your_comments_in_groups|likes_and_reactions|reactions|your_posts|posts|group_posts|your_posts_in_groups|shared_memories).*\.json$/i', $b))) {
+                                                        $diagnosticDetail = 'Solo archivos de perfil/dispositivos (sin archivos de actividad)';
+                                                    }
+                                                }
                                             @endphp
                                             <tr class="hover:bg-slate-50/70">
                                                 <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 truncate text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
@@ -230,6 +244,9 @@
                                                         @endif
                                                     @else
                                                         <span class="text-slate-500">{{ $emptyActivityLabel }}</span>
+                                                        @if($diagnosticDetail)
+                                                            <p class="mt-0.5 text-[10px] text-slate-400">{{ $diagnosticDetail }}</p>
+                                                        @endif
                                                     @endif
                                                 </td>
                                                 <td class="whitespace-nowrap px-4 py-3 text-slate-500">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
