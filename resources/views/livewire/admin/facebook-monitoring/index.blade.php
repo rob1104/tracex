@@ -85,7 +85,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="grid gap-2 p-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+                        <div class="grid gap-2 p-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));">
                             @forelse($profiles as $profile)
                                 @php
                                     $identifier = (string) $profile->facebook_identifier;
