@@ -6,6 +6,7 @@ use App\Models\EvidenceType;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\FacebookImportProfileNameResolver;
 use App\Services\ProfileAssignmentService;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -121,13 +122,17 @@ class Index extends Component
 
     public function render()
     {
+        $pendingImports = FacebookImportLog::pendingAssignment()
+            ->with(['profile', 'facebookUsers'])
+            ->withCount(['comments', 'reactions'])
+            ->latest('downloaded_at')
+            ->paginate(10, pageName: 'facebookImportsPage');
+
         return view('livewire.admin.evidence-types.index', [
             'types' => EvidenceType::all(),
-            'pendingImports' => FacebookImportLog::pendingAssignment()
-                ->with(['profile', 'facebookUsers'])
-                ->withCount(['comments', 'reactions'])
-                ->latest('downloaded_at')
-                ->paginate(10, pageName: 'facebookImportsPage'),
+            'pendingImports' => $pendingImports,
+            'detectedImportProfileNames' => app(FacebookImportProfileNameResolver::class)
+                ->resolveMany($pendingImports->getCollection()),
             'facebookProfiles' => $this->facebookProfilesQuery()->get(),
             'collaborators' => User::query()
                 ->where('role', 'user')

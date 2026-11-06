@@ -2,20 +2,30 @@
 
 namespace App\Livewire\Admin\FacebookMonitoring;
 
+use App\Jobs\ProcessFacebookExportJob;
 use App\Models\EmailAccount;
 use App\Models\Evidence;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
+use App\Services\LocalFacebookExportZip;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Throwable;
 
 class Index extends Component
 {
+    use WithFileUploads;
     use WithPagination;
+
+    public $localZip;
 
     public string $search = '';
 
@@ -34,6 +44,90 @@ class Index extends Component
     public string $chartPeriod = '7';
 
     public string $chartGrouping = 'day';
+
+    public function importLocalZip(): void
+    {
+        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        $this->resetValidation('localZip');
+
+        $this->validate([
+            'localZip' => 'required|file|mimes:zip|max:102400',
+        ], [
+            'localZip.required' => 'Selecciona un archivo ZIP de Facebook.',
+            'localZip.mimes' => 'El archivo debe tener formato ZIP.',
+            'localZip.max' => 'El ZIP no puede superar los 100 MB.',
+        ]);
+
+        $archiveHash = hash_file('sha256', $this->localZip->getRealPath());
+        if ($archiveHash === false) {
+            $this->addError('localZip', 'No se pudo leer el ZIP seleccionado.');
+
+            return;
+        }
+        $duplicate = FacebookImportLog::query()
+            ->where('metadata->source', 'local_upload')
+            ->where('metadata->archive_sha256', $archiveHash)
+            ->whereIn('status', ['downloaded', 'processing', 'pending_assignment', 'completed'])
+            ->exists();
+
+        if ($duplicate) {
+            $this->addError('localZip', 'Este mismo archivo ZIP ya se había cargado.');
+
+            return;
+        }
+
+        $importId = (string) Str::uuid();
+        $localDirectory = storage_path('app/temp_exports/local-'.$importId);
+        File::ensureDirectoryExists($localDirectory);
+
+        try {
+            $extracted = app(LocalFacebookExportZip::class)->extract(
+                $this->localZip->getRealPath(),
+                $localDirectory
+            );
+        } catch (Throwable $exception) {
+            File::deleteDirectory($localDirectory);
+            $this->addError('localZip', $exception->getMessage());
+
+            return;
+        }
+
+        $fileName = mb_substr(basename($this->localZip->getClientOriginalName()), 0, 255);
+        $importLog = FacebookImportLog::create([
+            'drive_file_id' => 'local:'.$importId,
+            'file_name' => $fileName,
+            'file_size_bytes' => $this->localZip->getSize(),
+            'status' => 'downloaded',
+            'downloaded_at' => now(),
+            'metadata' => [
+                'source' => 'local_upload',
+                'uploaded_by' => auth()->id(),
+                'archive_sha256' => $archiveHash,
+                'files_count' => $extracted['files_count'],
+                'extracted_bytes' => $extracted['bytes'],
+            ],
+        ]);
+
+        try {
+            ProcessFacebookExportJob::dispatch($localDirectory, $importLog->id, 'local_upload');
+        } catch (Throwable $exception) {
+            File::deleteDirectory($localDirectory);
+            $importLog->update([
+                'status' => 'failed',
+                'error_message' => 'No se pudo iniciar el procesamiento: '.$exception->getMessage(),
+            ]);
+            report($exception);
+            $this->addError('localZip', 'No se pudo iniciar el procesamiento del ZIP. Inténtalo de nuevo.');
+
+            return;
+        }
+
+        $this->reset('localZip');
+        $this->resetPage();
+        $this->resetPage('activityPage');
+        $this->resetPage('importsPage');
+        session()->flash('status', 'ZIP recibido. TraceX lo está procesando y asociará el perfil con su colaborador si encuentra una coincidencia.');
+    }
 
     public function updatingSearch(): void
     {
@@ -112,7 +206,7 @@ class Index extends Component
 
     public function setActivityTab(string $tab): void
     {
-        if (in_array($tab, ['recent', 'imports', 'pending', 'unassigned'], true)) {
+        if (in_array($tab, ['recent', 'imports', 'empty_imports', 'pending', 'unassigned'], true)) {
             $this->activityTab = $tab;
             $this->resetPage('activityPage');
             $this->resetPage('importsPage');
@@ -212,10 +306,53 @@ class Index extends Component
         return $query;
     }
 
+    private function filterImportsByActivity($query, bool $hasActivity)
+    {
+        if ($hasActivity) {
+            return $query->where(function ($activityQuery) {
+                $activityQuery->where('total_comments_extracted', '>', 0)
+                    ->orWhere('total_reactions_extracted', '>', 0)
+                    ->orWhere('metadata->facebook_shares_count', '>', 0)
+                    ->orWhereJsonLength('metadata->facebook_shares', '>', 0)
+                    ->orWhereHas('comments')
+                    ->orWhereHas('reactions')
+                    ->orWhereHas('evidences', fn ($evidenceQuery) => $evidenceQuery
+                        ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')));
+            });
+        }
+
+        return $query
+            ->whereIn('status', ['completed', 'pending_assignment'])
+            ->where(function ($emptyQuery) {
+                $emptyQuery->where(function ($commentsQuery) {
+                    $commentsQuery->whereNull('total_comments_extracted')
+                        ->orWhere('total_comments_extracted', '<=', 0);
+                })
+                    ->where(function ($reactionsQuery) {
+                        $reactionsQuery->whereNull('total_reactions_extracted')
+                            ->orWhere('total_reactions_extracted', '<=', 0);
+                    })
+                    ->whereDoesntHave('comments')
+                    ->whereDoesntHave('reactions')
+                    ->where(function ($sharesQuery) {
+                        $sharesQuery->where(function ($countQuery) {
+                            $countQuery->whereNull('metadata->facebook_shares_count')
+                                ->orWhere('metadata->facebook_shares_count', '<=', 0);
+                        })
+                            ->where(function ($arrayQuery) {
+                                $arrayQuery->whereNull('metadata->facebook_shares')
+                                    ->orWhereJsonLength('metadata->facebook_shares', '=', 0);
+                            })
+                            ->whereDoesntHave('evidences', fn ($evidenceQuery) => $evidenceQuery
+                                ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')));
+                    });
+            });
+    }
+
     private function activityQuery()
     {
         $query = Evidence::query()
-            ->where('origin', 'google_drive')
+            ->whereIn('origin', ['google_drive', 'local_upload'])
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
         if (auth()->user()->isUser()) {
@@ -246,7 +383,7 @@ class Index extends Component
                 'facebookCommentsThroughImports as facebook_comments_count',
                 'facebookReactionsThroughImports as facebook_reactions_count',
                 'evidences as facebook_shares_count' => fn ($query) => $query
-                    ->where('origin', 'google_drive')
+                    ->whereIn('origin', ['google_drive', 'local_upload'])
                     ->whereRaw('LOWER(social_network) = ?', ['facebook'])
                     ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')),
             ])
@@ -280,6 +417,7 @@ class Index extends Component
 
         $activity = collect();
         $imports = collect();
+        $detectedImportProfileNames = [];
         if ($this->activityTab === 'recent') {
             $activity = $this->activityQuery()
                 ->with(['profile', 'evidenceType'])
@@ -291,8 +429,14 @@ class Index extends Component
                 $logQuery->whereIn('status', ['downloaded', 'processing']);
             } elseif ($this->activityTab === 'unassigned') {
                 $logQuery->where('status', 'pending_assignment');
+            } elseif ($this->activityTab === 'imports') {
+                $this->filterImportsByActivity($logQuery, true);
+            } elseif ($this->activityTab === 'empty_imports') {
+                $this->filterImportsByActivity($logQuery, false);
             }
             $imports = $logQuery->latest('downloaded_at')->paginate(50, pageName: 'importsPage');
+            $detectedImportProfileNames = app(FacebookImportProfileNameResolver::class)
+                ->resolveMany($imports->getCollection());
         }
 
         if (! in_array($this->chartPeriod, ['7', '14', '30'], true)) {
@@ -383,6 +527,7 @@ class Index extends Component
             'databaseName' => $databaseName,
             'activity' => $activity,
             'imports' => $imports,
+            'detectedImportProfileNames' => $detectedImportProfileNames,
             'chart' => $chart,
             'chartMax' => $chartMax,
             'chartHasActivity' => $chartHasActivity,

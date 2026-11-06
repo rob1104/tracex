@@ -36,7 +36,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
     public function __construct(
         public string $localPath,
-        public int $importLogId
+        public int $importLogId,
+        public string $evidenceOrigin = 'google_drive'
     ) {}
 
     public function uniqueId(): string
@@ -142,7 +143,7 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 if ($assignedUser && $matchedProfile) {
                     Evidence::query()
                         ->where('profile_id', $matchedProfile->id)
-                        ->where('origin', 'google_drive')
+                        ->whereIn('origin', ['google_drive', 'local_upload'])
                         ->select(['evidence_type_id', 'external_published_at', 'comment'])
                         ->get()
                         ->each(function (Evidence $evidence) use (&$existingEvidenceKeys): void {
@@ -214,12 +215,12 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'profile_id' => $matchedProfile->id,
                                 'evidence_type_id' => $commentTypeId,
                                 'facebook_import_log_id' => $importLog->id,
-                                'origin' => 'google_drive',
+                                'origin' => $this->evidenceOrigin,
                                 'social_network' => 'Facebook',
                                 'comment' => $evidenceComment,
                                 'external_published_at' => $comment['fecha'],
                                 'ip_address' => null,
-                                'user_agent' => 'Google Drive Sync',
+                                'user_agent' => $this->evidenceOrigin === 'local_upload' ? 'Carga local de Facebook' : 'Google Drive Sync',
                                 'created_at' => $comment['fecha'],
                                 'updated_at' => $timestamp,
                             ];
@@ -278,12 +279,12 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'profile_id' => $matchedProfile->id,
                                 'evidence_type_id' => $reactionTypeId,
                                 'facebook_import_log_id' => $importLog->id,
-                                'origin' => 'google_drive',
+                                'origin' => $this->evidenceOrigin,
                                 'social_network' => 'Facebook',
                                 'comment' => $evidenceComment,
                                 'external_published_at' => $reaction['fecha'],
                                 'ip_address' => null,
-                                'user_agent' => 'Google Drive Sync',
+                                'user_agent' => $this->evidenceOrigin === 'local_upload' ? 'Carga local de Facebook' : 'Google Drive Sync',
                                 'created_at' => $reaction['fecha'],
                                 'updated_at' => $timestamp,
                             ];
@@ -344,12 +345,12 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'profile_id' => $matchedProfile->id,
                                 'evidence_type_id' => $shareTypeId,
                                 'facebook_import_log_id' => $importLog->id,
-                                'origin' => 'google_drive',
+                                'origin' => $this->evidenceOrigin,
                                 'social_network' => 'Facebook',
                                 'comment' => $shareDescription,
                                 'external_published_at' => $publishedAt,
                                 'ip_address' => null,
-                                'user_agent' => 'Google Drive Sync',
+                                'user_agent' => $this->evidenceOrigin === 'local_upload' ? 'Carga local de Facebook' : 'Google Drive Sync',
                                 'created_at' => $publishedAt,
                                 'updated_at' => $timestamp,
                             ];

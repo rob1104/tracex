@@ -51,8 +51,8 @@
                 <th>Colaborador</th>
                 <th>Correo</th>
                 <th>Total evidencias</th>
-                <th>Primera captura</th>
-                <th>Última captura</th>
+                <th>Exportaciones exitosas</th>
+                <th>Importaciones vacías</th>
             </tr>
         </thead>
         <tbody>
@@ -61,15 +61,15 @@
                     <td>{{ $collaborator->name }}</td>
                     <td>{{ $collaborator->email }}</td>
                     <td class="count">{{ number_format($collaborator->evidence_count) }}</td>
-                    <td>{{ $collaborator->first_evidence_at ? \Illuminate\Support\Carbon::parse($collaborator->first_evidence_at)->format('d/m/Y H:i') : '—' }}</td>
-                    <td>{{ $collaborator->last_evidence_at ? \Illuminate\Support\Carbon::parse($collaborator->last_evidence_at)->format('d/m/Y H:i') : '—' }}</td>
+                    <td class="count">{{ number_format($collaborator->successful_exports_count) }}</td>
+                    <td class="count">{{ number_format($collaborator->empty_imports_count) }}</td>
                 </tr>
             @empty
                 <tr><td colspan="5" style="text-align:center">No hay colaboradores que coincidan con los filtros.</td></tr>
             @endforelse
         </tbody>
         <tfoot>
-            <tr><td colspan="2">Total de evidencias en el reporte</td><td class="count">{{ number_format($totalEvidence) }}</td><td colspan="2"></td></tr>
+            <tr><td colspan="2">Totales del reporte</td><td class="count">{{ number_format($totalEvidence) }}</td><td class="count">{{ number_format($totalSuccessfulExports) }}</td><td class="count">{{ number_format($totalEmptyImports) }}</td></tr>
         </tfoot>
     </table>
 

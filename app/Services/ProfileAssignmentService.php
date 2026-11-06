@@ -124,6 +124,8 @@ class ProfileAssignmentService
             $count = 0;
             $shareCount = 0;
             $timestamp = now();
+            $origin = ($importLog->metadata['source'] ?? null) === 'local_upload' ? 'local_upload' : 'google_drive';
+            $userAgent = $origin === 'local_upload' ? 'Carga local de Facebook' : 'Google Drive Sync Manual Claim';
 
             foreach ($importLog->comments as $comment) {
                 $context = null;
@@ -147,12 +149,12 @@ class ProfileAssignmentService
                     'profile_id' => $profile->id,
                     'evidence_type_id' => $commentTypeId,
                     'facebook_import_log_id' => $importLog->id,
-                    'origin' => 'google_drive',
+                    'origin' => $origin,
                     'social_network' => 'Facebook',
                     'comment' => $evidenceComment,
                     'external_published_at' => $comment->published_at,
                     'ip_address' => null,
-                    'user_agent' => 'Google Drive Sync Manual Claim',
+                    'user_agent' => $userAgent,
                     'created_at' => $comment->published_at ?? $timestamp,
                     'updated_at' => $timestamp,
                 ];
@@ -182,12 +184,12 @@ class ProfileAssignmentService
                     'profile_id' => $profile->id,
                     'evidence_type_id' => $reactionTypeId,
                     'facebook_import_log_id' => $importLog->id,
-                    'origin' => 'google_drive',
+                    'origin' => $origin,
                     'social_network' => 'Facebook',
                     'comment' => $evidenceComment,
                     'external_published_at' => $reaction->published_at,
                     'ip_address' => null,
-                    'user_agent' => 'Google Drive Sync Manual Claim',
+                    'user_agent' => $userAgent,
                     'created_at' => $reaction->published_at ?? $timestamp,
                     'updated_at' => $timestamp,
                 ];
@@ -237,12 +239,12 @@ class ProfileAssignmentService
                         'profile_id' => $profile->id,
                         'evidence_type_id' => $shareTypeId,
                         'facebook_import_log_id' => $importLog->id,
-                        'origin' => 'google_drive',
+                        'origin' => $origin,
                         'social_network' => 'Facebook',
                         'comment' => $shareDescription,
                         'external_published_at' => $publishedAt,
                         'ip_address' => null,
-                        'user_agent' => 'Google Drive Sync Manual Claim',
+                        'user_agent' => $userAgent,
                         'created_at' => $publishedAt,
                         'updated_at' => $timestamp,
                     ];
