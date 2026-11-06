@@ -33,7 +33,10 @@ class FacebookImportProfileNameResolver
                 }
             }
 
-            if ($identifiers === [] && preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $import->file_name, $matches)) {
+            $importMetadata = is_array($import->metadata) ? $import->metadata : [];
+            $candidatePaths = implode(' ', [$import->file_name, ...(is_array($importMetadata['files'] ?? null) ? $importMetadata['files'] : [])]);
+
+            if ($identifiers === [] && preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', $candidatePaths, $matches)) {
                 $identifier = FacebookProfileIdentifier::normalize('id:'.$matches[1]);
                 if ($identifier !== null) {
                     $identifiers[] = $identifier;

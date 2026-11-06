@@ -27,6 +27,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
     public int $tries = 3;
 
+    public int $timeout = 300;
+
     public int $uniqueFor = 3600;
 
     /** @var array<int, int> */
@@ -97,7 +99,12 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 break;
             }
 
-            if (! $hasComments && ! $hasReactions && ! $hasShares && $exportIdentifier === null) {
+            $hasProfileData = $exportIdentifier !== null
+                || ! empty($profileDetails['nombre'])
+                || ! empty($profileDetails['emails'])
+                || $importLog->profile_id !== null;
+
+            if (! $hasComments && ! $hasReactions && ! $hasShares && ! $hasProfileData) {
                 throw new RuntimeException('Estructura de exportación inválida: no se extrajeron comentarios ni reacciones válidas para importar.');
             }
 
@@ -106,8 +113,14 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 // 1. Resolve Profile and Collaborator User
                 $assignmentService = app(ProfileAssignmentService::class);
                 $resolution = $assignmentService->resolve($profileDetails);
-                $matchedProfile = $resolution['profile'];
-                $assignedUser = $resolution['user'];
+                $matchedProfile = $resolution['profile'] ?? $importLog->profile;
+                $assignedUser = $resolution['user']
+                    ?? $importLog->user
+                    ?? $matchedProfile?->users()
+                        ->where('users.is_active', true)
+                        ->where('users.role', 'user')
+                        ->orderBy('users.id', 'asc')
+                        ->first();
 
                 // 2. Fetch EvidenceType IDs for Comentario and Reaccion
                 $commentTypeId = EvidenceType::where('name', 'Comentario')->value('id')
@@ -160,6 +173,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 $commentCount = 0;
                 $reactionCount = 0;
                 $shareCount = 0;
+                $evidencesCreated = 0;
+                $evidencesSkippedDuplicate = 0;
                 $timestamp = now();
 
                 // Process Comments
@@ -194,6 +209,7 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
                         if (! isset($existingEvidenceKeys[$evidenceKey])) {
                             $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidencesCreated++;
                             $evidences[] = [
                                 'user_id' => $assignedUser->id,
                                 'profile_id' => $matchedProfile->id,
@@ -208,6 +224,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'created_at' => $comment['fecha'],
                                 'updated_at' => $timestamp,
                             ];
+                        } else {
+                            $evidencesSkippedDuplicate++;
                         }
                     }
 
@@ -249,11 +267,13 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
                     // Option A: Ingest into evidence table if user & profile resolved
                     if ($assignedUser && $matchedProfile) {
-                        $evidenceComment = "Reacción [{$type}]".(! empty($reaction['objetivo']) ? " en: {$reaction['objetivo']}" : '');
+                        $targetLabel = ! empty($reaction['objetivo']) ? $reaction['objetivo'] : ($reaction['url'] ?? null);
+                        $evidenceComment = "Reacción [{$type}]".(! empty($targetLabel) ? " en: {$targetLabel}" : '');
                         $evidenceKey = "{$reactionTypeId}|{$reaction['fecha']}|{$evidenceComment}";
 
                         if (! isset($existingEvidenceKeys[$evidenceKey])) {
                             $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidencesCreated++;
                             $evidences[] = [
                                 'user_id' => $assignedUser->id,
                                 'profile_id' => $matchedProfile->id,
@@ -268,6 +288,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'created_at' => $reaction['fecha'],
                                 'updated_at' => $timestamp,
                             ];
+                        } else {
+                            $evidencesSkippedDuplicate++;
                         }
                     }
 
@@ -317,6 +339,7 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
 
                         if (! isset($existingEvidenceKeys[$evidenceKey])) {
                             $existingEvidenceKeys[$evidenceKey] = true;
+                            $evidencesCreated++;
                             $evidences[] = [
                                 'user_id' => $assignedUser->id,
                                 'profile_id' => $matchedProfile->id,
@@ -331,6 +354,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                                 'created_at' => $publishedAt,
                                 'updated_at' => $timestamp,
                             ];
+                        } else {
+                            $evidencesSkippedDuplicate++;
                         }
                     }
 
@@ -346,8 +371,22 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                     Evidence::insert($evidences);
                 }
 
+                $totalExtracted = $commentCount + $reactionCount + $shareCount;
+                $diagnostics = $parser->diagnostico($totalExtracted);
+
                 $metadata = $importLog->metadata ?? [];
                 $metadata['facebook_shares_count'] = $shareCount;
+                $metadata['diagnostics'] = array_merge($diagnostics, [
+                    'raw_extracted' => [
+                        'comments' => $commentCount,
+                        'reactions' => $reactionCount,
+                        'shares' => $shareCount,
+                    ],
+                    'evidences_created' => $evidencesCreated,
+                    'evidences_skipped_duplicate' => $evidencesSkippedDuplicate,
+                    'profile_resolved' => $matchedProfile !== null,
+                    'user_resolved' => $assignedUser !== null,
+                ]);
                 if ($matchedProfile && $assignedUser) {
                     unset($metadata['facebook_shares']);
                 } else {
@@ -365,14 +404,25 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                 ]);
             });
         } catch (Throwable $exception) {
+            $failureMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
+            if (isset($parser)) {
+                try {
+                    $failureMetadata['diagnostics'] = $parser->diagnostico(0);
+                } catch (Throwable) {
+                    // Ignore secondary diagnostic error
+                }
+            }
+
             $importLog->update([
                 'status' => 'failed',
                 'error_message' => mb_substr('Parsing failed: '.$exception->getMessage(), 0, 60000),
+                'metadata' => $failureMetadata !== [] ? $failureMetadata : $importLog->metadata,
             ]);
 
             Log::error('Failed to process Facebook export.', [
                 'import_log_id' => $importLog->id,
                 'error' => $exception->getMessage(),
+                'diagnostics' => $failureMetadata['diagnostics'] ?? null,
             ]);
 
             throw $exception;
@@ -384,6 +434,8 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
             'import_log_id' => $importLog->id,
             'comments' => $importLog->total_comments_extracted,
             'reactions' => $importLog->total_reactions_extracted,
+            'shares' => $importLog->metadata['facebook_shares_count'] ?? 0,
+            'diagnostics' => $importLog->metadata['diagnostics'] ?? null,
         ]);
     }
 
