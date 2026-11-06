@@ -48,9 +48,9 @@
                     </div>
 
                     <!-- Filtros -->
-                    <div class="flex flex-col sm:flex-row flex-wrap gap-4 mb-6 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div class="mb-6 grid grid-cols-1 gap-4 rounded-lg border border-gray-200 bg-gray-50 p-4 sm:grid-cols-2 xl:grid-cols-3">
                         @if(auth()->user()->isAdmin())
-                            <div class="w-full sm:w-1/4">
+                            <div class="w-full">
                                 <x-input-label for="filter_user_id" value="Usuarios" class="text-xs text-gray-500 mb-1" />
                                 <select wire:model.live="filter_user_id" id="filter_user_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
                                     <option value="">Todos los usuarios</option>
@@ -60,7 +60,7 @@
                                 </select>
                             </div>
                         @endif
-                        <div class="w-full sm:w-1/4">
+                        <div class="w-full">
                             <x-input-label for="filter_email_account_id" value="Cuenta de Correo" class="text-xs text-gray-500 mb-1" />
                             <div
                                 x-data="{
@@ -117,7 +117,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="w-full sm:w-1/4">
+                        <div class="w-full">
                             <x-input-label for="filter_network" value="Red Social" class="text-xs text-gray-500 mb-1" />
                             <select wire:model.live="filter_network" id="filter_network" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
                                 <option value="">Todas las redes</option>
@@ -126,7 +126,7 @@
                                 @endforeach
                             </select>
                         </div>
-                        <div class="w-full sm:w-1/4">
+                        <div class="w-full">
                             <x-input-label for="filter_status" value="Estatus" class="text-xs text-gray-500 mb-1" />
                             <select wire:model.live="filter_status" id="filter_status" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm w-full text-sm">
                                 <option value="">Todos los estatus</option>
@@ -135,18 +135,18 @@
                                 <option value="suspended">Suspendida</option>
                             </select>
                         </div>
-                        <div class="w-full sm:w-1/4">
+                        <div class="w-full">
                             <x-input-label for="filterDateFrom" value="Fecha Desde" class="text-xs text-gray-500 mb-1" />
                             <x-text-input type="date" wire:model.live="filterDateFrom" id="filterDateFrom" class="w-full text-sm" />
                         </div>
-                        <div class="w-full sm:w-1/4">
+                        <div class="w-full">
                             <x-input-label for="filterDateTo" value="Fecha Hasta" class="text-xs text-gray-500 mb-1" />
                             <x-text-input type="date" wire:model.live="filterDateTo" id="filterDateTo" class="w-full text-sm" />
                         </div>
                     </div>
 
-                    <div class="overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm">
-                        <table class="min-w-full divide-y divide-gray-200">
+                    <div class="w-full overflow-hidden bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <table class="w-full table-fixed divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil</th>
@@ -250,7 +250,7 @@
                                                 @endif
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                        <td class="px-2 py-3 whitespace-normal break-words text-sm text-gray-700 sm:px-3">
                                             @if(strtolower($profile->social_network) === 'facebook')
                                                 <div>{{ $profile->facebook_comments_count ?? 0 }} comentarios</div>
                                                 <div class="text-xs text-gray-500">{{ $profile->facebook_reactions_count ?? 0 }} reacciones</div>
@@ -259,14 +259,14 @@
                                                 <span class="text-xs text-gray-400">No aplica</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                        <td class="px-2 py-3 whitespace-normal break-words text-sm text-gray-700 sm:px-3">
                                             @if(strtolower($profile->social_network) === 'facebook')
                                                 {{ $profile->facebook_exports_count ?? 0 }} recibidas
                                             @else
                                                 <span class="text-xs text-gray-400">No aplica</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                                        <td class="px-2 py-3 whitespace-normal break-words text-sm text-gray-700 sm:px-3">
                                             @if(strtolower($profile->social_network) === 'facebook' && $profile->latest_facebook_export_at)
                                                 {{ \Illuminate\Support\Carbon::parse($profile->latest_facebook_export_at)->format('d/m/Y H:i') }}
                                             @else
@@ -281,7 +281,7 @@
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-red-50 text-red-700 border-red-200">Suspendido</span>
                                             @endif
                                         </td>
-                                        <td class="px-4 py-3 whitespace-normal break-words text-right text-sm font-medium">
+                                        <td class="px-2 py-3 whitespace-normal break-words text-right text-sm font-medium sm:px-3">
                                             <div class="flex items-center justify-end space-x-2">
                                                 @if(! auth()->user()->isUser())
                                                 <button wire:click="edit({{ $profile->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
@@ -323,8 +323,8 @@
                             <span class="rounded-full bg-amber-100 px-3 py-1 text-sm font-semibold text-amber-800">{{ $pendingImports->total() }} pendientes</span>
                         </div>
 
-                        <div class="overflow-x-auto rounded-lg border border-gray-200">
-                            <table class="min-w-full divide-y divide-gray-200">
+                        <div class="w-full overflow-hidden rounded-lg border border-gray-200">
+                            <table class="w-full table-fixed divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th class="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Exportacion</th>
@@ -336,12 +336,6 @@
                                 </thead>
                                 <tbody class="divide-y divide-gray-200 bg-white">
                                     @forelse($pendingImports as $importLog)
-                                        @php
-                                            $facebookUser = $importLog->facebookUsers->first();
-                                            $profileName = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['name'] ?? null) : null;
-                                            $exportIdentifier = is_array($facebookUser?->metadata) ? ($facebookUser->metadata['export_identifier'] ?? null) : null;
-                                            $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'id:'.$fbMatch[1] : null;
-                                        @endphp
                                         <tr>
                                             <td class="px-4 py-3 text-sm text-gray-900">
                                                 <div class="font-medium">{{ $importLog->file_name }}</div>
@@ -350,16 +344,13 @@
                                                 @endif
                                             </td>
                                             <td class="px-4 py-3 text-sm text-gray-700">
-                                                <div>{{ $importLog->profile?->name ?? $profileName ?? 'Sin coincidencia automatica' }}</div>
-                                                @if(! $importLog->profile_id && ($exportIdentifier || $folderFbId))
-                                                    <div class="mt-1 text-xs text-gray-500">ID detectado: {{ $exportIdentifier ?? $folderFbId }}</div>
-                                                @endif
+                                                <div>{{ $detectedImportProfileNames[$importLog->id] ?? 'Nombre no incluido en la exportación' }}</div>
                                             </td>
-                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                                            <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-600">
                                                 {{ $importLog->comments_count }} comentarios<br>
                                                 {{ $importLog->reactions_count }} reacciones
                                             </td>
-                                            <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
+                                            <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-600">{{ $importLog->downloaded_at?->format('d/m/Y H:i') ?? 'Sin fecha' }}</td>
                                             <td class="px-4 py-3 text-right">
                                                 <button wire:click="openClaimImportModal({{ $importLog->id }})" class="inline-flex items-center rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white hover:bg-indigo-700">
                                                     Asignar

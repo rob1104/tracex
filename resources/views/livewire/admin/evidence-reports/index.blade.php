@@ -99,10 +99,10 @@
                                 <button type="button" wire:click="sortBy('evidence_count')" class="inline-flex items-center gap-1 hover:text-slate-900">Total de evidencias @if($sortColumn === 'evidence_count')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                <button type="button" wire:click="sortBy('first_evidence_at')" class="inline-flex items-center gap-1 hover:text-slate-900">Primera captura @if($sortColumn === 'first_evidence_at')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
+                                <button type="button" wire:click="sortBy('successful_exports_count')" class="inline-flex items-center gap-1 hover:text-slate-900">Exportaciones exitosas @if($sortColumn === 'successful_exports_count')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
                             </th>
                             <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
-                                <button type="button" wire:click="sortBy('last_evidence_at')" class="inline-flex items-center gap-1 hover:text-slate-900">Última captura @if($sortColumn === 'last_evidence_at')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
+                                <button type="button" wire:click="sortBy('empty_imports_count')" class="inline-flex items-center gap-1 hover:text-slate-900">Importaciones vacías @if($sortColumn === 'empty_imports_count')<span>{{ $sortDirection === 'asc' ? '↑' : '↓' }}</span>@endif</button>
                             </th>
                         </tr>
                     </thead>
@@ -112,8 +112,8 @@
                                 <td class="px-6 py-4 text-sm font-medium text-slate-900">{{ $collaborator->name }}</td>
                                 <td class="px-6 py-4 text-sm text-slate-600">{{ $collaborator->email }}</td>
                                 <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ number_format($collaborator->evidence_count) }}</td>
-                                <td class="px-6 py-4 text-sm text-slate-600">{{ $collaborator->first_evidence_at ? \Illuminate\Support\Carbon::parse($collaborator->first_evidence_at)->format('d/m/Y H:i') : '—' }}</td>
-                                <td class="px-6 py-4 text-sm text-slate-600">{{ $collaborator->last_evidence_at ? \Illuminate\Support\Carbon::parse($collaborator->last_evidence_at)->format('d/m/Y H:i') : '—' }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ number_format($collaborator->successful_exports_count) }}</td>
+                                <td class="px-6 py-4 text-right text-sm font-semibold text-slate-900">{{ number_format($collaborator->empty_imports_count) }}</td>
                             </tr>
                         @empty
                             <tr>

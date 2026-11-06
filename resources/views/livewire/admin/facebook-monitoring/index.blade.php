@@ -9,40 +9,9 @@
                         <h1 class="mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
                             {{ auth()->user()->isAdmin() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
                         </h1>
-                        <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida mediante exportaciones oficiales y Google Drive.' }}</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida por Google Drive o mediante cargas locales.' }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
-                        @if(auth()->user()->isAdmin())
-                            <div x-data="{
-                                    open: false,
-                                    selectedId: @js((string) $collaboratorId),
-                                    collaborators: @js($collaborators->map(fn ($collaborator) => ['id' => (string) $collaborator->id, 'name' => $collaborator->name])->values()),
-                                    get selectedText() {
-                                        return this.collaborators.find((collaborator) => collaborator.id === this.selectedId)?.name || 'Todos los colaboradores';
-                                    },
-                                    selectCollaborator(id) {
-                                        this.selectedId = id;
-                                        this.open = false;
-                                        $wire.set('collaboratorId', id);
-                                    }
-                                }"
-                                class="relative w-full sm:w-64"
-                                @click.outside="open = false">
-                                <label class="sr-only" for="collaboratorFilter">Buscar o filtrar por colaborador</label>
-                                <button id="collaboratorFilter" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                                    <span class="truncate" x-text="selectedText"></span>
-                                    <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
-                                </button>
-                                <div x-cloak x-show="open" x-transition class="absolute right-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                    <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
-                                        <li><button type="button" role="option" :aria-selected="selectedId === ''" @click="selectCollaborator('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Todos los colaboradores</button></li>
-                                        <template x-for="collaborator in collaborators" :key="collaborator.id">
-                                            <li><button type="button" role="option" :aria-selected="selectedId === collaborator.id" @click="selectCollaborator(collaborator.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50" x-text="collaborator.name"></button></li>
-                                        </template>
-                                    </ul>
-                                </div>
-                            </div>
-                        @endif
                         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
                             <span class="font-semibold text-slate-700">Google Drive:</span>
                             <span class="{{ $driveConfigured ? 'text-emerald-700' : 'text-amber-700' }}">{{ $driveConfigured ? 'Configurado' : 'Pendiente de configurar' }}</span>
@@ -56,16 +25,16 @@
                 @endif
 
                 <section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Resumen del sistema">
-                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                    <article class="flex h-36 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">♟</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Perfiles registrados</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalProfiles }}</p><p class="mt-1 text-xs text-slate-400">Facebook vinculado</p></div>
                     </article>
-                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                    <article class="flex h-36 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">↓</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Importaciones</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalImports }}</p><p class="mt-1 text-xs text-slate-400">Exportaciones recibidas</p></div>
                     </article>
-                    <article class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg text-emerald-600">✓</span>
+                    <article class="flex h-36 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg text-emerald-600">&#10003;</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Procesamiento</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $processingCount > 0 ? 'En proceso' : 'Al día' }}</p><p class="mt-1 text-xs text-slate-400">{{ $processingCount }} cargas pendientes</p></div>
                     </article>
 
@@ -78,12 +47,42 @@
                                 <h2 class="text-lg font-bold text-slate-900">{{ auth()->user()->isAdmin() ? 'Perfiles de Facebook por colaborador' : 'Usuarios de Facebook monitoreados' }}</h2>
                                 <p class="text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Actividad acumulada y exportaciones vinculadas a los colaboradores.' : 'Actividad acumulada y exportaciones asociadas a cada usuario.' }}</p>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <div class="relative">
+                            <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                                @if(auth()->user()->isAdmin())
+                                    <div x-data="{
+                                            open: false,
+                                            selectedId: @js((string) $collaboratorId),
+                                            collaborators: @js($collaborators->map(fn ($collaborator) => ['id' => (string) $collaborator->id, 'name' => $collaborator->name])->values()),
+                                            get selectedText() {
+                                                return this.collaborators.find((collaborator) => collaborator.id === this.selectedId)?.name || 'Todos los colaboradores';
+                                            },
+                                            selectCollaborator(id) {
+                                                this.selectedId = id;
+                                                this.open = false;
+                                                $wire.set('collaboratorId', id);
+                                            }
+                                        }"
+                                        class="relative w-full sm:w-56"
+                                        @click.outside="open = false">
+                                        <label class="sr-only" for="collaboratorFilter">Buscar o filtrar por colaborador</label>
+                                        <button id="collaboratorFilter" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                            <span class="truncate" x-text="selectedText"></span>
+                                            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                        </button>
+                                        <div x-cloak x-show="open" x-transition class="absolute right-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                            <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
+                                                <li><button type="button" role="option" :aria-selected="selectedId === ''" @click="selectCollaborator('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Todos los colaboradores</button></li>
+                                                <template x-for="collaborator in collaborators" :key="collaborator.id">
+                                                    <li><button type="button" role="option" :aria-selected="selectedId === collaborator.id" @click="selectCollaborator(collaborator.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50" x-text="collaborator.name"></button></li>
+                                                </template>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                @endif
+                                <div class="relative w-full sm:w-64">
                                     <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">⌕</span>
-                                    <input wire:model.live.debounce.300ms="search" type="search" aria-label="Buscar usuario" placeholder="Buscar usuario..." class="w-full rounded-lg border-slate-200 py-2 pl-9 text-sm sm:w-52">
+                                    <input wire:model.live.debounce.300ms="search" type="search" aria-label="Buscar usuario" placeholder="Buscar usuario..." class="w-full rounded-lg border-slate-200 py-2 pl-9 text-sm">
                                 </div>
-                                <span class="whitespace-nowrap rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">{{ $profiles->total() }} perfiles</span>
                             </div>
                         </div>
                         <div class="grid gap-2 p-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
@@ -153,7 +152,7 @@
                             <a href="{{ auth()->user()->isAdmin() ? route('admin.evidences.index') : route('admin.profiles.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Ver reporte</a>
                         </div>
                         <div class="flex gap-4 overflow-x-auto border-b border-slate-100 px-4 sm:px-5">
-                            @foreach(['recent' => 'Actividad reciente', 'imports' => 'Importaciones', 'pending' => 'Cargas pendientes', 'unassigned' => 'Sin asignar'] as $tab => $label)
+                            @foreach(['recent' => 'Actividad reciente', 'imports' => 'Importaciones', 'empty_imports' => 'Importaciones vacías', 'pending' => 'Cargas pendientes', 'unassigned' => 'Sin asignar'] as $tab => $label)
                                 <button type="button" wire:click="setActivityTab('{{ $tab }}')" class="whitespace-nowrap border-b-2 px-1 py-3 text-xs font-semibold transition {{ $activityTab === $tab ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800' }}">{{ $label }}@if($tab === 'unassigned') <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{{ $pendingAssignmentCount }}</span>@endif</button>
                             @endforeach
                         </div>
@@ -190,14 +189,7 @@
                                     <tbody class="divide-y divide-slate-100">
                                         @forelse($imports as $importLog)
                                             @php
-                                                $facebookUser = $importLog->facebookUsers->first();
-                                                $metadata = is_array($facebookUser?->metadata) ? $facebookUser->metadata : [];
-                                                $folderFbId = preg_match('/facebook-(\d{5,})(?:[-_\/\\\\]|$)/i', (string) $importLog->file_name, $fbMatch) ? 'ID: '.$fbMatch[1] : null;
-                                                $detectedProfileLabel = $importLog->profile?->name
-                                                    ?? $metadata['name']
-                                                    ?? (! empty($metadata['export_identifier']) ? 'ID: '.str_replace('id:', '', (string) $metadata['export_identifier']) : null)
-                                                    ?? $folderFbId
-                                                    ?? 'Pendiente de coincidencia';
+                                                $detectedProfileLabel = $detectedImportProfileNames[$importLog->id] ?? 'Nombre no incluido en la exportación';
                                                 $importMetadata = is_array($importLog->metadata) ? $importLog->metadata : [];
                                                 $commentCount = (int) ($importLog->total_comments_extracted ?? 0);
                                                 $reactionCount = (int) ($importLog->total_reactions_extracted ?? 0);
@@ -214,7 +206,7 @@
                                                 };
                                             @endphp
                                             <tr class="hover:bg-slate-50/70">
-                                                <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><p class="mt-1 truncate text-slate-400">ID: {{ $importLog->drive_file_id }}</p></td>
+                                                <td class="max-w-xs px-4 py-3"><p class="truncate font-semibold text-slate-700">{{ $importLog->file_name }}</p><span class="mt-1 inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold {{ ($importMetadata['source'] ?? null) === 'local_upload' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500' }}">{{ ($importMetadata['source'] ?? null) === 'local_upload' ? 'Carga local' : 'Google Drive' }}</span></td>
                                                 <td class="px-4 py-3 text-slate-600">{{ $detectedProfileLabel }}</td>
                                                 <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $importLog->status === 'completed' ? 'bg-emerald-50 text-emerald-700' : ($importLog->status === 'failed' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800') }}">{{ $statusLabel }}</span></td>
                                                 <td class="min-w-[280px] px-4 py-3">
@@ -363,7 +355,7 @@
                 @endif
 
                 <footer class="flex flex-col gap-1 py-4 text-[11px] text-slate-400 sm:flex-row sm:items-center sm:justify-between">
-                    <span>TraceX · Panel de monitoreo de Facebook</span><span>Exportación de Meta → Drive → base de datos local</span>
+                    <span>TraceX · Panel de monitoreo de Facebook</span><span>Exportación de Meta → Google Drive o carga local → base de datos</span>
                 </footer>
             </main>
         </div>

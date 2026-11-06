@@ -30,6 +30,7 @@
                     <option value="">Todos los orígenes</option>
                     <option value="manual">Manual</option>
                     <option value="google_drive">Google Drive</option>
+                    <option value="local_upload">Carga local</option>
                 </select>
             </div>
 
@@ -112,6 +113,10 @@
                                                         <svg class="w-2.5 h-2.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>
                                                         Drive
                                                     </span>
+                                                @elseif($evidence->origin === 'local_upload')
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded-md bg-blue-100 text-blue-800 border border-blue-300">
+                                                        ZIP local
+                                                    </span>
                                                 @else
                                                     <span class="inline-flex items-center px-1.5 py-0.5 text-[10px] font-medium rounded-md bg-slate-100 text-slate-600 border border-slate-200">
                                                         Manual
@@ -134,10 +139,10 @@
                                                     </button>
                                                 @endforeach
                                             </div>
-                                        @elseif($evidence->origin === 'google_drive')
+                                        @elseif(in_array($evidence->origin, ['google_drive', 'local_upload'], true))
                                             <span class="inline-flex items-center gap-1 text-xs text-emerald-600 font-medium">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                JSON Sync
+                                                {{ $evidence->origin === 'local_upload' ? 'ZIP procesado' : 'JSON Sync' }}
                                             </span>
                                         @else
                                             <span class="text-xs text-gray-400 italic">Sin capturas</span>

@@ -6,6 +6,7 @@ use App\Models\EmailAccount;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\ProfileAssignmentService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -226,7 +227,7 @@ class Index extends Component
         }
 
         if ($rawFacebookIdentifier !== '' && ($facebookIdentifier === null || mb_strlen($facebookIdentifier) > 191)) {
-            $this->addError('facebook_identifier', 'Ingresa un ID numerico o una URL valida de Facebook.');
+            $this->addError('facebook_identifier', 'Ingresa un ID o una URL valida de Facebook.');
 
             return;
         }
@@ -616,7 +617,7 @@ class Index extends Component
                 'facebookComments as facebook_comments_count',
                 'facebookReactions as facebook_reactions_count',
                 'evidences as facebook_shares_count' => fn ($query) => $query
-                    ->where('origin', 'google_drive')
+                    ->whereIn('origin', ['google_drive', 'local_upload'])
                     ->whereRaw('LOWER(social_network) = ?', ['facebook'])
                     ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')),
             ])
@@ -655,10 +656,14 @@ class Index extends Component
             ? User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get()
             : collect();
 
+        $pendingImports = $pendingImportsQuery->paginate(10, pageName: 'pendingImportsPage');
+
         return view('livewire.admin.profiles.index', [
             'profiles' => $profiles,
             'facebookProfilesByUser' => $facebookProfilesByUser,
-            'pendingImports' => $pendingImportsQuery->paginate(10, pageName: 'pendingImportsPage'),
+            'pendingImports' => $pendingImports,
+            'detectedImportProfileNames' => app(FacebookImportProfileNameResolver::class)
+                ->resolveMany($pendingImports->getCollection()),
             'facebookProfiles' => $this->facebookProfilesQuery()->get(),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),

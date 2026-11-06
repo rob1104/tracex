@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\EvidenceReports;
 
 use App\Models\Evidence;
+use App\Models\FacebookImportLog;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
@@ -59,7 +60,7 @@ class Index extends Component
     {
         $this->authorizeAccess();
 
-        if (! in_array($column, ['name', 'evidence_count', 'first_evidence_at', 'last_evidence_at'], true)) {
+        if (! in_array($column, ['name', 'evidence_count', 'successful_exports_count', 'empty_imports_count'], true)) {
             return;
         }
 
@@ -96,15 +97,15 @@ class Index extends Component
         return response()->streamDownload(function () use ($collaborators): void {
             $file = fopen('php://output', 'w');
             fwrite($file, "\xEF\xBB\xBF");
-            fputcsv($file, ['Colaborador', 'Correo', 'Total de evidencias', 'Primera captura', 'Última captura']);
+            fputcsv($file, ['Colaborador', 'Correo', 'Total de evidencias', 'Exportaciones exitosas', 'Importaciones vacías']);
 
             foreach ($collaborators as $collaborator) {
                 fputcsv($file, [
                     $this->escapeSpreadsheetValue($collaborator->name),
                     $this->escapeSpreadsheetValue($collaborator->email),
                     $collaborator->evidence_count,
-                    $collaborator->first_evidence_at ? Carbon::parse($collaborator->first_evidence_at)->format('Y-m-d H:i:s') : '',
-                    $collaborator->last_evidence_at ? Carbon::parse($collaborator->last_evidence_at)->format('Y-m-d H:i:s') : '',
+                    $collaborator->successful_exports_count,
+                    $collaborator->empty_imports_count,
                 ]);
             }
 
@@ -123,6 +124,8 @@ class Index extends Component
         $pdf = Pdf::loadView('pdf.evidence-reports', [
             'collaborators' => $collaborators,
             'totalEvidence' => $this->totalEvidenceCount(),
+            'totalSuccessfulExports' => $collaborators->sum('successful_exports_count'),
+            'totalEmptyImports' => $collaborators->sum('empty_imports_count'),
             'filters' => $this->filterLabels(),
             'generator' => auth()->user(),
         ])->setPaper('a4', 'landscape');
@@ -163,21 +166,52 @@ class Index extends Component
 
     private function collaboratorsQuery(): Builder
     {
-        $periodConstraint = fn (Builder $query) => $this->applyDateRange($query);
-
         $query = User::query()
             ->where('role', 'user')
-            ->withCount(['evidences as evidence_count' => $periodConstraint])
-            ->withMin(['evidences as first_evidence_at' => $periodConstraint], 'created_at')
-            ->withMax(['evidences as last_evidence_at' => $periodConstraint], 'created_at');
+            ->withCount(['evidences as evidence_count' => fn (Builder $query) => $this->applyDateRange($query)])
+            ->addSelect([
+                'successful_exports_count' => $this->importsForCollaboratorQuery()
+                    ->where('facebook_import_logs.status', 'completed')
+                    ->selectRaw('COUNT(*)'),
+                'empty_imports_count' => $this->emptyImportsForCollaboratorQuery()->selectRaw('COUNT(*)'),
+            ]);
 
         $this->applyCollaboratorFilters($query);
 
-        $allowedSortColumns = ['name', 'evidence_count', 'first_evidence_at', 'last_evidence_at'];
+        $allowedSortColumns = ['name', 'evidence_count', 'successful_exports_count', 'empty_imports_count'];
         $sortColumn = in_array($this->sortColumn, $allowedSortColumns, true) ? $this->sortColumn : 'name';
         $sortDirection = $this->sortDirection === 'desc' ? 'desc' : 'asc';
 
         return $query->orderBy($sortColumn, $sortDirection)->orderBy('id');
+    }
+
+    private function importsForCollaboratorQuery(): Builder
+    {
+        $query = FacebookImportLog::query()
+            ->join('profile_user', 'profile_user.profile_id', '=', 'facebook_import_logs.profile_id')
+            ->whereColumn('profile_user.user_id', 'users.id');
+
+        $this->applyDateRange($query, 'facebook_import_logs.created_at');
+
+        return $query;
+    }
+
+    private function emptyImportsForCollaboratorQuery(): Builder
+    {
+        return $this->importsForCollaboratorQuery()
+            ->whereIn('facebook_import_logs.status', ['completed', 'pending_assignment'])
+            ->where(fn (Builder $query) => $query->whereNull('facebook_import_logs.total_comments_extracted')->orWhere('facebook_import_logs.total_comments_extracted', '<=', 0))
+            ->where(fn (Builder $query) => $query->whereNull('facebook_import_logs.total_reactions_extracted')->orWhere('facebook_import_logs.total_reactions_extracted', '<=', 0))
+            ->whereDoesntHave('comments')
+            ->whereDoesntHave('reactions')
+            ->where(fn (Builder $query) => $query
+                ->whereNull('facebook_import_logs.metadata->facebook_shares_count')
+                ->orWhere('facebook_import_logs.metadata->facebook_shares_count', '<=', 0))
+            ->where(fn (Builder $query) => $query
+                ->whereNull('facebook_import_logs.metadata->facebook_shares')
+                ->orWhereJsonLength('facebook_import_logs.metadata->facebook_shares', '=', 0))
+            ->whereDoesntHave('evidences', fn (Builder $query) => $query
+                ->whereHas('evidenceType', fn (Builder $typeQuery) => $typeQuery->where('name', 'Compartido')));
     }
 
     private function applyCollaboratorFilters(Builder $query): void
@@ -195,7 +229,7 @@ class Index extends Component
             });
     }
 
-    private function applyDateRange(Builder $query): void
+    private function applyDateRange(Builder $query, string $column = 'created_at'): void
     {
         if (! $this->dateRangeIsValid()) {
             $query->whereRaw('1 = 0');
@@ -206,11 +240,11 @@ class Index extends Component
         [$start, $end] = $this->validDateRange();
 
         if ($start !== null) {
-            $query->where('created_at', '>=', $start);
+            $query->where($column, '>=', $start);
         }
 
         if ($end !== null) {
-            $query->where('created_at', '<', $end);
+            $query->where($column, '<', $end);
         }
     }
 

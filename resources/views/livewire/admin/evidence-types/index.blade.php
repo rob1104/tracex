@@ -52,12 +52,9 @@
                                         @if($importLog->error_message)<p class="mt-1 max-w-md text-xs text-amber-700">{{ $importLog->error_message }}</p>@endif
                                     </td>
                                     <td class="px-5 py-4 text-sm text-slate-700">
-                                        <div>{{ $importLog->profile?->name ?? ($facebookMetadata['name'] ?? 'Sin coincidencia') }}</div>
+                                        <div>{{ $detectedImportProfileNames[$importLog->id] ?? 'Nombre no incluido en la exportación' }}</div>
                                         @if(! empty($facebookMetadata['profile_uri']))
                                             <div class="mt-1 max-w-xs break-all text-xs text-slate-500">{{ $facebookMetadata['profile_uri'] }}</div>
-                                        @endif
-                                        @if(! $importLog->profile_id && ! empty($facebookMetadata['export_identifier']))
-                                            <div class="mt-1 text-xs text-slate-500">ID detectado: {{ $facebookMetadata['export_identifier'] }}</div>
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-4 text-sm text-slate-600">
