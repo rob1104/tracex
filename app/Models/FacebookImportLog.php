@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'drive_deleted_at',
     'total_comments_extracted',
     'total_reactions_extracted',
+    'total_shares_extracted',
     'error_message',
     'metadata',
 ])]
@@ -49,6 +50,7 @@ class FacebookImportLog extends Model
             'file_size_bytes' => 'integer',
             'total_comments_extracted' => 'integer',
             'total_reactions_extracted' => 'integer',
+            'total_shares_extracted' => 'integer',
             'metadata' => 'array',
         ];
     }

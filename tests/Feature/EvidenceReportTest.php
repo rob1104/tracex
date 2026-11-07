@@ -155,7 +155,7 @@ class EvidenceReportTest extends TestCase
             ->call('exportCsv')
             ->assertFileDownloaded(
                 'reporte_evidencias_'.now()->format('Y-m-d').'.csv',
-                "\xEF\xBB\xBFColaborador,Correo,\"Total de evidencias\",\"Primera captura\",\"Última captura\"\n\"'=Ángela CSV\",angela@example.com,1,\"2026-06-10 12:30:00\",\"2026-06-10 12:30:00\"\n"
+                "\xEF\xBB\xBFColaborador,Correo,\"Total de evidencias\",\"Exportaciones exitosas\",\"Importaciones vac\u{00ED}as\"\n\"\x27=\u{00C1}ngela CSV\",angela@example.com,1,0,0\n"
             );
 
         Livewire::actingAs($cuentas)
