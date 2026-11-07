@@ -65,10 +65,11 @@ class Index extends Component
             return;
         }
         $duplicate = FacebookImportLog::query()
-            ->where('metadata->source', 'local_upload')
-            ->where('metadata->archive_sha256', $archiveHash)
+            ->where('drive_file_id', 'like', 'local:%')
             ->whereIn('status', ['downloaded', 'processing', 'pending_assignment', 'completed'])
-            ->exists();
+            ->get(['metadata'])
+            ->contains(fn (FacebookImportLog $importLog): bool => is_array($importLog->metadata)
+                && ($importLog->metadata['archive_sha256'] ?? null) === $archiveHash);
 
         if ($duplicate) {
             $this->addError('localZip', 'Este mismo archivo ZIP ya se había cargado.');
@@ -206,7 +207,7 @@ class Index extends Component
 
     public function setActivityTab(string $tab): void
     {
-        if (in_array($tab, ['recent', 'imports', 'empty_imports', 'pending', 'unassigned'], true)) {
+        if (in_array($tab, ['recent', 'imports', 'pending', 'unassigned'], true)) {
             $this->activityTab = $tab;
             $this->resetPage('activityPage');
             $this->resetPage('importsPage');
@@ -306,49 +307,6 @@ class Index extends Component
         return $query;
     }
 
-    private function filterImportsByActivity($query, bool $hasActivity)
-    {
-        if ($hasActivity) {
-            return $query->where(function ($activityQuery) {
-                $activityQuery->where('total_comments_extracted', '>', 0)
-                    ->orWhere('total_reactions_extracted', '>', 0)
-                    ->orWhere('metadata->facebook_shares_count', '>', 0)
-                    ->orWhereJsonLength('metadata->facebook_shares', '>', 0)
-                    ->orWhereHas('comments')
-                    ->orWhereHas('reactions')
-                    ->orWhereHas('evidences', fn ($evidenceQuery) => $evidenceQuery
-                        ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')));
-            });
-        }
-
-        return $query
-            ->whereIn('status', ['completed', 'pending_assignment'])
-            ->where(function ($emptyQuery) {
-                $emptyQuery->where(function ($commentsQuery) {
-                    $commentsQuery->whereNull('total_comments_extracted')
-                        ->orWhere('total_comments_extracted', '<=', 0);
-                })
-                    ->where(function ($reactionsQuery) {
-                        $reactionsQuery->whereNull('total_reactions_extracted')
-                            ->orWhere('total_reactions_extracted', '<=', 0);
-                    })
-                    ->whereDoesntHave('comments')
-                    ->whereDoesntHave('reactions')
-                    ->where(function ($sharesQuery) {
-                        $sharesQuery->where(function ($countQuery) {
-                            $countQuery->whereNull('metadata->facebook_shares_count')
-                                ->orWhere('metadata->facebook_shares_count', '<=', 0);
-                        })
-                            ->where(function ($arrayQuery) {
-                                $arrayQuery->whereNull('metadata->facebook_shares')
-                                    ->orWhereJsonLength('metadata->facebook_shares', '=', 0);
-                            })
-                            ->whereDoesntHave('evidences', fn ($evidenceQuery) => $evidenceQuery
-                                ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')));
-                    });
-            });
-    }
-
     private function activityQuery()
     {
         $query = Evidence::query()
@@ -429,10 +387,6 @@ class Index extends Component
                 $logQuery->whereIn('status', ['downloaded', 'processing']);
             } elseif ($this->activityTab === 'unassigned') {
                 $logQuery->where('status', 'pending_assignment');
-            } elseif ($this->activityTab === 'imports') {
-                $this->filterImportsByActivity($logQuery, true);
-            } elseif ($this->activityTab === 'empty_imports') {
-                $this->filterImportsByActivity($logQuery, false);
             }
             $imports = $logQuery->latest('downloaded_at')->paginate(50, pageName: 'importsPage');
             $detectedImportProfileNames = app(FacebookImportProfileNameResolver::class)
