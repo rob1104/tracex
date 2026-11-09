@@ -43,7 +43,7 @@
                     <span class="ml-2 text-sm font-semibold text-red-600">Solo sospechosas</span>
                 </label>
                 <div class="flex flex-wrap justify-end gap-3">
-                    <button wire:click="exportCsv" wire:loading.attr="disabled" class="inline-flex items-center rounded-md border border-transparent bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50">
+                    <button wire:click="exportExcel" wire:loading.attr="disabled" class="inline-flex items-center rounded-md border border-transparent bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50">
                     Exportar a Excel
                     </button>
                     <button wire:click="exportPdf" wire:loading.attr="disabled" class="inline-flex items-center rounded-md border border-transparent bg-rose-600 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-50">

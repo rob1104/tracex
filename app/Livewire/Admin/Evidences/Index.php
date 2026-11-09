@@ -6,8 +6,10 @@ use App\Models\Evidence;
 use App\Models\EvidenceImage;
 use App\Models\EvidenceType;
 use App\Models\User;
+use App\Services\EvidenceExcelWorkbook;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\File;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -141,29 +143,75 @@ class Index extends Component
         return $query;
     }
 
-    public function exportCsv()
+    public function exportExcel()
     {
         $evidences = $this->buildQuery()->get();
+        $collaborators = User::query()
+            ->where('role', 'user')
+            ->when($this->filterCollaborator, fn (Builder $query) => $query->whereKey($this->filterCollaborator))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->get(['id', 'name', 'email']);
+        $evidencesByCollaborator = $evidences->groupBy(fn (Evidence $evidence) => $evidence->user_id ?? 'unassigned');
+        $headers = ['ID', 'Colaborador', 'Correo', 'Red social', 'Perfil', 'Tipo de evidencia', 'Comentario', 'Fecha'];
+        $sheets = [[
+            'name' => 'Reporte de evidencias',
+            'rows' => [
+                ['Colaborador', 'Correo', 'Total de evidencias'],
+                ...$collaborators->map(fn (User $collaborator) => [
+                    $collaborator->name,
+                    $collaborator->email,
+                    $evidencesByCollaborator->get($collaborator->id, collect())->count(),
+                ])->all(),
+                ...($evidencesByCollaborator->get('unassigned', collect())->isNotEmpty()
+                    ? [['Sin colaborador', '', $evidencesByCollaborator->get('unassigned')->count()]]
+                    : []),
+            ],
+        ]];
 
-        return response()->streamDownload(function () use ($evidences) {
-            $file = fopen('php://output', 'w');
-            fwrite($file, "\xEF\xBB\xBF"); // UTF-8 BOM
-            fputcsv($file, ['ID', 'Usuario', 'Correo', 'Red Social', 'Perfil', 'Tipo de Evidencia', 'Comentario', 'Fecha']);
-
-            foreach ($evidences as $e) {
-                fputcsv($file, [
-                    $e->id,
-                    $e->user->name,
-                    $e->user->email,
-                    $e->social_network,
-                    $e->profile ? $e->profile->name : 'N/A',
-                    optional($e->evidenceType)->name,
-                    $e->comment,
-                    $e->created_at->format('Y-m-d H:i:s'),
-                ]);
+        foreach ($collaborators as $collaborator) {
+            $rows = [$headers];
+            foreach ($evidencesByCollaborator->get($collaborator->id, collect()) as $evidence) {
+                $rows[] = [
+                    $evidence->id,
+                    $collaborator->name,
+                    $collaborator->email,
+                    $evidence->social_network,
+                    $evidence->profile?->name ?? 'N/A',
+                    $evidence->evidenceType?->name ?? '',
+                    $evidence->comment ?? '',
+                    ($evidence->external_published_at ?? $evidence->created_at)?->format('Y-m-d H:i:s') ?? '',
+                ];
             }
-            fclose($file);
-        }, 'reporte_evidencias_'.date('Y-m-d').'.csv');
+            $sheets[] = ['name' => $collaborator->name, 'rows' => $rows];
+        }
+
+        $unassigned = $evidencesByCollaborator->get('unassigned', collect());
+        if ($unassigned->isNotEmpty()) {
+            $rows = [$headers];
+            foreach ($unassigned as $evidence) {
+                $rows[] = [
+                    $evidence->id,
+                    'Sin colaborador',
+                    '',
+                    $evidence->social_network,
+                    $evidence->profile?->name ?? 'N/A',
+                    $evidence->evidenceType?->name ?? '',
+                    $evidence->comment ?? '',
+                    ($evidence->external_published_at ?? $evidence->created_at)?->format('Y-m-d H:i:s') ?? '',
+                ];
+            }
+            $sheets[] = ['name' => 'Sin colaborador', 'rows' => $rows];
+        }
+
+        $directory = storage_path('app/temp_exports');
+        File::ensureDirectoryExists($directory);
+        $filePath = $directory.'/reporte_evidencias_'.uniqid('', true).'.xlsx';
+        app(EvidenceExcelWorkbook::class)->create($sheets, $filePath);
+
+        return response()->download($filePath, 'reporte_evidencias_'.now()->format('Y-m-d').'.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ])->deleteFileAfterSend(true);
     }
 
     public function exportPdf()
