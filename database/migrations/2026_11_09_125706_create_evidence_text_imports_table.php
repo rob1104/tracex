@@ -25,8 +25,8 @@ return new class extends Migration
             $table->unsignedBigInteger('processed_count')->default(0);
             $table->unsignedBigInteger('imported_count')->default(0);
             $table->unsignedBigInteger('duplicate_count')->default(0);
-            $table->json('preview_records')->nullable();
-            $table->json('preview_unparsed')->nullable();
+            $table->longText('preview_records')->nullable();
+            $table->longText('preview_unparsed')->nullable();
             $table->text('error_message')->nullable();
             $table->timestamps();
         });
