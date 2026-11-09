@@ -398,6 +398,7 @@ class ProcessFacebookExportJob implements ShouldBeUnique, ShouldQueue
                     'user_id' => $assignedUser?->id,
                     'total_comments_extracted' => $commentCount,
                     'total_reactions_extracted' => $reactionCount,
+                    'total_shares_extracted' => $shareCount,
                     'metadata' => $metadata,
                     'status' => $matchedProfile && $assignedUser ? 'completed' : 'pending_assignment',
                     'error_message' => $matchedProfile && $assignedUser ? null : 'Se requiere asignación manual de perfil y colaborador.',

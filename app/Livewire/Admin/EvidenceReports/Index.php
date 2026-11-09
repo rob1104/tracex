@@ -202,14 +202,9 @@ class Index extends Component
             ->whereIn('facebook_import_logs.status', ['completed', 'pending_assignment'])
             ->where(fn (Builder $query) => $query->whereNull('facebook_import_logs.total_comments_extracted')->orWhere('facebook_import_logs.total_comments_extracted', '<=', 0))
             ->where(fn (Builder $query) => $query->whereNull('facebook_import_logs.total_reactions_extracted')->orWhere('facebook_import_logs.total_reactions_extracted', '<=', 0))
+            ->where('facebook_import_logs.total_shares_extracted', '<=', 0)
             ->whereDoesntHave('comments')
             ->whereDoesntHave('reactions')
-            ->where(fn (Builder $query) => $query
-                ->whereNull('facebook_import_logs.metadata->facebook_shares_count')
-                ->orWhere('facebook_import_logs.metadata->facebook_shares_count', '<=', 0))
-            ->where(fn (Builder $query) => $query
-                ->whereNull('facebook_import_logs.metadata->facebook_shares')
-                ->orWhereJsonLength('facebook_import_logs.metadata->facebook_shares', '=', 0))
             ->whereDoesntHave('evidences', fn (Builder $query) => $query
                 ->whereHas('evidenceType', fn (Builder $typeQuery) => $typeQuery->where('name', 'Compartido')));
     }

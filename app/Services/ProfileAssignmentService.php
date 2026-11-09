@@ -267,6 +267,7 @@ class ProfileAssignmentService
             $importLog->update([
                 'status' => 'completed',
                 'error_message' => null,
+                'total_shares_extracted' => $shareCount,
                 'metadata' => $importMetadata,
             ]);
 

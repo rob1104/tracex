@@ -152,7 +152,7 @@
                             <a href="{{ auth()->user()->isAdmin() ? route('admin.evidences.index') : route('admin.profiles.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Ver reporte</a>
                         </div>
                         <div class="flex gap-4 overflow-x-auto border-b border-slate-100 px-4 sm:px-5">
-                            @foreach(['recent' => 'Actividad reciente', 'imports' => 'Importaciones', 'empty_imports' => 'Importaciones vacías', 'pending' => 'Cargas pendientes', 'unassigned' => 'Sin asignar'] as $tab => $label)
+                            @foreach(['recent' => 'Actividad reciente', 'imports' => 'Importaciones', 'pending' => 'Cargas pendientes', 'unassigned' => 'Sin asignar'] as $tab => $label)
                                 <button type="button" wire:click="setActivityTab('{{ $tab }}')" class="whitespace-nowrap border-b-2 px-1 py-3 text-xs font-semibold transition {{ $activityTab === $tab ? 'border-blue-600 text-blue-700' : 'border-transparent text-slate-500 hover:text-slate-800' }}">{{ $label }}@if($tab === 'unassigned') <span class="ml-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-800">{{ $pendingAssignmentCount }}</span>@endif</button>
                             @endforeach
                         </div>
