@@ -92,6 +92,9 @@
                                 <div class="flex flex-wrap items-center gap-1">
                                     <span class="rounded-full border px-2 py-1 text-xs font-semibold {{ $netColor }}">{{ $evidence->social_network }}</span>
                                     <span class="rounded-full border px-2 py-1 text-xs font-semibold {{ $typeColor }}">{{ optional($evidence->evidenceType)->name }}</span>
+                                    @if($evidence->origin === 'facebook_txt')
+                                        <span class="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-xs font-semibold text-violet-700">TXT Facebook</span>
+                                    @endif
                                     @if($isSuspectRow)
                                         <button wire:click="viewSuspectDetails({{ $evidence->id }})" class="rounded-full border border-red-200 bg-red-100 px-2 py-1 text-xs font-bold text-red-700 hover:bg-red-200">Sospechosa</button>
                                     @endif

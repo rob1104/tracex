@@ -5,6 +5,7 @@ use App\Livewire\Admin\Evidences\Index;
 use App\Livewire\User\EvidenceCreate;
 use App\Livewire\User\EvidenceCreateMultiple;
 use App\Livewire\User\EvidenceList;
+use App\Livewire\User\EvidenceTextImport;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');
@@ -21,6 +22,10 @@ Route::middleware(['auth', 'verified', 'role:user,admin'])->group(function () {
     Route::get('/evidencias/registrar', EvidenceCreate::class)->name('evidences.create');
     Route::get('/evidencias/registrar-masivo', EvidenceCreateMultiple::class)->name('evidences.create.multiple');
     Route::get('/evidencias/historial', EvidenceList::class)->name('evidences.list');
+});
+
+Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
+    Route::get('/evidencias/importar-txt', EvidenceTextImport::class)->name('evidences.import.txt');
 });
 
 Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {

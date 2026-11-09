@@ -44,6 +44,15 @@ return [
             'after_commit' => false,
         ],
 
+        'facebook_text_imports' => [
+            'driver' => 'database',
+            'connection' => env('DB_QUEUE_CONNECTION'),
+            'table' => env('DB_QUEUE_TABLE', 'jobs'),
+            'queue' => env('FACEBOOK_TEXT_IMPORT_QUEUE', 'facebook-text-imports'),
+            'retry_after' => (int) env('FACEBOOK_TEXT_IMPORT_RETRY_AFTER', 3700),
+            'after_commit' => false,
+        ],
+
         'beanstalkd' => [
             'driver' => 'beanstalkd',
             'host' => env('BEANSTALKD_QUEUE_HOST', 'localhost'),

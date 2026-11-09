@@ -41,7 +41,7 @@ if (method_exists($syncSchedule, $frequency)) {
 | without a dedicated Supervisor daemon.
 |
 */
-Schedule::command('queue:work --stop-when-empty --max-time=240 --tries=3')
+Schedule::command('queue:work --queue=default,facebook-text-imports --stop-when-empty --max-time=240 --tries=3')
     ->everyMinute()
     ->withoutOverlapping(5)
     ->runInBackground()

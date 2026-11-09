@@ -86,6 +86,9 @@ new class extends Component
                         <x-nav-link :href="route('evidences.create')" :active="request()->routeIs('evidences.create')" wire:navigate>
                             Registrar Evidencia
                         </x-nav-link>
+                        <x-nav-link :href="route('evidences.import.txt')" :active="request()->routeIs('evidences.import.txt')" wire:navigate>
+                            Pegar texto
+                        </x-nav-link>
                         <x-nav-link :href="route('evidences.list')" :active="request()->routeIs('evidences.list')" wire:navigate>
                             Historial
                         </x-nav-link>
@@ -203,6 +206,9 @@ new class extends Component
             @if(auth()->user()->isUser())
                 <x-responsive-nav-link :href="route('evidences.create')" :active="request()->routeIs('evidences.create')" wire:navigate>
                     Registrar Evidencia
+                </x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('evidences.import.txt')" :active="request()->routeIs('evidences.import.txt')" wire:navigate>
+                    Pegar texto
                 </x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('evidences.list')" :active="request()->routeIs('evidences.list')" wire:navigate>
                     Historial
