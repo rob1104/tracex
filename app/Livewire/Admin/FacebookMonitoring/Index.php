@@ -48,6 +48,111 @@ class Index extends Component
 
     public string $chartGrouping = 'day';
 
+    public ?int $assigningIdentifierProfileId = null;
+
+    public string $assigningFacebookIdentifier = '';
+
+    /** @var array<int, string> */
+    public array $profileFacebookIdentifiers = [];
+
+    public string $profileActivityFilter = 'all';
+
+    public function openAssignIdentifier(int $profileId): void
+    {
+        $profile = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        )->find($profileId);
+        abort_if($profile === null, 403);
+
+        $this->resetValidation(['assigningFacebookIdentifier', "profileFacebookIdentifiers.{$profileId}"]);
+        $this->assigningIdentifierProfileId = $profile->id;
+        $this->assigningFacebookIdentifier = (string) ($this->profileFacebookIdentifiers[$profile->id] ?? '');
+    }
+
+    public function cancelAssignIdentifier(): void
+    {
+        if ($this->assigningIdentifierProfileId !== null) {
+            unset($this->profileFacebookIdentifiers[$this->assigningIdentifierProfileId]);
+        }
+
+        $this->reset(['assigningIdentifierProfileId', 'assigningFacebookIdentifier']);
+        $this->resetValidation(['assigningFacebookIdentifier', 'profileFacebookIdentifiers']);
+    }
+
+    public function assignFacebookIdentifier(?int $profileId = null): void
+    {
+        $targetProfileId = $profileId ?? $this->assigningIdentifierProfileId;
+        abort_if($targetProfileId === null, 422);
+
+        $profile = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        )->find($targetProfileId);
+        abort_if($profile === null, 403);
+
+        $errorKey = $profileId !== null && array_key_exists($profileId, $this->profileFacebookIdentifiers)
+            ? "profileFacebookIdentifiers.{$profileId}"
+            : 'assigningFacebookIdentifier';
+
+        $this->resetValidation([$errorKey, 'assigningFacebookIdentifier', "profileFacebookIdentifiers.{$profile->id}"]);
+
+        if (filled($profile->facebook_identifier)) {
+            $this->addError($errorKey, 'Este perfil ya tiene un ID de Facebook asignado.');
+
+            return;
+        }
+
+        $rawValue = trim((string) ($this->profileFacebookIdentifiers[$profile->id] ?? $this->assigningFacebookIdentifier));
+        if ($rawValue === '') {
+            $this->addError($errorKey, 'Ingresa el ID o enlace del perfil de Facebook.');
+
+            return;
+        }
+
+        $identifier = FacebookProfileIdentifier::normalize($rawValue);
+        if ($identifier === null) {
+            $this->addError($errorKey, 'Ingresa un ID numérico o un enlace válido de facebook.com.');
+
+            return;
+        }
+
+        if (mb_strlen($identifier, 'UTF-8') > 191) {
+            $this->addError($errorKey, 'El identificador del perfil es demasiado largo.');
+
+            return;
+        }
+
+        $alreadyUsed = Profile::query()
+            ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+            ->where('facebook_identifier', $identifier)
+            ->whereKeyNot($profile->id)
+            ->exists();
+
+        if ($alreadyUsed) {
+            $this->addError($errorKey, 'Este ID o enlace de Facebook ya está registrado en otro perfil.');
+
+            return;
+        }
+
+        $profile->update([
+            'facebook_identifier' => $identifier,
+        ]);
+
+        unset($this->profileFacebookIdentifiers[$profile->id]);
+        if ($this->assigningIdentifierProfileId === $profile->id) {
+            $this->reset(['assigningIdentifierProfileId', 'assigningFacebookIdentifier']);
+        }
+
+        session()->flash('status', "ID de Facebook asignado correctamente a {$profile->name}.");
+    }
+
+    public function setProfileActivityFilter(string $filter): void
+    {
+        if (in_array($filter, ['all', 'with_activity', 'without_activity', 'missing_id'], true)) {
+            $this->profileActivityFilter = $filter;
+            $this->resetPage();
+        }
+    }
+
     public function importLocalZip(): void
     {
         abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
@@ -381,9 +486,9 @@ class Index extends Component
         return $query;
     }
 
-    public function render()
+    private function withProfileActivityMetrics(Builder $query): Builder
     {
-        $profilesQuery = $this->facebookProfilesQuery()
+        return $query
             ->withCount([
                 'facebookImportLogs as facebook_exports_count',
                 'facebookCommentsThroughImports as facebook_comments_count',
@@ -402,12 +507,78 @@ class Index extends Component
                     ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
                     ->whereRaw('LOWER(social_network) = ?', ['facebook'])
                     ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')),
+                'evidences as facebook_evidences_count' => fn ($query) => $query
+                    ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook']),
             ])
-            ->withMax('facebookImportLogs as latest_facebook_export_at', 'downloaded_at');
+            ->withMax('facebookImportLogs as latest_facebook_export_at', 'downloaded_at')
+            ->withMax([
+                'evidences as latest_facebook_evidence_at' => fn ($query) => $query
+                    ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook']),
+            ], 'external_published_at');
+    }
 
-        $profileCountQuery = $this->filterProfilesByCollaborator($this->restrictToManageableProfiles(
-            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
-        ));
+    private function profileTotalActivityCount(Profile $profile): int
+    {
+        $commentsCount = (int) ($profile->facebook_comments_count ?? 0) + (int) ($profile->facebook_txt_comments_count ?? 0);
+        $reactionsCount = (int) ($profile->facebook_reactions_count ?? 0) + (int) ($profile->facebook_txt_reactions_count ?? 0);
+        $sharesCount = (int) ($profile->facebook_shares_count ?? 0);
+        $evidencesCount = (int) ($profile->facebook_evidences_count ?? 0);
+
+        return max($commentsCount + $reactionsCount + $sharesCount, $evidencesCount);
+    }
+
+    public function render()
+    {
+        $allTrackedProfiles = $this->withProfileActivityMetrics(
+            $this->filterProfilesByCollaborator($this->restrictToManageableProfiles(
+                Profile::query()
+                    ->with(['emailAccount.creator', 'users'])
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+            ))
+        )
+            ->orderBy('name')
+            ->get()
+            ->each(function (Profile $profile): void {
+                $profile->setAttribute('total_activity_count', $this->profileTotalActivityCount($profile));
+            });
+
+        $profilesWithActivity = $allTrackedProfiles
+            ->filter(fn (Profile $profile): bool => (int) $profile->total_activity_count > 0)
+            ->sortByDesc('total_activity_count')
+            ->values();
+
+        $profilesWithoutActivity = $allTrackedProfiles
+            ->filter(fn (Profile $profile): bool => (int) $profile->total_activity_count === 0)
+            ->sortBy([
+                fn (Profile $profile): int => blank($profile->facebook_identifier) ? 0 : 1,
+                fn (Profile $profile): string => mb_strtolower((string) $profile->name),
+            ])
+            ->values();
+
+        $profilesMissingIdCount = $allTrackedProfiles
+            ->filter(fn (Profile $profile): bool => blank($profile->facebook_identifier))
+            ->count();
+
+        $totalProfilesCount = $allTrackedProfiles->count();
+        $profilesWithActivityCount = $profilesWithActivity->count();
+        $profilesWithoutActivityCount = $profilesWithoutActivity->count();
+        $activityCoveragePercent = $totalProfilesCount > 0
+            ? (int) round(($profilesWithActivityCount / $totalProfilesCount) * 100)
+            : 0;
+
+        $profilesQuery = $this->withProfileActivityMetrics($this->facebookProfilesQuery());
+
+        if ($this->profileActivityFilter === 'with_activity') {
+            $profilesQuery->whereIn('profiles.id', $profilesWithActivity->pluck('id')->all() ?: [0]);
+        } elseif ($this->profileActivityFilter === 'without_activity') {
+            $profilesQuery->whereIn('profiles.id', $profilesWithoutActivity->pluck('id')->all() ?: [0]);
+        } elseif ($this->profileActivityFilter === 'missing_id') {
+            $profilesQuery->where(function ($query) {
+                $query->whereNull('facebook_identifier')->orWhere('facebook_identifier', '');
+            });
+        }
 
         $importsQuery = $this->importsQuery();
         $textImportsQuery = $this->textImportsQuery();
@@ -555,7 +726,13 @@ class Index extends Component
                 ? User::query()->where('role', 'user')->where('is_active', true)->orderBy('name')->get()
                 : collect(),
             'emails' => $emailsQuery->orderBy('email')->get(),
-            'totalProfiles' => $profileCountQuery->count(),
+            'totalProfiles' => $totalProfilesCount,
+            'profilesWithActivityCount' => $profilesWithActivityCount,
+            'profilesWithoutActivityCount' => $profilesWithoutActivityCount,
+            'profilesMissingIdCount' => $profilesMissingIdCount,
+            'activityCoveragePercent' => $activityCoveragePercent,
+            'profilesWithActivity' => $profilesWithActivity,
+            'profilesWithoutActivity' => $profilesWithoutActivity,
             'totalImports' => $totalImports,
             'processingCount' => $processingCount,
             'pendingAssignmentCount' => $pendingAssignmentCount,
