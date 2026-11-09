@@ -5,12 +5,15 @@ namespace App\Livewire\Admin\FacebookMonitoring;
 use App\Jobs\ProcessFacebookExportJob;
 use App\Models\EmailAccount;
 use App\Models\Evidence;
+use App\Models\EvidenceTextImport;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
 use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\LocalFacebookExportZip;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -307,10 +310,55 @@ class Index extends Component
         return $query;
     }
 
+    private function textImportsQuery(): Builder
+    {
+        $query = EvidenceTextImport::query();
+
+        if (auth()->user()->isUser()) {
+            $query->where(function ($importsQuery) {
+                $importsQuery->where('user_id', auth()->id())
+                    ->orWhereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+            });
+        } elseif (auth()->user()->isCuentas()) {
+            $query->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+        }
+
+        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+            $collaboratorId = (int) $this->collaboratorId;
+            $query->where(function ($importsQuery) use ($collaboratorId) {
+                $importsQuery->where('user_id', $collaboratorId)
+                    ->orWhereHas('profile', fn ($profileQuery) => $profileQuery->where('created_by', $collaboratorId))
+                    ->orWhereHas('profile.users', fn ($userQuery) => $userQuery->where('users.id', $collaboratorId));
+            });
+        }
+
+        if ($this->activityProfileId !== '') {
+            $query->where('profile_id', $this->activityProfileId);
+        }
+
+        return $query;
+    }
+
+    private function combinedImportsQuery(): QueryBuilder
+    {
+        $exportImports = $this->importsQuery()
+            ->selectRaw("id as source_id, 'export' as source_type, file_name as display_name, profile_id, user_id, status, COALESCE(downloaded_at, created_at) as received_at, error_message")
+            ->toBase();
+        $textImports = $this->textImportsQuery()
+            ->selectRaw("id as source_id, 'text' as source_type, original_file_name as display_name, profile_id, user_id, status, created_at as received_at, error_message")
+            ->toBase();
+
+        return DB::query()
+            ->fromSub($exportImports->unionAll($textImports), 'combined_imports')
+            ->orderByDesc('received_at')
+            ->orderBy('source_type')
+            ->orderByDesc('source_id');
+    }
+
     private function activityQuery()
     {
         $query = Evidence::query()
-            ->whereIn('origin', ['google_drive', 'local_upload'])
+            ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
             ->whereRaw('LOWER(social_network) = ?', ['facebook']);
 
         if (auth()->user()->isUser()) {
@@ -340,8 +388,18 @@ class Index extends Component
                 'facebookImportLogs as facebook_exports_count',
                 'facebookCommentsThroughImports as facebook_comments_count',
                 'facebookReactionsThroughImports as facebook_reactions_count',
+                'evidences as facebook_txt_comments_count' => fn ($query) => $query
+                    ->where('origin', 'facebook_txt')
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+                    ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'like', '%Coment%')),
+                'evidences as facebook_txt_reactions_count' => fn ($query) => $query
+                    ->where('origin', 'facebook_txt')
+                    ->whereRaw('LOWER(social_network) = ?', ['facebook'])
+                    ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery
+                        ->where('name', 'like', '%Reacci%')
+                        ->orWhere('name', 'like', '%Like%')),
                 'evidences as facebook_shares_count' => fn ($query) => $query
-                    ->whereIn('origin', ['google_drive', 'local_upload'])
+                    ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
                     ->whereRaw('LOWER(social_network) = ?', ['facebook'])
                     ->whereHas('evidenceType', fn ($typeQuery) => $typeQuery->where('name', 'Compartido')),
             ])
@@ -352,8 +410,11 @@ class Index extends Component
         ));
 
         $importsQuery = $this->importsQuery();
-        $processingCount = (clone $importsQuery)->whereIn('status', ['downloaded', 'processing'])->count();
+        $textImportsQuery = $this->textImportsQuery();
+        $processingCount = (clone $importsQuery)->whereIn('status', ['downloaded', 'processing'])->count()
+            + (clone $textImportsQuery)->whereIn('status', ['queued_preview', 'analyzing', 'queued', 'processing'])->count();
         $pendingAssignmentCount = (clone $importsQuery)->where('status', 'pending_assignment')->count();
+        $totalImports = (clone $importsQuery)->count() + (clone $textImportsQuery)->count();
 
         $emailsQuery = EmailAccount::query()->where('status', 'active');
         if (auth()->user()->isUser()) {
@@ -375,12 +436,33 @@ class Index extends Component
 
         $activity = collect();
         $imports = collect();
+        $combinedImports = collect();
+        $exportImportRecords = collect();
+        $textImportRecords = collect();
         $detectedImportProfileNames = [];
         if ($this->activityTab === 'recent') {
             $activity = $this->activityQuery()
                 ->with(['profile', 'evidenceType'])
                 ->orderByRaw('COALESCE(external_published_at, created_at) DESC')
                 ->paginate(50, pageName: 'activityPage');
+        } elseif ($this->activityTab === 'imports') {
+            $combinedImports = $this->combinedImportsQuery()->paginate(50, pageName: 'importsPage');
+            $rows = $combinedImports->getCollection();
+            $exportIds = $rows->where('source_type', 'export')->pluck('source_id');
+            $textImportIds = $rows->where('source_type', 'text')->pluck('source_id');
+
+            $exportImportRecords = FacebookImportLog::query()
+                ->with(['profile', 'user', 'facebookUsers'])
+                ->whereIn('id', $exportIds)
+                ->get()
+                ->keyBy('id');
+            $textImportRecords = EvidenceTextImport::query()
+                ->with(['profile', 'user'])
+                ->whereIn('id', $textImportIds)
+                ->get()
+                ->keyBy('id');
+            $detectedImportProfileNames = app(FacebookImportProfileNameResolver::class)
+                ->resolveMany($exportImportRecords->values());
         } else {
             $logQuery = $this->importsQuery()->with(['profile', 'facebookUsers']);
             if ($this->activityTab === 'pending') {
@@ -474,13 +556,16 @@ class Index extends Component
                 : collect(),
             'emails' => $emailsQuery->orderBy('email')->get(),
             'totalProfiles' => $profileCountQuery->count(),
-            'totalImports' => (clone $importsQuery)->count(),
+            'totalImports' => $totalImports,
             'processingCount' => $processingCount,
             'pendingAssignmentCount' => $pendingAssignmentCount,
             'driveConfigured' => $driveConfigured,
             'databaseName' => $databaseName,
             'activity' => $activity,
             'imports' => $imports,
+            'combinedImports' => $combinedImports,
+            'exportImportRecords' => $exportImportRecords,
+            'textImportRecords' => $textImportRecords,
             'detectedImportProfileNames' => $detectedImportProfileNames,
             'chart' => $chart,
             'chartMax' => $chartMax,

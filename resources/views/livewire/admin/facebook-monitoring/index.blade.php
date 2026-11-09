@@ -31,7 +31,7 @@
                     </article>
                     <article class="flex h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">↓</span>
-                        <div class="min-w-0"><p class="text-xs text-slate-500">Importaciones</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalImports }}</p><p class="mt-1 text-xs text-slate-400">Exportaciones recibidas</p></div>
+                        <div class="min-w-0"><p class="text-xs text-slate-500">Importaciones</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalImports }}</p><p class="mt-1 text-xs text-slate-400">Exportaciones y textos recibidos</p></div>
                     </article>
                     <article class="flex h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg text-emerald-600">&#10003;</span>
@@ -85,7 +85,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="grid gap-2 p-3" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));">
+                        <div class="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
                             @forelse($profiles as $profile)
                                 @php
                                     $identifier = (string) $profile->facebook_identifier;
@@ -98,7 +98,7 @@
                                             <h3 class="truncate text-sm font-bold text-slate-900">{{ $profile->name }}</h3>
                                             <p class="mt-0.5 truncate text-xs text-slate-500">{{ $profile->emailAccount?->email ?? 'Sin cuenta asociada' }}</p>
                                             @if(auth()->user()->isAdmin())
-                                                <p class="mt-1 truncate text-xs text-indigo-700">Colaborador: {{ $profile->users->first()?->name ?? 'Sin asignar' }}</p>
+                                                <p class="mt-1 break-words text-xs leading-4 text-indigo-700">Colaborador: {{ $profile->users->first()?->name ?? 'Sin asignar' }}</p>
                                             @endif
                                             <span class="mt-1 inline-flex items-center gap-1.5 text-xs font-medium {{ $identifier !== '' ? 'text-emerald-700' : 'text-amber-700' }}"><span class="h-2 w-2 rounded-full {{ $identifier !== '' ? 'bg-emerald-500' : 'bg-amber-500' }}"></span> {{ $identifier !== '' ? 'Facebook vinculado' : 'ID por asociar' }}</span>
                                         </div>
@@ -111,8 +111,8 @@
                                         <p class="mt-2 text-xs text-amber-700">Falta asociar un ID de Facebook</p>
                                     @endif
                                     <div class="my-2 grid grid-cols-3 gap-1.5 border-y border-slate-100 py-2 text-[11px]">
-                                        <div><p class="text-slate-500">Comentarios</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_comments_count ?? 0) }}</p></div>
-                                        <div><p class="text-slate-500">Reacciones</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_reactions_count ?? 0) }}</p></div>
+                                        <div><p class="text-slate-500">Comentarios</p><p class="mt-1 font-bold text-slate-800">{{ number_format(($profile->facebook_comments_count ?? 0) + ($profile->facebook_txt_comments_count ?? 0)) }}</p></div>
+                                        <div><p class="text-slate-500">Reacciones</p><p class="mt-1 font-bold text-slate-800">{{ number_format(($profile->facebook_reactions_count ?? 0) + ($profile->facebook_txt_reactions_count ?? 0)) }}</p></div>
                                         <div><p class="text-slate-500">Compartidos</p><p class="mt-1 font-bold text-slate-800">{{ number_format($profile->facebook_shares_count ?? 0) }}</p></div>
                                     </div>
                                     <div class="mb-2 flex items-center justify-between text-[11px] text-slate-500">
@@ -146,7 +146,7 @@
                                 @if($activityProfileId !== '')
                                     <p class="mt-1 text-xs text-slate-500">Filtrando actividad del perfil seleccionado. <button wire:click="showAllActivity" class="font-semibold text-blue-600 hover:underline">Ver todos</button></p>
                                 @else
-                                    <p class="mt-1 text-xs text-slate-500">Comentarios, reacciones y publicaciones compartidas procesadas.</p>
+                                    <p class="mt-1 text-xs text-slate-500">Comentarios, reacciones y publicaciones compartidas de exportaciones y textos importados.</p>
                                 @endif
                             </div>
                             <a href="{{ auth()->user()->isAdmin() ? route('admin.evidences.index') : route('admin.profiles.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Ver reporte</a>
@@ -171,7 +171,7 @@
                                                 <td class="whitespace-nowrap px-4 py-3 font-medium text-slate-700">{{ $evidence->profile?->name ?? 'Perfil no asignado' }}</td>
                                                 <td class="whitespace-nowrap px-4 py-3"><span class="inline-flex items-center gap-1.5 text-slate-700"><span class="h-2 w-2 rounded-full {{ str_contains(mb_strtolower($typeName), 'coment') ? 'bg-blue-500' : (str_contains(mb_strtolower($typeName), 'compart') ? 'bg-emerald-500' : 'bg-rose-500') }}"></span>{{ $typeName }}</span></td>
                                                 <td class="max-w-sm break-words px-4 py-3 text-slate-500"><div class="whitespace-pre-line">{{ $evidence->comment }}</div></td>
-                                                <td class="px-4 py-3"><span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700">Procesado</span></td>
+                                                <td class="px-4 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $evidence->origin === 'facebook_txt' ? 'bg-indigo-50 text-indigo-700' : 'bg-emerald-50 text-emerald-700' }}">{{ $evidence->origin === 'facebook_txt' ? 'Importado por texto' : 'Procesado' }}</span></td>
                                             </tr>
                                         @empty
                                             <tr><td colspan="5" class="px-4 py-10 text-center text-slate-500">Aún no hay comentarios, reacciones o compartidos asignados.</td></tr>
@@ -181,6 +181,122 @@
                             </div>
                             @if($activity->hasPages())
                                 <div class="border-t border-slate-100 px-4 py-3 sm:px-5">{{ $activity->links() }}</div>
+                            @endif
+                        @elseif($activityTab === 'imports')
+                            <div class="max-h-96 overflow-auto overscroll-contain">
+                                <table class="w-full table-fixed divide-y divide-slate-100 text-left text-xs">
+                                    <colgroup>
+                                        <col class="w-[10%]">
+                                        <col class="w-[17%]">
+                                        <col class="w-[12%]">
+                                        <col class="w-[12%]">
+                                        <col class="w-[15%]">
+                                        <col class="w-[19%]">
+                                        <col class="w-[15%]">
+                                    </colgroup>
+                                    <thead class="sticky top-0 z-10 bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                                        <tr><th class="px-2 py-3 font-semibold">Método</th><th class="px-2 py-3 font-semibold">Archivo / texto</th><th class="px-2 py-3 font-semibold">Perfil de Facebook</th><th class="px-2 py-3 font-semibold">Colaborador</th><th class="px-2 py-3 font-semibold">Estado</th><th class="px-2 py-3 font-semibold">Resultado</th><th class="px-2 py-3 font-semibold">Recibida</th></tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100">
+                                        @forelse($combinedImports as $importRow)
+                                            @php
+                                                $isTextImport = $importRow->source_type === 'text';
+                                                $importRecord = $isTextImport
+                                                    ? $textImportRecords->get($importRow->source_id)
+                                                    : $exportImportRecords->get($importRow->source_id);
+                                                $importMetadata = ! $isTextImport && is_array($importRecord?->metadata) ? $importRecord->metadata : [];
+                                                $methodLabel = $isTextImport
+                                                    ? 'TXT'
+                                                    : (($importMetadata['source'] ?? null) === 'local_upload' ? 'Carga local' : 'Google Drive');
+                                                $profileLabel = $isTextImport
+                                                    ? ($importRecord?->profile?->name ?? 'Perfil no disponible')
+                                                    : ($detectedImportProfileNames[$importRow->source_id] ?? $importRecord?->profile?->name ?? 'Nombre no incluido en la exportación');
+                                                $collaboratorLabel = $importRecord?->user?->name ?? 'Usuario no disponible';
+                                                $statusLabel = $isTextImport
+                                                    ? match($importRow->status) {
+                                                        'queued_preview' => 'En cola para analizar', 'analyzing' => 'Analizando', 'awaiting_confirmation' => 'Vista previa lista', 'queued' => 'En cola para importar', 'processing' => 'Importando', 'completed' => 'Completada', 'failed' => 'Error', 'cancelled' => 'Descartada', default => ucfirst($importRow->status),
+                                                    }
+                                                    : match($importRow->status) {
+                                                        'completed' => 'Procesado', 'processing' => 'Procesando', 'downloaded' => 'Descargado', 'pending_assignment' => 'Sin asignar', 'failed' => 'Error', default => ucfirst($importRow->status),
+                                                    };
+                                                $statusClass = match($importRow->status) {
+                                                    'completed' => 'bg-emerald-50 text-emerald-700',
+                                                    'failed' => 'bg-rose-50 text-rose-700',
+                                                    'awaiting_confirmation' => 'bg-blue-50 text-blue-700',
+                                                    'cancelled' => 'bg-slate-100 text-slate-600',
+                                                    default => 'bg-amber-50 text-amber-800',
+                                                };
+                                                $importFiles = is_array($importMetadata['files'] ?? null) ? $importMetadata['files'] : [];
+                                                $importDiagnostics = is_array($importMetadata['diagnostics'] ?? null) ? $importMetadata['diagnostics'] : [];
+                                                $diagnosticDetail = $importDiagnostics['empty_reason_label'] ?? null;
+                                                $errorText = (string) ($importRecord?->error_message ?? '');
+                                                $basenames = array_map(fn ($path) => strtolower(basename((string) $path)), $importFiles);
+                                                $exportCommentCount = (int) ($importRecord?->total_comments_extracted ?? 0);
+                                                $exportReactionCount = (int) ($importRecord?->total_reactions_extracted ?? 0);
+                                                $exportShareCount = (int) ($importMetadata['facebook_shares_count'] ?? (is_array($importMetadata['facebook_shares'] ?? null) ? count($importMetadata['facebook_shares']) : 0));
+                                                $hasExportActivity = $exportCommentCount + $exportReactionCount + $exportShareCount > 0;
+                                                if (! $isTextImport && $diagnosticDetail === null && ! $hasExportActivity) {
+                                                    if (str_contains($errorText, 'formato HTML')) {
+                                                        $diagnosticDetail = 'Exportación en formato HTML (se requiere JSON)';
+                                                    } elseif (in_array('no_data.json', $basenames, true)) {
+                                                        $diagnosticDetail = 'Meta sin actividad en el periodo (no_data.json)';
+                                                    } elseif ($basenames !== [] && ! collect($basenames)->contains(fn ($basename) => (bool) preg_match('/^(comments|group_comments|your_comments_in_groups|likes_and_reactions|reactions|your_posts|posts|group_posts|your_posts_in_groups|shared_memories).*\.json$/i', $basename))) {
+                                                        $diagnosticDetail = 'Solo archivos de perfil/dispositivos (sin archivos de actividad)';
+                                                    }
+                                                }
+                                                $textImportIsProcessing = in_array($importRow->status, ['queued_preview', 'analyzing', 'queued', 'processing'], true);
+                                                $textImportName = $importRecord?->original_file_name ?? $importRow->display_name;
+                                                $exportFileName = $importRecord?->file_name ?? $importRow->display_name;
+                                                $emptyExportActivityLabel = match($importRow->status) {
+                                                    'processing' => 'Extrayendo actividad',
+                                                    'downloaded' => 'Pendiente de extracción',
+                                                    'failed' => 'No se pudo extraer',
+                                                    default => 'Sin actividad detectada',
+                                                };
+                                            @endphp
+                                            <tr class="align-top hover:bg-slate-50/70">
+                                                <td class="whitespace-nowrap px-2 py-3"><span class="inline-flex rounded-full px-2 py-1 text-[10px] font-semibold {{ $isTextImport ? 'bg-indigo-50 text-indigo-700' : (($importMetadata['source'] ?? null) === 'local_upload' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $methodLabel }}</span></td>
+                                                <td class="px-2 py-3"><p title="{{ $isTextImport ? $textImportName : $exportFileName }}" class="truncate font-semibold text-slate-700">{{ $isTextImport ? $textImportName : $exportFileName }}</p></td>
+                                                <td class="px-2 py-3 text-slate-600">{{ $profileLabel }}</td>
+                                                <td class="px-2 py-3 text-slate-600">{{ $collaboratorLabel }}</td>
+                                                <td class="whitespace-nowrap px-2 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span></td>
+                                                <td class="break-words px-2 py-3 text-slate-600">
+                                                    @if($isTextImport)
+                                                        <div class="flex flex-wrap gap-x-2 gap-y-1">
+                                                            <span>Detectadas: {{ number_format($importRecord?->recognized_count ?? 0) }}</span>
+                                                            <span>Importadas: {{ number_format($importRecord?->imported_count ?? 0) }}</span>
+                                                            <span>Duplicadas: {{ number_format($importRecord?->duplicate_count ?? 0) }}</span>
+                                                            <span>Por revisar: {{ number_format($importRecord?->unrecognized_count ?? 0) }}</span>
+                                                        </div>
+                                                        @if($textImportIsProcessing)
+                                                            <p class="mt-1 text-[10px] text-slate-400">Procesadas {{ number_format($importRecord?->processed_count ?? 0) }} de {{ number_format($importRecord?->total_entries ?? 0) }}</p>
+                                                        @elseif($importRow->status === 'awaiting_confirmation')
+                                                            <p class="mt-1 text-[10px] text-blue-600">Pendiente de confirmación desde el módulo de importación.</p>
+                                                        @elseif($errorText !== '')
+                                                            <p class="mt-1 break-words text-[10px] text-rose-600">{{ $errorText }}</p>
+                                                        @endif
+                                                    @elseif($hasExportActivity)
+                                                        <div class="flex flex-wrap gap-1.5">
+                                                            <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700">Comentarios: {{ $exportCommentCount }}</span>
+                                                            <span class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-medium text-rose-700">Reacciones: {{ $exportReactionCount }}</span>
+                                                            <span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700">Compartidos: {{ $exportShareCount }}</span>
+                                                        </div>
+                                                        @if($importRow->status === 'failed')<p class="mt-1 text-[10px] text-rose-600">Extracción incompleta</p>@endif
+                                                    @else
+                                                        <span class="text-slate-500">{{ $emptyExportActivityLabel }}</span>
+                                                        @if($diagnosticDetail)<p class="mt-0.5 text-[10px] text-slate-400">{{ $diagnosticDetail }}</p>@endif
+                                                    @endif
+                                                </td>
+                                                <td class="whitespace-nowrap px-2 py-3 text-slate-500">{{ $importRow->received_at ? \Illuminate\Support\Carbon::parse($importRow->received_at)->format('d/m/Y H:i') : 'Sin fecha' }}</td>
+                                            </tr>
+                                        @empty
+                                            <tr><td colspan="7" class="px-4 py-10 text-center text-slate-500">No hay importaciones para estos filtros.</td></tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                            @if($combinedImports->hasPages())
+                                <div class="border-t border-slate-100 px-4 py-3 sm:px-5">{{ $combinedImports->links() }}</div>
                             @endif
                         @else
                             <div class="max-h-96 overflow-auto overscroll-contain">
@@ -295,7 +411,7 @@
                                 <span class="grid h-10 w-10 place-items-center rounded-full bg-white text-lg text-slate-400 shadow-sm" aria-hidden="true">◷</span>
                                 <p class="mt-3 text-sm font-semibold text-slate-700">No hay actividad en {{ mb_strtolower($chartRangeLabel) }}</p>
                                 @if($totalImports === 0)
-                                    <p class="mt-1 max-w-xs text-xs leading-5 text-slate-500">Cuando registres perfiles y se procese una exportación de Facebook, los comentarios, reacciones y compartidos aparecerán aquí.</p>
+                                    <p class="mt-1 max-w-xs text-xs leading-5 text-slate-500">Cuando se procese una exportación o confirmes una importación por texto, sus actividades aparecerán aquí.</p>
                                 @else
                                     <p class="mt-1 max-w-xs text-xs leading-5 text-slate-500">No hay evidencias asignadas en este periodo. Revisa la pestaña “Sin asignar” si una exportación aún no tiene perfil asociado.</p>
                                 @endif
