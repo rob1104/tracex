@@ -66,53 +66,88 @@
                                 x-data="{
                                     open: false,
                                     search: '',
-                                    selectedId: $wire.entangle('filter_email_account_id'),
-                                    emails: @js($emails->map(fn ($email) => ['id' => (string) $email->id, 'email' => $email->email, 'alias' => $email->alias])->values()),
-                                    get selectedText() {
-                                        if (!this.selectedId) return 'Todas las cuentas';
-                                        const selected = this.emails.find((email) => email.id === String(this.selectedId));
-                                        return selected ? `${selected.email}${selected.alias ? ' (' + selected.alias + ')' : ''}` : 'Todas las cuentas';
+                                    selectedId: $wire.entangle('filter_email_account_id').live,
+                                    emails: @js($emails->map(fn ($email) => ['id' => (string) $email->id, 'email' => $email->email, 'alias' => $email->alias, 'label' => $email->email.($email->alias ? ' ('.$email->alias.')' : '')])->values()),
+                                    init() {
+                                        this.syncSearchFromSelection();
+                                        this.$watch('selectedId', () => this.syncSearchFromSelection());
                                     },
-                                    matches(email) {
-                                        return `${email.email} ${email.alias || ''}`.toLowerCase().includes(this.search.toLowerCase());
+                                    syncSearchFromSelection() {
+                                        if (!this.selectedId) {
+                                            this.search = '';
+                                            return;
+                                        }
+                                        const selected = this.emails.find((email) => email.id === String(this.selectedId));
+                                        this.search = selected ? selected.label : '';
+                                    },
+                                    get filteredEmails() {
+                                        const q = this.search.trim().toLowerCase();
+                                        if (!q) return this.emails;
+                                        const selected = this.emails.find((email) => email.id === String(this.selectedId));
+                                        if (selected && selected.label.toLowerCase() === q) {
+                                            return this.emails;
+                                        }
+                                        return this.emails.filter((email) => `${email.email} ${email.alias || ''}`.toLowerCase().includes(q));
+                                    },
+                                    onInput() {
+                                        this.open = true;
+                                        if (this.search.trim() === '') {
+                                            this.selectedId = '';
+                                        }
                                     },
                                     selectEmail(id) {
                                         this.selectedId = id;
+                                        this.syncSearchFromSelection();
                                         this.open = false;
-                                        this.search = '';
                                     }
                                 }"
-                                @click.outside="open = false; search = ''"
-                                @keydown.escape="open = false; search = ''"
+                                @click.outside="open = false; syncSearchFromSelection()"
+                                @keydown.escape="open = false; syncSearchFromSelection()"
                                 class="relative"
                             >
-                                <button
-                                    type="button"
-                                    id="filter_email_account_id"
-                                    @click="open = !open; if (open) $nextTick(() => $refs.emailSearch.focus())"
-                                    :aria-expanded="open"
-                                    aria-haspopup="listbox"
-                                    class="flex w-full items-center justify-between gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-left text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
-                                    <span class="truncate" x-text="selectedText"></span>
-                                    <svg class="h-4 w-4 shrink-0 text-gray-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
-                                </button>
+                                <div class="relative">
+                                    <input
+                                        id="filter_email_account_id"
+                                        x-ref="emailSearch"
+                                        type="text"
+                                        x-model="search"
+                                        @focus="open = true"
+                                        @click="open = true"
+                                        @input="onInput()"
+                                        placeholder="Todas las cuentas (escribe para buscar...)"
+                                        autocomplete="off"
+                                        role="combobox"
+                                        :aria-expanded="open"
+                                        aria-haspopup="listbox"
+                                        class="w-full rounded-md border-gray-300 bg-white py-2 pl-3 pr-9 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    >
+                                    <button
+                                        type="button"
+                                        @click="if (selectedId) { selectEmail(''); } else { open = !open; if (open) $nextTick(() => $refs.emailSearch.focus()); }"
+                                        class="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-600"
+                                        :title="selectedId ? 'Limpiar filtro' : 'Mostrar cuentas'"
+                                    >
+                                        <template x-if="selectedId">
+                                            <span class="text-sm font-bold leading-none">&times;</span>
+                                        </template>
+                                        <template x-if="!selectedId">
+                                            <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                        </template>
+                                    </button>
+                                </div>
                                 <div x-cloak x-show="open" x-transition class="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
-                                    <div class="border-b border-gray-100 p-2">
-                                        <input x-ref="emailSearch" x-model="search" type="search" placeholder="Buscar cuenta..." autocomplete="off" class="w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" aria-label="Buscar cuenta de correo">
-                                    </div>
                                     <ul role="listbox" class="max-h-56 overflow-y-auto py-1">
                                         <li>
                                             <button type="button" role="option" :aria-selected="!selectedId" @click="selectEmail('')" class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50">Todas las cuentas</button>
                                         </li>
-                                        <template x-for="email in emails.filter((email) => matches(email))" :key="email.id">
+                                        <template x-for="email in filteredEmails" :key="email.id">
                                             <li>
                                                 <button type="button" role="option" :aria-selected="String(selectedId) === email.id" @click="selectEmail(email.id)" class="w-full truncate px-3 py-2 text-left text-sm text-gray-700 hover:bg-blue-50">
                                                     <span x-text="email.email"></span><span x-show="email.alias" class="text-gray-500" x-text="email.alias ? ' (' + email.alias + ')' : ''"></span>
                                                 </button>
                                             </li>
                                         </template>
-                                        <li x-show="!emails.some((email) => matches(email))" class="px-3 py-2 text-sm text-gray-500">No se encontraron cuentas.</li>
+                                        <li x-show="filteredEmails.length === 0" class="px-3 py-2 text-sm text-gray-500">No se encontraron cuentas.</li>
                                     </ul>
                                 </div>
                             </div>
@@ -394,7 +429,7 @@
                             </div>
                             <!-- Alpine Searchable Dropdown for Email Account -->
                             @php
-                                $initialSelectedEmailText = 'Seleccione una cuenta...';
+                                $initialSelectedEmailText = '';
                                 if ($email_account_id) {
                                     $selectedEmailModel = $emails->firstWhere('id', (int) $email_account_id) ?? \App\Models\EmailAccount::find($email_account_id);
                                     if ($selectedEmailModel) {
@@ -409,45 +444,81 @@
                                 ])->values();
                             @endphp
                             <div x-data="{
-                                    search: '',
+                                    search: @js($initialSelectedEmailText),
                                     open: false,
-                                    selectedText: @js($initialSelectedEmailText),
+                                    selectedId: $wire.entangle('email_account_id'),
                                     accounts: @js($emailOptions),
-
-                                    get filteredAccounts() {
-                                        if (!this.search.trim()) return this.accounts;
-                                        const q = this.search.toLowerCase();
-                                        return this.accounts.filter(a => a.displayText.toLowerCase().includes(q));
+                                    syncSearchFromSelection() {
+                                        if (!this.selectedId) {
+                                            this.search = '';
+                                            return;
+                                        }
+                                        const selected = this.accounts.find((a) => a.id === String(this.selectedId));
+                                        if (selected) {
+                                            this.search = selected.displayText;
+                                        }
                                     },
-
+                                    get filteredAccounts() {
+                                        const q = this.search.trim().toLowerCase();
+                                        if (!q) return this.accounts;
+                                        const selected = this.accounts.find((a) => a.id === String(this.selectedId));
+                                        if (selected && selected.displayText.toLowerCase() === q) {
+                                            return this.accounts;
+                                        }
+                                        return this.accounts.filter((a) => a.displayText.toLowerCase().includes(q));
+                                    },
+                                    onInput() {
+                                        this.open = true;
+                                        const match = this.accounts.find((a) => a.displayText.toLowerCase() === this.search.trim().toLowerCase());
+                                        this.selectedId = match ? match.id : '';
+                                    },
                                     selectAccount(id, text) {
-                                        $wire.set('email_account_id', id);
-                                        this.selectedText = text;
+                                        this.selectedId = id;
+                                        this.search = text;
                                         this.open = false;
                                     }
                                 }"
                                 class="relative"
-                                @click.outside="open = false">
+                                @click.outside="open = false; syncSearchFromSelection()"
+                                @keydown.escape="open = false; syncSearchFromSelection()">
 
-                                <x-input-label value="Cuenta de Correo Asociada" />
+                                <x-input-label for="modal_email_account_search" value="Cuenta de Correo Asociada" />
 
-                                <button type="button" @click="open = !open" class="mt-1 relative w-full bg-white border border-gray-300 rounded-md shadow-sm pl-3 pr-10 py-2 text-left cursor-default focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                                    <span class="block truncate" x-text="selectedText">{{ $initialSelectedEmailText }}</span>
-                                    <span class="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                        </svg>
-                                    </span>
-                                </button>
+                                <div class="relative mt-1">
+                                    <input
+                                        id="modal_email_account_search"
+                                        x-ref="modalEmailSearch"
+                                        type="text"
+                                        x-model="search"
+                                        @focus="open = true"
+                                        @click="open = true"
+                                        @input="onInput()"
+                                        placeholder="Escribe para buscar por correo o alias..."
+                                        autocomplete="off"
+                                        role="combobox"
+                                        :aria-expanded="open"
+                                        aria-haspopup="listbox"
+                                        class="block w-full rounded-md border-gray-300 bg-white py-2 pl-3 pr-9 text-sm text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                                    >
+                                    <button
+                                        type="button"
+                                        @click="if (selectedId) { selectAccount('', ''); $nextTick(() => { open = true; $refs.modalEmailSearch.focus(); }); } else { open = !open; if (open) $nextTick(() => $refs.modalEmailSearch.focus()); }"
+                                        class="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-600"
+                                        :title="selectedId ? 'Cambiar cuenta' : 'Mostrar cuentas'"
+                                    >
+                                        <template x-if="selectedId">
+                                            <span class="text-sm font-bold leading-none">&times;</span>
+                                        </template>
+                                        <template x-if="!selectedId">
+                                            <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 011.414 0L10 14.586l2.293-2.293a1 1 0 011.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </template>
+                                    </button>
+                                </div>
 
-                                <div x-show="open" class="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto sm:text-sm" style="display: none;">
-                                    <div class="px-2 pb-2 sticky top-0 bg-white pt-2">
-                                        <input type="text" x-model="search" placeholder="Buscar por correo o alias..." class="w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm sm:text-sm">
-                                    </div>
-                                    <ul class="max-h-48 overflow-y-auto">
-                                        <li @click="selectAccount('', 'Seleccione una cuenta...')" class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white">
-                                            <span class="block font-normal truncate">-- Seleccione --</span>
-                                        </li>
+                                <div x-cloak x-show="open" x-transition class="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto sm:text-sm">
+                                    <ul role="listbox" class="max-h-48 overflow-y-auto">
                                         <template x-for="item in filteredAccounts" :key="item.id">
                                             <li @click="selectAccount(item.id, item.displayText)"
                                                 class="text-gray-900 cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-600 hover:text-white transition-colors">
@@ -459,6 +530,7 @@
                                                 </div>
                                             </li>
                                         </template>
+                                        <li x-show="filteredAccounts.length === 0" class="px-3 py-2 text-sm text-gray-500">No se encontraron cuentas.</li>
                                     </ul>
                                 </div>
                                 <x-input-error :messages="$errors->get('email_account_id')" class="mt-2" />
