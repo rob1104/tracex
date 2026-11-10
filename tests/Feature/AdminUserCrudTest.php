@@ -93,4 +93,30 @@ class AdminUserCrudTest extends TestCase
         $this->assertSame($supervisor->id, $collab2->fresh()->supervisor_id);
         $this->assertNull($collab3->fresh()->supervisor_id);
     }
+
+    public function test_admin_can_delete_user_from_users_panel_and_cannot_delete_themselves(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $supervisor = User::factory()->create(['role' => 'supervisor', 'name' => 'Supervisor a Eliminar', 'is_active' => true]);
+        $collaborator = User::factory()->create([
+            'role' => 'user',
+            'name' => 'Colaborador Huérfano',
+            'is_active' => true,
+            'supervisor_id' => $supervisor->id,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('delete', $supervisor->id)
+            ->assertHasNoErrors();
+
+        $this->assertDatabaseMissing('users', ['id' => $supervisor->id]);
+        $this->assertNull($collaborator->fresh()->supervisor_id);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->call('delete', $admin->id);
+
+        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+    }
 }

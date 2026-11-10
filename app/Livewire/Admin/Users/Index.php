@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin\Users;
 
 use App\Models\EmailAccount;
+use App\Models\Profile;
 use App\Models\User;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Hash;
@@ -200,6 +201,37 @@ class Index extends Component
             $user->is_active = ! $user->is_active;
             $user->save();
         }
+    }
+
+    public function delete(int $id): void
+    {
+        abort_unless(auth()->user()?->isAdmin(), 403);
+
+        $user = User::findOrFail($id);
+        if ($user->id === auth()->id()) {
+            return;
+        }
+
+        $deletedName = $user->name;
+
+        User::query()->where('supervisor_id', $user->id)->update(['supervisor_id' => null]);
+        EmailAccount::query()->where('created_by', $user->id)->update(['created_by' => null]);
+        Profile::query()->where('created_by', $user->id)->update(['created_by' => null]);
+        $user->assignedProfiles()->detach();
+
+        if ($this->assigningAdminId === $user->id) {
+            $this->showCollaboratorsModal = false;
+            $this->assigningAdminId = null;
+        }
+
+        if ((int) $this->userId === $user->id) {
+            $this->showModal = false;
+            $this->userId = null;
+        }
+
+        $user->delete();
+
+        session()->flash('status', "Usuario {$deletedName} eliminado correctamente.");
     }
 
     public function buildQuery()
