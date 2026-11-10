@@ -349,4 +349,49 @@ TXT;
             ->get(route('admin.profiles.index'))
             ->assertOk();
     }
+
+    public function test_collaborator_can_deactivate_and_reactivate_assigned_facebook_profiles(): void
+    {
+        $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+        $otherUser = User::factory()->create(['role' => 'user', 'is_active' => true]);
+
+        $email = EmailAccount::create([
+            'email' => 'toggle-profile@example.com',
+            'password' => 'secret',
+            'status' => 'active',
+        ]);
+
+        $assignedProfile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Perfil Propio',
+            'social_network' => 'Facebook',
+            'status' => 'active',
+        ]);
+        $assignedProfile->users()->attach($collaborator->id);
+
+        $unassignedProfile = Profile::create([
+            'email_account_id' => $email->id,
+            'name' => 'Perfil Ajeno',
+            'social_network' => 'Facebook',
+            'status' => 'active',
+        ]);
+        $unassignedProfile->users()->attach($otherUser->id);
+
+        Livewire::actingAs($collaborator)
+            ->test(Index::class)
+            ->call('toggleProfileStatus', $assignedProfile->id);
+
+        $this->assertSame('suspended', $assignedProfile->fresh()->status);
+
+        Livewire::actingAs($collaborator)
+            ->test(\App\Livewire\Admin\Profiles\Index::class)
+            ->call('toggleStatus', $assignedProfile->id);
+
+        $this->assertSame('active', $assignedProfile->fresh()->status);
+
+        Livewire::actingAs($collaborator)
+            ->test(\App\Livewire\Admin\Profiles\Index::class)
+            ->call('toggleStatus', $unassignedProfile->id)
+            ->assertForbidden();
+    }
 }

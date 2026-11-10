@@ -275,7 +275,10 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $profile = Profile::findOrFail($id);
-        if (! $this->canManageProfile($profile)) {
+        $isAssignedCollaborator = auth()->user()->isUser()
+            && $profile->users()->where('users.id', auth()->id())->exists();
+
+        if (! $this->canManageProfile($profile) && ! $isAssignedCollaborator) {
             abort(403);
         }
         $profile->status = $profile->status === 'active' ? 'suspended' : 'active';

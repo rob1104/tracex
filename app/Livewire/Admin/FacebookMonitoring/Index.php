@@ -155,6 +155,20 @@ class Index extends Component
         }
     }
 
+    public function toggleProfileStatus(int $profileId): void
+    {
+        $profile = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        )->find($profileId);
+        abort_if($profile === null, 403);
+
+        $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
+        $profile->save();
+
+        $statusLabel = $profile->status === 'active' ? 'activado' : 'desactivado';
+        session()->flash('status', "El perfil {$profile->name} fue {$statusLabel} correctamente.");
+    }
+
     public function importLocalZip(): void
     {
         abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);

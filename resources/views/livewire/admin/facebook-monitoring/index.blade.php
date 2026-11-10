@@ -191,9 +191,19 @@
                                         <span>{{ $profile->facebook_exports_count ?? 0 }} exportaciones</span>
                                         <span>{{ $profile->latest_facebook_export_at ? \Illuminate\Support\Carbon::parse($profile->latest_facebook_export_at)->format('d/m/Y') : 'Sin exportaciones' }}</span>
                                     </div>
-                                    <a href="#recent-activity" wire:click="showProfileActivity({{ $profile->id }})" class="mt-auto flex w-full items-center justify-center gap-2 rounded-md border border-blue-100 bg-blue-50/70 px-2 py-1.5 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100">
-                                        <span aria-hidden="true">◉</span> Ver actividad
-                                    </a>
+                                    <div class="mt-auto flex items-center gap-2">
+                                        <a href="#recent-activity" wire:click="showProfileActivity({{ $profile->id }})" class="flex flex-1 items-center justify-center gap-2 rounded-md border border-blue-100 bg-blue-50/70 px-2 py-1.5 text-[11px] font-semibold text-blue-700 transition hover:bg-blue-100">
+                                            <span aria-hidden="true">◉</span> Ver actividad
+                                        </a>
+                                        <button
+                                            type="button"
+                                            wire:click="toggleProfileStatus({{ $profile->id }})"
+                                            class="shrink-0 rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition {{ $profile->status === 'active' ? 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100' }}"
+                                            title="{{ $profile->status === 'active' ? 'Desactivar perfil' : 'Activar perfil' }}"
+                                        >
+                                            {{ $profile->status === 'active' ? 'Desactivar' : 'Activar' }}
+                                        </button>
+                                    </div>
                                 </article>
                             @empty
                                 <div class="col-span-full rounded-lg border border-dashed border-slate-200 px-5 py-10 text-center">
