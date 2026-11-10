@@ -14,14 +14,14 @@
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar por correo o alias..." class="w-full" />
                         </div>
                         <div class="flex gap-3">
-                            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
                                 </button>
                             @endif
                             @if(! auth()->user()->isUser())
                                 <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button> <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button>
                             @endif
-                            @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
                                 <x-primary-button wire:click="create">Nueva Cuenta</x-primary-button>
                             @endif
                         </div>

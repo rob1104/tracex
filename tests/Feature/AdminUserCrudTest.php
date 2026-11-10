@@ -70,4 +70,27 @@ class AdminUserCrudTest extends TestCase
             ->assertSet('viewingUserName', 'Gestor Test')
             ->assertSeeHtml($account->email);
     }
+
+    public function test_admin_can_assign_multiple_collaborators_to_a_supervisor(): void
+    {
+        $superAdmin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $supervisor = User::factory()->create(['role' => 'supervisor', 'name' => 'Supervisor Equipo', 'is_active' => true]);
+        $collab1 = User::factory()->create(['role' => 'user', 'name' => 'Colaborador Uno', 'is_active' => true]);
+        $collab2 = User::factory()->create(['role' => 'user', 'name' => 'Colaborador Dos', 'is_active' => true]);
+        $collab3 = User::factory()->create(['role' => 'user', 'name' => 'Colaborador Tres', 'is_active' => true, 'supervisor_id' => $supervisor->id]);
+
+        Livewire::actingAs($superAdmin)
+            ->test(Index::class)
+            ->call('openCollaboratorsModal', $supervisor->id)
+            ->assertSet('showCollaboratorsModal', true)
+            ->assertSet('assigningAdminId', $supervisor->id)
+            ->set('assignedCollaboratorIds', [$collab1->id, $collab2->id])
+            ->call('saveAdminCollaborators')
+            ->assertHasNoErrors()
+            ->assertSet('showCollaboratorsModal', false);
+
+        $this->assertSame($supervisor->id, $collab1->fresh()->supervisor_id);
+        $this->assertSame($supervisor->id, $collab2->fresh()->supervisor_id);
+        $this->assertNull($collab3->fresh()->supervisor_id);
+    }
 }

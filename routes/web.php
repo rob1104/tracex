@@ -29,16 +29,19 @@ Route::middleware(['auth', 'verified', 'role:user'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/evidencias', Index::class)->name('evidences.index');
     Route::get('/usuarios', App\Livewire\Admin\Users\Index::class)->name('users.index');
     Route::get('/tipos-evidencia', App\Livewire\Admin\EvidenceTypes\Index::class)->name('evidence_types.index');
 });
 
-Route::middleware(['auth', 'verified', 'role:admin,cuentas'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'role:admin,supervisor'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/evidencias', Index::class)->name('evidences.index');
+});
+
+Route::middleware(['auth', 'verified', 'role:admin,supervisor,cuentas'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/reporte-evidencias', EvidenceReport::class)->name('evidence-reports.index');
 });
 
-Route::middleware(['auth', 'verified', 'role:admin,cuentas,user'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'role:admin,supervisor,cuentas,user'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/monitoreo-usuarios', App\Livewire\Admin\FacebookMonitoring\Index::class)->name('facebook_monitoring.index');
     Route::get('/cuentas-correo', App\Livewire\Admin\Emails\Index::class)->name('emails.index');
     Route::get('/perfiles-sociales', App\Livewire\Admin\Profiles\Index::class)->name('profiles.index');

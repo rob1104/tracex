@@ -133,15 +133,20 @@ class FacebookTextEvidenceParser
             array_pop($lines);
         }
 
-        $dedupeText = implode("\n", $lines);
-        $text = $dedupeText;
+        $type = $this->activityType($activity['action']);
         $visibilityText = implode(', ', $visibility);
 
-        if ($visibilityText !== '') {
-            $text .= "\nVisibilidad: {$visibilityText}";
-        }
+        if ($type === 'reaction') {
+            $dedupeText = self::extractReactionSummary((string) ($lines[0] ?? $activity['action']));
+            $text = $dedupeText;
+        } else {
+            $dedupeText = implode("\n", $lines);
+            $text = $dedupeText;
 
-        $type = $this->activityType($activity['action']);
+            if ($visibilityText !== '') {
+                $text .= "\nVisibilidad: {$visibilityText}";
+            }
+        }
 
         if ($type === null) {
             $reason = 'El tipo de actividad no está contemplado por el importador.';
@@ -182,6 +187,22 @@ class FacebookTextEvidenceParser
             'text' => $text,
             'source_line' => $activity['line'],
         ];
+    }
+
+    public static function extractReactionSummary(string $text): string
+    {
+        $firstLine = trim((string) strtok($text, "\r\n"));
+
+        if (preg_match('/^(.+?\b(?:le\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|reaccion[oó])\b[^.]*\.)/iu', $firstLine, $matches) === 1) {
+            return trim($matches[1]);
+        }
+
+        $dotPosition = mb_strpos($firstLine, '.');
+        if ($dotPosition !== false) {
+            return trim(mb_substr($firstLine, 0, $dotPosition + 1));
+        }
+
+        return $firstLine;
     }
 
     private function isActivityStart(string $line): bool

@@ -107,6 +107,11 @@ class Index extends Component
     {
         $query = $this->applyFilters(Evidence::query()->with(['user', 'evidenceType', 'images', 'profile']));
 
+        $monitoredIds = auth()->user()?->monitoredCollaboratorIds();
+        if ($monitoredIds !== null) {
+            $query->whereIn('user_id', $monitoredIds);
+        }
+
         if ($this->filterCollaborator) {
             $query->where('user_id', $this->filterCollaborator);
         }
@@ -148,6 +153,7 @@ class Index extends Component
         $evidences = $this->buildQuery()->get();
         $collaborators = User::query()
             ->where('role', 'user')
+            ->forAdminHierarchy(auth()->user())
             ->when($this->filterCollaborator, fn (Builder $query) => $query->whereKey($this->filterCollaborator))
             ->orderBy('name')
             ->orderBy('id')
@@ -242,7 +248,7 @@ class Index extends Component
     public function render()
     {
         return view('livewire.admin.evidences.index', [
-            'collaborators' => User::query()->where('role', 'user')->orderBy('name')->orderBy('id')->get(),
+            'collaborators' => User::query()->where('role', 'user')->forAdminHierarchy(auth()->user())->orderBy('name')->orderBy('id')->get(),
             'evidences' => $this->buildQuery()->paginate(15),
             'types' => EvidenceType::all(),
         ])->layout('layouts.app');

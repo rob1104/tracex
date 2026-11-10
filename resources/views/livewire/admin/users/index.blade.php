@@ -49,10 +49,22 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                     @if($user->role === 'admin')
                                         <span class="px-2 py-1 text-xs font-bold rounded bg-purple-100 text-purple-700">Administrador</span>
+                                    @elseif($user->role === 'supervisor')
+                                        <div class="flex flex-col items-start gap-1">
+                                            <span class="px-2 py-1 text-xs font-bold rounded bg-indigo-100 text-indigo-700">Supervisor</span>
+                                            <span class="text-xs {{ ($user->monitored_collaborators_count ?? 0) > 0 ? 'text-indigo-600 font-medium' : 'text-amber-600' }}">
+                                                {{ ($user->monitored_collaborators_count ?? 0).' colaboradores asignados' }}
+                                            </span>
+                                        </div>
                                     @elseif($user->role === 'cuentas')
                                         <span class="px-2 py-1 text-xs font-bold rounded bg-blue-100 text-blue-700">Cuentas</span>
                                     @else
-                                        <span class="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-600">Usuario Regular</span>
+                                        <div class="flex flex-col items-start gap-1">
+                                            <span class="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-600">Usuario Regular</span>
+                                            <span class="text-xs {{ $user->supervisor ? 'text-indigo-700 font-medium' : 'text-gray-400' }}">
+                                                {{ $user->supervisor ? 'Supervisor: '.$user->supervisor->name : 'Sin supervisor asignado' }}
+                                            </span>
+                                        </div>
                                     @endif
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -64,6 +76,13 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <div class="flex items-center justify-end space-x-2">
+                                        @if($user->role === 'supervisor')
+                                            <button wire:click="openCollaboratorsModal({{ $user->id }})" title="Asignar Colaboradores" class="p-2 text-purple-600 hover:text-purple-900 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+                                                </svg>
+                                            </button>
+                                        @endif
                                         @if($user->role === 'cuentas')
                                             <button wire:click="viewAccounts({{ $user->id }})" title="Ver Cuentas Asignadas" class="p-2 text-emerald-600 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
@@ -134,13 +153,27 @@
 
                             <div>
                                 <x-input-label for="role" value="Rol" />
-                                <select wire:model="role" id="role" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
+                                <select wire:model.live="role" id="role" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full" required>
                                     <option value="user">Usuario Regular</option>
+                                    <option value="supervisor">Supervisor</option>
                                     <option value="cuentas">Gestor de Cuentas</option>
                                     <option value="admin">Administrador</option>
                                 </select>
                                 <x-input-error :messages="$errors->get('role')" class="mt-2" />
                             </div>
+
+                            @if($role === 'user')
+                                <div>
+                                    <x-input-label for="supervisorId" value="Supervisor asignado" />
+                                    <select wire:model="supervisorId" id="supervisorId" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
+                                        <option value="">Sin supervisor asignado</option>
+                                        @foreach($supervisors as $supervisorOption)
+                                            <option value="{{ $supervisorOption->id }}">{{ $supervisorOption->name }}</option>
+                                        @endforeach
+                                    </select>
+                                    <x-input-error :messages="$errors->get('supervisorId')" class="mt-2" />
+                                </div>
+                            @endif
 
                             <div>
                                 <x-input-label for="password" value="Contraseña {{ $userId ? '(Dejar en blanco para no cambiar)' : '' }}" />
@@ -236,6 +269,86 @@
                             Cerrar
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Collaborators Assignment Modal -->
+    @if($showCollaboratorsModal)
+        <div class="fixed z-50 inset-0 overflow-y-auto" aria-labelledby="collaborators-modal-title" role="dialog" aria-modal="true">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:p-0">
+                <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" wire:click="$set('showCollaboratorsModal', false)"></div>
+                <div class="relative bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-2xl w-full">
+                    <form wire:submit="saveAdminCollaborators">
+                        <div class="bg-purple-600 px-6 py-4 flex justify-between items-center">
+                            <h3 class="text-lg leading-6 font-bold text-white" id="collaborators-modal-title">
+                                Asignar colaboradores a {{ $assigningAdminName }}
+                            </h3>
+                            <button type="button" wire:click="$set('showCollaboratorsModal', false)" class="text-purple-100 hover:text-white focus:outline-none">
+                                <span class="sr-only">Cerrar</span>
+                                <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <p class="text-xs text-gray-500">
+                                    Selecciona los colaboradores que este supervisor deberá monitorear.
+                                </p>
+                                <span class="shrink-0 bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full">
+                                    {{ count($assignedCollaboratorIds) }} seleccionados
+                                </span>
+                            </div>
+
+                            <div>
+                                <x-text-input wire:model.live.debounce.300ms="collaboratorSearch" type="search" class="block w-full text-sm" placeholder="Buscar colaborador por nombre o correo..." />
+                            </div>
+
+                            <div class="max-h-80 overflow-y-auto border border-gray-200 rounded-md divide-y divide-gray-100">
+                                @forelse($collaboratorCandidates as $collaborator)
+                                    <label wire:key="assign-collab-{{ $collaborator->id }}" class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-purple-50/40 cursor-pointer">
+                                        <div class="flex items-center gap-3 min-w-0">
+                                            <input
+                                                type="checkbox"
+                                                value="{{ $collaborator->id }}"
+                                                wire:model.live="assignedCollaboratorIds"
+                                                class="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                            >
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-medium text-gray-900 truncate">{{ $collaborator->name }}</p>
+                                                <p class="text-xs text-gray-500 truncate">{{ $collaborator->email }}</p>
+                                            </div>
+                                        </div>
+                                        <div class="shrink-0">
+                                            @if($collaborator->supervisor_id === $assigningAdminId)
+                                                <span class="px-2 py-0.5 text-[11px] font-semibold rounded-full bg-purple-100 text-purple-800">Asignado aquí</span>
+                                            @elseif($collaborator->supervisor)
+                                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-amber-100 text-amber-800">En: {{ $collaborator->supervisor->name }}</span>
+                                            @else
+                                                <span class="px-2 py-0.5 text-[11px] font-medium rounded-full bg-gray-100 text-gray-600">Sin supervisor</span>
+                                            @endif
+                                        </div>
+                                    </label>
+                                @empty
+                                    <div class="py-8 text-center text-sm text-gray-500">
+                                        No se encontraron colaboradores con ese criterio.
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 flex justify-end gap-2 border-t border-gray-200">
+                            <button type="button" wire:click="$set('showCollaboratorsModal', false)" class="inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Cancelar
+                            </button>
+                            <x-primary-button type="submit">
+                                Guardar Asignación
+                            </x-primary-button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

@@ -6,11 +6,14 @@ namespace App\Models;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'supervisor_id', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -41,6 +44,16 @@ class User extends Authenticatable
         return $this->role === 'admin';
     }
 
+    public function isSupervisor(): bool
+    {
+        return $this->role === 'supervisor';
+    }
+
+    public function canMonitorCollaborators(): bool
+    {
+        return $this->isAdmin() || $this->isSupervisor();
+    }
+
     public function isUser(): bool
     {
         return $this->role === 'user';
@@ -64,5 +77,52 @@ class User extends Authenticatable
     public function createdProfiles()
     {
         return $this->hasMany(Profile::class, 'created_by');
+    }
+
+    public function supervisor(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'supervisor_id');
+    }
+
+    public function monitoredCollaborators(): HasMany
+    {
+        return $this->hasMany(self::class, 'supervisor_id')->where('role', 'user');
+    }
+
+    /**
+     * Return the IDs of collaborators assigned to this supervisor, or null for unrestricted roles.
+     *
+     * @return list<int>|null
+     */
+    public function monitoredCollaboratorIds(): ?array
+    {
+        if (! $this->isSupervisor()) {
+            return null;
+        }
+
+        $ids = $this->monitoredCollaborators()
+            ->pluck('users.id')
+            ->map(fn ($id): int => (int) $id)
+            ->values()
+            ->all();
+
+        return $ids !== [] ? $ids : [0];
+    }
+
+    public function hasAssignedCollaborators(): bool
+    {
+        return $this->isSupervisor() && $this->monitoredCollaborators()->exists();
+    }
+
+    public function scopeForAdminHierarchy(Builder $query, ?self $actor = null): Builder
+    {
+        $targetUser = $actor ?? auth()->user();
+        $collaboratorIds = $targetUser?->monitoredCollaboratorIds();
+
+        if ($collaboratorIds !== null) {
+            $query->whereIn($query->qualifyColumn('id'), $collaboratorIds);
+        }
+
+        return $query;
     }
 }

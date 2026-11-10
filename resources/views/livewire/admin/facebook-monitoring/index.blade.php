@@ -7,9 +7,9 @@
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-600">Módulo de monitoreo</p>
                         <h1 class="mt-1 flex items-center gap-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
-                            {{ auth()->user()->isAdmin() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
+                            {{ auth()->user()->canMonitorCollaborators() ? 'Monitoreo de colaboradores' : 'Monitoreo de usuarios' }}
                         </h1>
-                        <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida por Google Drive o mediante cargas locales.' }}</p>
+                        <p class="mt-1 text-sm text-slate-500">{{ auth()->user()->canMonitorCollaborators() ? 'Consulta las exportaciones y actividad de Facebook asociadas a cada colaborador.' : 'Consulta la actividad de Facebook recibida por Google Drive o mediante cargas locales.' }}</p>
                     </div>
                     <div class="flex flex-wrap items-center gap-3">
                         <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-sm">
@@ -47,148 +47,74 @@
                     </article>
                 </section>
 
-                <section id="profile-activity-metrics" class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Métrica de actividad por perfil">
-                    <div class="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div>
-                            <h2 class="text-base font-bold text-slate-900">Métrica de cobertura de actividad en perfiles asignados</h2>
-                            <p class="mt-0.5 text-xs text-slate-500">Identifica qué perfiles asignados ya registran actividad (comentarios, reacciones o compartidos) y cuáles siguen sin actividad.</p>
-                        </div>
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            @foreach([
-                                'all' => 'Todos ('.$totalProfiles.')',
-                                'with_activity' => 'Con actividad ('.$profilesWithActivityCount.')',
-                                'without_activity' => 'Sin actividad ('.$profilesWithoutActivityCount.')',
-                                'missing_id' => 'Sin ID ('.$profilesMissingIdCount.')',
-                            ] as $filterKey => $filterLabel)
-                                <button type="button" wire:click="setProfileActivityFilter('{{ $filterKey }}')" class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition {{ $profileActivityFilter === $filterKey ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
-                                    {{ $filterLabel }}
-                                </button>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div class="mt-4">
-                        <div class="mb-1.5 flex items-center justify-between text-xs">
-                            <span class="font-semibold text-slate-700">{{ $profilesWithActivityCount }} de {{ $totalProfiles }} perfiles han recibido actividad</span>
-                            <span class="font-bold {{ $activityCoveragePercent >= 70 ? 'text-emerald-700' : ($activityCoveragePercent >= 35 ? 'text-amber-700' : 'text-rose-700') }}">{{ $activityCoveragePercent }}%</span>
-                        </div>
-                        <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                            <div class="h-full rounded-full bg-emerald-500 transition-all" style="width: {{ $activityCoveragePercent }}%"></div>
-                        </div>
-                    </div>
-
-                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3.5">
-                            <div class="mb-2.5 flex items-center justify-between">
-                                <h3 class="text-xs font-bold uppercase tracking-wide text-emerald-800">Perfiles con actividad ({{ $profilesWithActivityCount }})</h3>
-                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Activos</span>
-                            </div>
-                            @if($profilesWithActivity->isNotEmpty())
-                                <ul class="max-h-52 space-y-2 overflow-y-auto pr-1">
-                                    @foreach($profilesWithActivity as $activeProfile)
-                                        @php
-                                            $activeComments = (int) ($activeProfile->facebook_comments_count ?? 0) + (int) ($activeProfile->facebook_txt_comments_count ?? 0);
-                                            $activeReactions = (int) ($activeProfile->facebook_reactions_count ?? 0) + (int) ($activeProfile->facebook_txt_reactions_count ?? 0);
-                                            $activeShares = (int) ($activeProfile->facebook_shares_count ?? 0);
-                                        @endphp
-                                        <li wire:key="metric-active-profile-{{ $activeProfile->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200/80 bg-white px-3 py-2 text-xs">
-                                            <div class="min-w-0 flex-1">
-                                                <p class="truncate font-semibold text-slate-800">{{ $activeProfile->name }}</p>
-                                                <p class="text-[11px] text-slate-500">
-                                                    {{ $activeComments }} comentarios · {{ $activeReactions }} reacciones · {{ $activeShares }} compartidos
-                                                </p>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">{{ number_format($activeProfile->total_activity_count) }} act.</span>
-                                                <a href="#recent-activity" wire:click="showProfileActivity({{ $activeProfile->id }})" class="font-semibold text-blue-600 hover:underline">Ver</a>
-                                            </div>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @else
-                                <p class="py-4 text-center text-xs text-slate-500">Ninguno de los perfiles asignados registra actividad todavía.</p>
-                            @endif
-                        </div>
-
-                        <div class="rounded-lg border border-amber-200 bg-amber-50/40 p-3.5">
-                            <div class="mb-2.5 flex items-center justify-between">
-                                <h3 class="text-xs font-bold uppercase tracking-wide text-amber-800">Perfiles sin actividad ({{ $profilesWithoutActivityCount }})</h3>
-                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Pendientes</span>
-                            </div>
-                            @if($profilesWithoutActivity->isNotEmpty())
-                                <ul class="max-h-52 space-y-2 overflow-y-auto pr-1">
-                                    @foreach($profilesWithoutActivity as $inactiveProfile)
-                                        @php
-                                            $hasIdentifier = filled($inactiveProfile->facebook_identifier);
-                                        @endphp
-                                        <li wire:key="metric-inactive-profile-{{ $inactiveProfile->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200/80 bg-white px-3 py-2 text-xs">
-                                            <div class="min-w-0 flex-1">
-                                                <p class="truncate font-semibold text-slate-800">{{ $inactiveProfile->name }}</p>
-                                                <p class="text-[11px] {{ $hasIdentifier ? 'text-slate-500' : 'font-medium text-amber-700' }}">
-                                                    {{ $hasIdentifier ? 'ID vinculado · Sin actividad recibida aún' : 'Falta asociar ID de Facebook' }}
-                                                </p>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                @if(! $hasIdentifier)
-                                                    <a href="#monitored-profiles" wire:click="openAssignIdentifier({{ $inactiveProfile->id }})" class="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200">
-                                                        Asignar ID
-                                                    </a>
-                                                @else
-                                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">0 act.</span>
-                                                @endif
-                                            </div>
-                                        </li>
-                                    @endforeach
-                                </ul>
-                            @else
-                                <p class="py-4 text-center text-xs text-emerald-700">¡Todos los perfiles asignados han recibido actividad!</p>
-                            @endif
-                        </div>
-                    </div>
-                </section>
-
                 <div class="mb-5">
-                    <section id="monitored-profiles" class="rounded-xl border border-slate-200 bg-white shadow-sm">
-                        <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <h2 class="text-lg font-bold text-slate-900">{{ auth()->user()->isAdmin() ? 'Perfiles de Facebook por colaborador' : 'Usuarios de Facebook monitoreados' }}</h2>
-                                <p class="text-sm text-slate-500">{{ auth()->user()->isAdmin() ? 'Actividad acumulada y exportaciones vinculadas a los colaboradores.' : 'Actividad acumulada y exportaciones asociadas a cada usuario.' }}</p>
-                            </div>
-                            <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
-                                @if(auth()->user()->isAdmin())
-                                    <div x-data="{
-                                            open: false,
-                                            selectedId: @js((string) $collaboratorId),
-                                            collaborators: @js($collaborators->map(fn ($collaborator) => ['id' => (string) $collaborator->id, 'name' => $collaborator->name])->values()),
-                                            get selectedText() {
-                                                return this.collaborators.find((collaborator) => collaborator.id === this.selectedId)?.name || 'Todos los colaboradores';
-                                            },
-                                            selectCollaborator(id) {
-                                                this.selectedId = id;
-                                                this.open = false;
-                                                $wire.set('collaboratorId', id);
-                                            }
-                                        }"
-                                        class="relative w-full sm:w-56"
-                                        @click.outside="open = false">
-                                        <label class="sr-only" for="collaboratorFilter">Buscar o filtrar por colaborador</label>
-                                        <button id="collaboratorFilter" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                                            <span class="truncate" x-text="selectedText"></span>
-                                            <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
-                                        </button>
-                                        <div x-cloak x-show="open" x-transition class="absolute right-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
-                                            <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
-                                                <li><button type="button" role="option" :aria-selected="selectedId === ''" @click="selectCollaborator('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Todos los colaboradores</button></li>
-                                                <template x-for="collaborator in collaborators" :key="collaborator.id">
-                                                    <li><button type="button" role="option" :aria-selected="selectedId === collaborator.id" @click="selectCollaborator(collaborator.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50" x-text="collaborator.name"></button></li>
-                                                </template>
-                                            </ul>
+                    <section id="monitored-profiles" class="rounded-xl border border-slate-200 bg-white shadow-sm" aria-label="Gestión de Perfiles de Facebook">
+                        <div class="border-b border-slate-100 px-5 py-4">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h2 class="text-lg font-bold text-slate-900">Gestión de Perfiles de Facebook</h2>
+                                    <p class="text-sm text-slate-500">{{ auth()->user()->canMonitorCollaborators() ? 'Cobertura de actividad, perfiles asignados y exportaciones vinculadas a los colaboradores.' : 'Cobertura de actividad acumulada y exportaciones asociadas a cada perfil asignado.' }}</p>
+                                </div>
+                                <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-nowrap sm:items-center">
+                                    @if(auth()->user()->canMonitorCollaborators())
+                                        <div x-data="{
+                                                open: false,
+                                                selectedId: @js((string) $collaboratorId),
+                                                collaborators: @js($collaborators->map(fn ($collaborator) => ['id' => (string) $collaborator->id, 'name' => $collaborator->name])->values()),
+                                                get selectedText() {
+                                                    return this.collaborators.find((collaborator) => collaborator.id === this.selectedId)?.name || 'Todos los colaboradores';
+                                                },
+                                                selectCollaborator(id) {
+                                                    this.selectedId = id;
+                                                    this.open = false;
+                                                    $wire.set('collaboratorId', id);
+                                                }
+                                            }"
+                                            class="relative w-full sm:w-56"
+                                            @click.outside="open = false">
+                                            <label class="sr-only" for="collaboratorFilter">Buscar o filtrar por colaborador</label>
+                                            <button id="collaboratorFilter" type="button" @click="open = !open" :aria-expanded="open" aria-haspopup="listbox" class="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                                <span class="truncate" x-text="selectedText"></span>
+                                                <svg class="h-4 w-4 shrink-0 text-slate-400" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                            </button>
+                                            <div x-cloak x-show="open" x-transition class="absolute right-0 z-50 mt-1 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                                                <ul role="listbox" class="max-h-60 overflow-y-auto p-1">
+                                                    <li><button type="button" role="option" :aria-selected="selectedId === ''" @click="selectCollaborator('')" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50">Todos los colaboradores</button></li>
+                                                    <template x-for="collaborator in collaborators" :key="collaborator.id">
+                                                        <li><button type="button" role="option" :aria-selected="selectedId === collaborator.id" @click="selectCollaborator(collaborator.id)" class="w-full rounded-md px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50" x-text="collaborator.name"></button></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
                                         </div>
+                                    @endif
+                                    <div class="relative w-full sm:w-64">
+                                        <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">⌕</span>
+                                        <input wire:model.live.debounce.300ms="search" type="search" aria-label="Buscar usuario" placeholder="Buscar usuario..." class="w-full rounded-lg border-slate-200 py-2 pl-9 text-sm">
                                     </div>
-                                @endif
-                                <div class="relative w-full sm:w-64">
-                                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">⌕</span>
-                                    <input wire:model.live.debounce.300ms="search" type="search" aria-label="Buscar usuario" placeholder="Buscar usuario..." class="w-full rounded-lg border-slate-200 py-2 pl-9 text-sm">
+                                </div>
+                            </div>
+
+                            <div class="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 lg:flex-row lg:items-center lg:justify-between">
+                                <div class="min-w-0 flex-1">
+                                    <div class="mb-1.5 flex items-center justify-between text-xs">
+                                        <span class="font-semibold text-slate-700">{{ $profilesWithActivityCount }} de {{ $totalProfiles }} perfiles han recibido actividad</span>
+                                        <span class="font-bold {{ $activityCoveragePercent >= 70 ? 'text-emerald-700' : ($activityCoveragePercent >= 35 ? 'text-amber-700' : 'text-rose-700') }}">{{ $activityCoveragePercent }}%</span>
+                                    </div>
+                                    <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                        <div class="h-full rounded-full bg-emerald-500 transition-all" style="width: {{ $activityCoveragePercent }}%"></div>
+                                    </div>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-1.5 lg:shrink-0">
+                                    @foreach([
+                                        'all' => 'Todos ('.$totalProfiles.')',
+                                        'with_activity' => 'Con actividad ('.$profilesWithActivityCount.')',
+                                        'without_activity' => 'Sin actividad ('.$profilesWithoutActivityCount.')',
+                                        'missing_id' => 'Sin ID ('.$profilesMissingIdCount.')',
+                                    ] as $filterKey => $filterLabel)
+                                        <button type="button" wire:click="setProfileActivityFilter('{{ $filterKey }}')" class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition {{ $profileActivityFilter === $filterKey ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
+                                            {{ $filterLabel }}
+                                        </button>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>
@@ -214,7 +140,7 @@
                                                 </span>
                                             </div>
                                             <p class="mt-0.5 truncate text-xs text-slate-500">{{ $profile->emailAccount?->email ?? 'Sin cuenta asociada' }}</p>
-                                            @if(auth()->user()->isAdmin())
+                                            @if(auth()->user()->canMonitorCollaborators())
                                                 <p class="mt-1 break-words text-xs leading-4 text-indigo-700">Colaborador: {{ $profile->users->first()?->name ?? 'Sin asignar' }}</p>
                                             @endif
                                             <span class="mt-1 inline-flex items-center gap-1.5 text-xs font-medium {{ $identifier !== '' ? 'text-emerald-700' : 'text-amber-700' }}"><span class="h-2 w-2 rounded-full {{ $identifier !== '' ? 'bg-emerald-500' : 'bg-amber-500' }}"></span> {{ $identifier !== '' ? 'Facebook vinculado' : 'ID por asociar' }}</span>
@@ -295,7 +221,7 @@
                                     <p class="mt-1 text-xs text-slate-500">Comentarios, reacciones y publicaciones compartidas de exportaciones y textos importados.</p>
                                 @endif
                             </div>
-                            <a href="{{ auth()->user()->isAdmin() ? route('admin.evidences.index') : route('admin.profiles.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Ver reporte</a>
+                            <a href="{{ auth()->user()->canMonitorCollaborators() ? route('admin.evidences.index') : route('admin.profiles.index') }}" wire:navigate class="text-xs font-semibold text-blue-600 hover:underline">Ver reporte</a>
                         </div>
                         <div class="flex gap-4 overflow-x-auto border-b border-slate-100 px-4 sm:px-5">
                             @foreach(['recent' => 'Actividad reciente', 'imports' => 'Importaciones', 'pending' => 'Cargas pendientes', 'unassigned' => 'Sin asignar'] as $tab => $label)
@@ -377,9 +303,21 @@
                                                 $diagnosticDetail = $importDiagnostics['empty_reason_label'] ?? null;
                                                 $errorText = (string) ($importRecord?->error_message ?? '');
                                                 $basenames = array_map(fn ($path) => strtolower(basename((string) $path)), $importFiles);
-                                                $exportCommentCount = (int) ($importRecord?->total_comments_extracted ?? 0);
-                                                $exportReactionCount = (int) ($importRecord?->total_reactions_extracted ?? 0);
-                                                $exportShareCount = (int) ($importMetadata['facebook_shares_count'] ?? (is_array($importMetadata['facebook_shares'] ?? null) ? count($importMetadata['facebook_shares']) : 0));
+                                                $textCounts = $isTextImport
+                                                    ? ($textImportActivityCounts[$importRow->source_id] ?? ['comments' => 0, 'reactions' => 0, 'shares' => 0])
+                                                    : ['comments' => 0, 'reactions' => 0, 'shares' => 0];
+                                                $exportCommentCount = $isTextImport
+                                                    ? (int) ($textCounts['comments'] ?? 0)
+                                                    : (int) ($importRecord?->total_comments_extracted ?? 0);
+                                                $exportReactionCount = $isTextImport
+                                                    ? (int) ($textCounts['reactions'] ?? 0)
+                                                    : (int) ($importRecord?->total_reactions_extracted ?? 0);
+                                                $exportShareCount = $isTextImport
+                                                    ? (int) ($textCounts['shares'] ?? 0)
+                                                    : max(
+                                                        (int) ($importRecord?->total_shares_extracted ?? 0),
+                                                        (int) ($importMetadata['facebook_shares_count'] ?? (is_array($importMetadata['facebook_shares'] ?? null) ? count($importMetadata['facebook_shares']) : 0))
+                                                    );
                                                 $hasExportActivity = $exportCommentCount + $exportReactionCount + $exportShareCount > 0;
                                                 if (! $isTextImport && $diagnosticDetail === null && ! $hasExportActivity) {
                                                     if (str_contains($errorText, 'formato HTML')) {
@@ -393,12 +331,21 @@
                                                 $textImportIsProcessing = in_array($importRow->status, ['queued_preview', 'analyzing', 'queued', 'processing'], true);
                                                 $textImportName = $importRecord?->original_file_name ?? $importRow->display_name;
                                                 $exportFileName = $importRecord?->file_name ?? $importRow->display_name;
-                                                $emptyExportActivityLabel = match($importRow->status) {
-                                                    'processing' => 'Extrayendo actividad',
-                                                    'downloaded' => 'Pendiente de extracción',
-                                                    'failed' => 'No se pudo extraer',
-                                                    default => 'Sin actividad detectada',
-                                                };
+                                                $emptyExportActivityLabel = $isTextImport
+                                                    ? match($importRow->status) {
+                                                        'queued_preview', 'analyzing' => 'Analizando actividad',
+                                                        'awaiting_confirmation' => 'Pendiente de confirmación',
+                                                        'queued', 'processing' => 'Importando actividad',
+                                                        'failed' => 'No se pudo extraer',
+                                                        'cancelled' => 'Importación descartada',
+                                                        default => 'Sin actividad detectada',
+                                                    }
+                                                    : match($importRow->status) {
+                                                        'processing' => 'Extrayendo actividad',
+                                                        'downloaded' => 'Pendiente de extracción',
+                                                        'failed' => 'No se pudo extraer',
+                                                        default => 'Sin actividad detectada',
+                                                    };
                                             @endphp
                                             <tr class="align-top hover:bg-slate-50/70">
                                                 <td class="whitespace-nowrap px-2 py-3"><span class="inline-flex rounded-full px-2 py-1 text-[10px] font-semibold {{ $isTextImport ? 'bg-indigo-50 text-indigo-700' : (($importMetadata['source'] ?? null) === 'local_upload' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600') }}">{{ $methodLabel }}</span></td>
@@ -407,30 +354,28 @@
                                                 <td class="px-2 py-3 text-slate-600">{{ $collaboratorLabel }}</td>
                                                 <td class="whitespace-nowrap px-2 py-3"><span class="rounded-full px-2 py-1 text-[10px] font-semibold {{ $statusClass }}">{{ $statusLabel }}</span></td>
                                                 <td class="break-words px-2 py-3 text-slate-600">
-                                                    @if($isTextImport)
-                                                        <div class="flex flex-wrap gap-x-2 gap-y-1">
-                                                            <span>Detectadas: {{ number_format($importRecord?->recognized_count ?? 0) }}</span>
-                                                            <span>Importadas: {{ number_format($importRecord?->imported_count ?? 0) }}</span>
-                                                            <span>Duplicadas: {{ number_format($importRecord?->duplicate_count ?? 0) }}</span>
-                                                            <span>Por revisar: {{ number_format($importRecord?->unrecognized_count ?? 0) }}</span>
-                                                        </div>
-                                                        @if($textImportIsProcessing)
-                                                            <p class="mt-1 text-[10px] text-slate-400">Procesadas {{ number_format($importRecord?->processed_count ?? 0) }} de {{ number_format($importRecord?->total_entries ?? 0) }}</p>
-                                                        @elseif($importRow->status === 'awaiting_confirmation')
-                                                            <p class="mt-1 text-[10px] text-blue-600">Pendiente de confirmación desde el módulo de importación.</p>
-                                                        @elseif($errorText !== '')
-                                                            <p class="mt-1 break-words text-[10px] text-rose-600">{{ $errorText }}</p>
-                                                        @endif
-                                                    @elseif($hasExportActivity)
+                                                    @if($hasExportActivity)
                                                         <div class="flex flex-wrap gap-1.5">
                                                             <span class="rounded-full bg-blue-50 px-2 py-1 text-[10px] font-medium text-blue-700">Comentarios: {{ $exportCommentCount }}</span>
                                                             <span class="rounded-full bg-rose-50 px-2 py-1 text-[10px] font-medium text-rose-700">Reacciones: {{ $exportReactionCount }}</span>
                                                             <span class="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700">Compartidos: {{ $exportShareCount }}</span>
                                                         </div>
-                                                        @if($importRow->status === 'failed')<p class="mt-1 text-[10px] text-rose-600">Extracción incompleta</p>@endif
+                                                        @if($isTextImport && $textImportIsProcessing)
+                                                            <p class="mt-1 text-[10px] text-slate-400">Procesadas {{ number_format($importRecord?->processed_count ?? 0) }} de {{ number_format($importRecord?->total_entries ?? 0) }}</p>
+                                                        @elseif($isTextImport && $importRow->status === 'awaiting_confirmation')
+                                                            <p class="mt-1 text-[10px] text-blue-600">Pendiente de confirmación desde el módulo de importación.</p>
+                                                        @elseif($importRow->status === 'failed')
+                                                            <p class="mt-1 text-[10px] text-rose-600">{{ $isTextImport && $errorText !== '' ? $errorText : 'Extracción incompleta' }}</p>
+                                                        @endif
                                                     @else
                                                         <span class="text-slate-500">{{ $emptyExportActivityLabel }}</span>
-                                                        @if($diagnosticDetail)<p class="mt-0.5 text-[10px] text-slate-400">{{ $diagnosticDetail }}</p>@endif
+                                                        @if($isTextImport && $textImportIsProcessing)
+                                                            <p class="mt-0.5 text-[10px] text-slate-400">Procesadas {{ number_format($importRecord?->processed_count ?? 0) }} de {{ number_format($importRecord?->total_entries ?? 0) }}</p>
+                                                        @elseif($isTextImport && $errorText !== '')
+                                                            <p class="mt-0.5 break-words text-[10px] text-rose-600">{{ $errorText }}</p>
+                                                        @elseif($diagnosticDetail)
+                                                            <p class="mt-0.5 text-[10px] text-slate-400">{{ $diagnosticDetail }}</p>
+                                                        @endif
                                                     @endif
                                                 </td>
                                                 <td class="whitespace-nowrap px-2 py-3 text-slate-500">{{ $importRow->received_at ? \Illuminate\Support\Carbon::parse($importRow->received_at)->format('d/m/Y H:i') : 'Sin fecha' }}</td>
@@ -566,7 +511,7 @@
                     </section>
                 </div>
 
-                @if(auth()->user()->isAdmin() || auth()->user()->isCuentas())
+                @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
                 <section id="register-facebook-profile" class="mt-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="mb-4">
                         <h2 class="font-bold text-slate-900">Agregar usuario de Facebook</h2>
