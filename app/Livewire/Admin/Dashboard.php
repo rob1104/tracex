@@ -68,11 +68,14 @@ class Dashboard extends Component
     public function refreshDashboard($dispatch = true)
     {
         $now = now();
+        $monitoredIds = auth()->user()?->monitoredCollaboratorIds();
 
-        $this->todayCount = Evidence::whereDate('created_at', $now->toDateString())->count();
-        $this->weekCount = Evidence::whereBetween('created_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()])->count();
-        $this->monthCount = Evidence::whereMonth('created_at', $now->month)->whereYear('created_at', $now->year)->count();
-        $this->usersCount = User::where('is_active', true)->where('role', 'user')->count();
+        $evidenceScope = fn ($query) => $monitoredIds !== null ? $query->whereIn('user_id', $monitoredIds) : $query;
+
+        $this->todayCount = $evidenceScope(Evidence::whereDate('created_at', $now->toDateString()))->count();
+        $this->weekCount = $evidenceScope(Evidence::whereBetween('created_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()]))->count();
+        $this->monthCount = $evidenceScope(Evidence::whereMonth('created_at', $now->month)->whereYear('created_at', $now->year))->count();
+        $this->usersCount = User::where('is_active', true)->where('role', 'user')->forAdminHierarchy(auth()->user())->count();
 
         $this->accountsToday = EmailAccount::whereDate('created_at', $now->toDateString())->count();
         $this->accountsWeek = EmailAccount::whereBetween('created_at', [$now->copy()->startOfWeek(), $now->copy()->endOfWeek()])->count();
@@ -117,7 +120,9 @@ class Dashboard extends Component
 
     public function loadChartData()
     {
-        $queryBase = Evidence::query();
+        $monitoredIds = auth()->user()?->monitoredCollaboratorIds();
+        $queryBase = Evidence::query()
+            ->when($monitoredIds !== null, fn ($query) => $query->whereIn('user_id', $monitoredIds));
         $accountsBase = EmailAccount::query();
 
         if ($this->filterDateFrom) {
@@ -131,6 +136,7 @@ class Dashboard extends Component
 
         /* --- EVIDENCES --- */
         $this->evidencesByUser = User::where('role', 'user')
+            ->forAdminHierarchy(auth()->user())
             ->withCount(['evidences' => function ($query) {
                 if ($this->filterDateFrom) {
                     $query->whereDate('created_at', '>=', $this->filterDateFrom);
@@ -152,7 +158,10 @@ class Dashboard extends Component
 
         $this->evidencesByDate = $this->fillDateGaps($countsByDate);
 
-        $this->evidencesByType = EvidenceType::withCount(['evidences' => function ($query) {
+        $this->evidencesByType = EvidenceType::withCount(['evidences' => function ($query) use ($monitoredIds) {
+            if ($monitoredIds !== null) {
+                $query->whereIn('user_id', $monitoredIds);
+            }
             if ($this->filterDateFrom) {
                 $query->whereDate('created_at', '>=', $this->filterDateFrom);
             }

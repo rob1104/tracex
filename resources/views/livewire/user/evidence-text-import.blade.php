@@ -22,12 +22,100 @@
             <form wire:submit="startAnalysis" class="grid gap-5 md:grid-cols-2">
                 <div>
                     <x-input-label for="profileId" value="Perfil de Facebook" />
-                    <select id="profileId" wire:model="profileId" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="">Selecciona un perfil asignado</option>
-                        @foreach($profiles as $profile)
-                            <option value="{{ $profile->id }}">{{ $profile->name }}</option>
-                        @endforeach
-                    </select>
+                    <div
+                        x-data="{
+                            open: false,
+                            search: '',
+                            selectedId: $wire.entangle('profileId'),
+                            profiles: @js($profiles->map(fn ($profile) => ['id' => (string) $profile->id, 'name' => $profile->name])->values()),
+                            init() {
+                                this.syncSearchFromSelection();
+                                this.$watch('selectedId', () => this.syncSearchFromSelection());
+                            },
+                            syncSearchFromSelection() {
+                                if (!this.selectedId) {
+                                    this.search = '';
+                                    return;
+                                }
+                                const selected = this.profiles.find((profile) => profile.id === String(this.selectedId));
+                                this.search = selected ? selected.name : '';
+                            },
+                            get filteredProfiles() {
+                                const q = this.search.trim().toLowerCase();
+                                if (!q) return this.profiles;
+                                const selected = this.profiles.find((profile) => profile.id === String(this.selectedId));
+                                if (selected && selected.name.toLowerCase() === q) {
+                                    return this.profiles;
+                                }
+                                return this.profiles.filter((profile) => profile.name.toLowerCase().includes(q));
+                            },
+                            onInput() {
+                                this.open = true;
+                                const match = this.profiles.find((profile) => profile.name.toLowerCase() === this.search.trim().toLowerCase());
+                                this.selectedId = match ? match.id : '';
+                            },
+                            selectProfile(id) {
+                                this.selectedId = id;
+                                this.syncSearchFromSelection();
+                                this.open = false;
+                            }
+                        }"
+                        @click.outside="open = false; syncSearchFromSelection()"
+                        @keydown.escape="open = false; syncSearchFromSelection()"
+                        class="relative mt-1"
+                    >
+                        <div class="relative">
+                            <input
+                                id="profileId"
+                                x-ref="profileSearchInput"
+                                type="text"
+                                x-model="search"
+                                @focus="open = true"
+                                @click="open = true"
+                                @input="onInput()"
+                                placeholder="Selecciona o escribe el nombre del perfil asignado..."
+                                autocomplete="off"
+                                role="combobox"
+                                :aria-expanded="open"
+                                aria-haspopup="listbox"
+                                @disabled($profiles->isEmpty())
+                                class="block w-full rounded-md border-gray-300 bg-white py-2 pl-3 pr-9 text-sm text-gray-700 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100"
+                            >
+                            <button
+                                type="button"
+                                @click="if (selectedId) { selectProfile(''); $nextTick(() => { open = true; $refs.profileSearchInput.focus(); }); } else { open = !open; if (open) $nextTick(() => $refs.profileSearchInput.focus()); }"
+                                @disabled($profiles->isEmpty())
+                                class="absolute inset-y-0 right-0 flex items-center px-2.5 text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+                                :title="selectedId ? 'Cambiar perfil' : 'Mostrar perfiles'"
+                            >
+                                <template x-if="selectedId">
+                                    <span class="text-sm font-bold leading-none">&times;</span>
+                                </template>
+                                <template x-if="!selectedId">
+                                    <svg class="h-4 w-4 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M5.22 7.47a.75.75 0 0 1 1.06 0L10 11.19l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 8.53a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" /></svg>
+                                </template>
+                            </button>
+                        </div>
+                        <div x-cloak x-show="open" x-transition class="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-gray-200 bg-white shadow-lg">
+                            <ul role="listbox" class="max-h-56 overflow-y-auto py-1">
+                                <template x-for="profile in filteredProfiles" :key="profile.id">
+                                    <li>
+                                        <button
+                                            type="button"
+                                            role="option"
+                                            :aria-selected="String(selectedId) === profile.id"
+                                            @click="selectProfile(profile.id)"
+                                            class="flex w-full items-center justify-between truncate px-3 py-2 text-left text-sm text-gray-700 hover:bg-indigo-50"
+                                            :class="String(selectedId) === profile.id ? 'bg-indigo-50 font-semibold text-indigo-700' : ''"
+                                        >
+                                            <span class="truncate" x-text="profile.name"></span>
+                                        </button>
+                                    </li>
+                                </template>
+                                <li x-show="filteredProfiles.length === 0" class="px-3 py-2 text-sm text-gray-500">No se encontraron perfiles con ese nombre.</li>
+                            </ul>
+                        </div>
+                    </div>
                     <x-input-error :messages="$errors->get('profileId')" class="mt-2" />
                     @if($profiles->isEmpty())
                         <p class="mt-2 text-sm text-amber-700">No tienes perfiles activos de Facebook asignados.</p>

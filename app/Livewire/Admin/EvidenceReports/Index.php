@@ -157,6 +157,7 @@ class Index extends Component
             'collaborators' => $filteredCollaborators->paginate(15),
             'collaboratorOptions' => User::query()
                 ->where('role', 'user')
+                ->forAdminHierarchy(auth()->user())
                 ->orderBy('name')
                 ->get(['id', 'name']),
             'totalCollaborators' => (clone $filteredCollaborators)->count(),
@@ -168,6 +169,7 @@ class Index extends Component
     {
         $query = User::query()
             ->where('role', 'user')
+            ->forAdminHierarchy(auth()->user())
             ->withCount(['evidences as evidence_count' => fn (Builder $query) => $this->applyDateRange($query)])
             ->addSelect([
                 'successful_exports_count' => $this->importsForCollaboratorQuery()
@@ -253,7 +255,7 @@ class Index extends Component
 
         return Evidence::query()
             ->whereHas('user', function (Builder $query): void {
-                $query->where('role', 'user');
+                $query->where('role', 'user')->forAdminHierarchy(auth()->user());
                 $this->applyCollaboratorFilters($query);
             })
             ->when($start !== null, fn (Builder $query) => $query->where('created_at', '>=', $start))
@@ -316,6 +318,6 @@ class Index extends Component
 
     private function authorizeAccess(): void
     {
-        abort_unless(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isCuentas()), 403);
+        abort_unless(auth()->check() && (auth()->user()->isAdmin() || auth()->user()->isSupervisor() || auth()->user()->isCuentas()), 403);
     }
 }

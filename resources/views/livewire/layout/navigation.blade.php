@@ -40,7 +40,7 @@ new class extends Component
                         Panel Principal
                     </x-nav-link>
 
-                    @if(auth()->user()->isAdmin())
+                    @if(auth()->user()->isAdmin() || auth()->user()->isSupervisor())
                         <x-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                             Monitoreo de Colaboradores
                         </x-nav-link>
@@ -50,12 +50,14 @@ new class extends Component
                         <x-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
                             Gestión de Evidencias
                         </x-nav-link>
-                        <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
-                            Usuarios de Plataforma
-                        </x-nav-link>
-                        <x-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
-                            Catálogo
-                        </x-nav-link>
+                        @if(auth()->user()->isAdmin())
+                            <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
+                                Usuarios de Plataforma
+                            </x-nav-link>
+                            <x-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                                Catálogo
+                            </x-nav-link>
+                        @endif
                         <x-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
                             Cuentas de Correo
                         </x-nav-link>
@@ -109,6 +111,10 @@ new class extends Component
                                 <span class="ms-2 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
                                     Admin
                                 </span>
+                            @elseif(auth()->user()->isSupervisor())
+                                <span class="ms-2 px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase tracking-wider border border-purple-500/30">
+                                    Supervisor
+                                </span>
                             @elseif(auth()->user()->isCuentas())
                                 <span class="ms-2 px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">
                                     Cuentas
@@ -161,7 +167,7 @@ new class extends Component
                 Panel Principal
             </x-responsive-nav-link>
 
-            @if(auth()->user()->isAdmin())
+            @if(auth()->user()->isAdmin() || auth()->user()->isSupervisor())
                 <x-responsive-nav-link :href="route('admin.facebook_monitoring.index')" :active="request()->routeIs('admin.facebook_monitoring.index')" wire:navigate>
                     Monitoreo de Colaboradores
                 </x-responsive-nav-link>
@@ -171,12 +177,14 @@ new class extends Component
                 <x-responsive-nav-link :href="route('admin.evidences.index')" :active="request()->routeIs('admin.evidences.index')" wire:navigate>
                     Gestión de Evidencias
                 </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
-                    Usuarios de Plataforma
-                </x-responsive-nav-link>
-                <x-responsive-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
-                    Catálogo
-                </x-responsive-nav-link>
+                @if(auth()->user()->isAdmin())
+                    <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.index')" wire:navigate>
+                        Usuarios de Plataforma
+                    </x-responsive-nav-link>
+                    <x-responsive-nav-link :href="route('admin.evidence_types.index')" :active="request()->routeIs('admin.evidence_types.index')" wire:navigate>
+                        Catálogo
+                    </x-responsive-nav-link>
+                @endif
                 <x-responsive-nav-link :href="route('admin.emails.index')" :active="request()->routeIs('admin.emails.index')" wire:navigate>
                     Cuentas de Correo
                 </x-responsive-nav-link>
@@ -225,6 +233,10 @@ new class extends Component
                     @if(auth()->user()->isAdmin())
                         <span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-bold uppercase tracking-wider border border-emerald-500/30">
                             Admin
+                        </span>
+                    @elseif(auth()->user()->isSupervisor())
+                        <span class="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-bold uppercase tracking-wider border border-purple-500/30">
+                            Supervisor
                         </span>
                     @elseif(auth()->user()->isCuentas())
                         <span class="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 text-[10px] font-bold uppercase tracking-wider border border-amber-500/30">

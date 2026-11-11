@@ -57,7 +57,7 @@ class Index extends Component
     {
         $this->authorizeAccountManagement();
 
-        if (auth()->user()->isCuentas() && $value != auth()->id()) {
+        if ((auth()->user()->isCuentas() || auth()->user()->isSupervisor()) && $value != auth()->id()) {
             return;
         }
         if ($value) {
@@ -89,7 +89,7 @@ class Index extends Component
     {
         $this->authorizeAccountManagement();
 
-        if (auth()->user()->isCuentas() && $this->sourceGestorId != auth()->id()) {
+        if ((auth()->user()->isCuentas() || auth()->user()->isSupervisor()) && $this->sourceGestorId != auth()->id()) {
             abort(403);
         }
         $this->validate([
@@ -133,6 +133,14 @@ class Index extends Component
             return true;
         }
 
+        if (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+
+            return $account->profiles()
+                ->whereHas('users', fn ($query) => $query->whereIn('users.id', $monitoredIds))
+                ->exists();
+        }
+
         if ($account->created_by === null) {
             return true;
         }
@@ -152,7 +160,7 @@ class Index extends Component
 
     private function authorizeAccountManagement(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
     }
 
     public function edit($id)
@@ -310,6 +318,12 @@ class Index extends Component
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $query->where(function ($q) use ($monitoredIds) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereHas('profiles.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+            });
         } elseif ($this->gestorFilter) {
             $query->where('created_by', $this->gestorFilter);
         }
@@ -397,14 +411,14 @@ class Index extends Component
 
     private function authorizeExport(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
     }
 
     public function render()
     {
         return view('livewire.admin.emails.index', [
             'accounts' => $this->buildQuery()->paginate(15),
-            'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'supervisor', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
         ])->layout('layouts.app');
     }
 }

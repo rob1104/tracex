@@ -15,8 +15,10 @@ use App\Services\LocalFacebookExportZip;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
@@ -153,9 +155,23 @@ class Index extends Component
         }
     }
 
+    public function toggleProfileStatus(int $profileId): void
+    {
+        $profile = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        )->find($profileId);
+        abort_if($profile === null, 403);
+
+        $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
+        $profile->save();
+
+        $statusLabel = $profile->status === 'active' ? 'activado' : 'desactivado';
+        session()->flash('status', "El perfil {$profile->name} fue {$statusLabel} correctamente.");
+    }
+
     public function importLocalZip(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
         $this->resetValidation('localZip');
 
         $this->validate([
@@ -254,7 +270,7 @@ class Index extends Component
 
     public function registerMonitoredFacebookProfile(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
 
         $this->validate([
             'monitorName' => 'required|string|max:255',
@@ -347,6 +363,15 @@ class Index extends Component
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('role', 'admin'));
             });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds();
+            if ($monitoredIds !== null) {
+                $query->where(function ($profileQuery) use ($monitoredIds) {
+                    $profileQuery->where('created_by', auth()->id())
+                        ->orWhereIn('created_by', $monitoredIds)
+                        ->orWhereHas('users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                });
+            }
         }
 
         return $query;
@@ -354,7 +379,7 @@ class Index extends Component
 
     private function filterProfilesByCollaborator($query)
     {
-        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+        if (auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
             $collaboratorId = (int) $this->collaboratorId;
             $query->where(function ($profileQuery) use ($collaboratorId) {
                 $profileQuery->where('created_by', $collaboratorId)
@@ -397,9 +422,18 @@ class Index extends Component
                         $unassignedQuery->whereNull('profile_id')->where('status', 'pending_assignment');
                     });
             });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds();
+            if ($monitoredIds !== null) {
+                $query->where(function ($importsQuery) use ($monitoredIds) {
+                    $importsQuery->whereIn('user_id', $monitoredIds)
+                        ->orWhereHas('profile', fn ($profileQuery) => $profileQuery->where('created_by', auth()->id())->orWhereIn('created_by', $monitoredIds))
+                        ->orWhereHas('profile.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                });
+            }
         }
 
-        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+        if (auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
             $collaboratorId = (int) $this->collaboratorId;
             $query->where(function ($importsQuery) use ($collaboratorId) {
                 $importsQuery->where('user_id', $collaboratorId)
@@ -426,9 +460,18 @@ class Index extends Component
             });
         } elseif (auth()->user()->isCuentas()) {
             $query->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds();
+            if ($monitoredIds !== null) {
+                $query->where(function ($importsQuery) use ($monitoredIds) {
+                    $importsQuery->whereIn('user_id', $monitoredIds)
+                        ->orWhereHas('profile', fn ($profileQuery) => $profileQuery->where('created_by', auth()->id())->orWhereIn('created_by', $monitoredIds))
+                        ->orWhereHas('profile.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                });
+            }
         }
 
-        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+        if (auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
             $collaboratorId = (int) $this->collaboratorId;
             $query->where(function ($importsQuery) use ($collaboratorId) {
                 $importsQuery->where('user_id', $collaboratorId)
@@ -473,9 +516,17 @@ class Index extends Component
             });
         } elseif (auth()->user()->isCuentas()) {
             $query->whereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds();
+            if ($monitoredIds !== null) {
+                $query->where(function ($activityQuery) use ($monitoredIds) {
+                    $activityQuery->whereIn('user_id', $monitoredIds)
+                        ->orWhereHas('profile', fn ($profileQuery) => $this->restrictToManageableProfiles($profileQuery));
+                });
+            }
         }
 
-        if (auth()->user()->isAdmin() && $this->collaboratorId !== '') {
+        if (auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
             $query->where('user_id', (int) $this->collaboratorId);
         }
 
@@ -527,6 +578,109 @@ class Index extends Component
         $evidencesCount = (int) ($profile->facebook_evidences_count ?? 0);
 
         return max($commentsCount + $reactionsCount + $sharesCount, $evidencesCount);
+    }
+
+    /**
+     * @param  Collection<int, EvidenceTextImport>  $textImports
+     * @return array<int, array{comments: int, reactions: int, shares: int}>
+     */
+    private function resolveTextImportActivityCounts(Collection $textImports): array
+    {
+        if ($textImports->isEmpty()) {
+            return [];
+        }
+
+        $profileIds = $textImports
+            ->filter(fn (EvidenceTextImport $import): bool => $import->status !== 'cancelled' && filled($import->profile_id))
+            ->pluck('profile_id')
+            ->map(fn ($id): int => (int) $id)
+            ->unique()
+            ->values();
+
+        $countsByProfile = [];
+        if ($profileIds->isNotEmpty()) {
+            $rows = Evidence::query()
+                ->join('evidence_types', 'evidence_types.id', '=', 'evidence.evidence_type_id')
+                ->where('evidence.origin', 'facebook_txt')
+                ->whereRaw('LOWER(evidence.social_network) = ?', ['facebook'])
+                ->whereIn('evidence.profile_id', $profileIds)
+                ->selectRaw('evidence.profile_id, evidence_types.name as type_name, COUNT(*) as total')
+                ->groupBy('evidence.profile_id', 'evidence_types.name')
+                ->get();
+
+            foreach ($rows as $row) {
+                $profileId = (int) $row->profile_id;
+                $countsByProfile[$profileId] ??= ['comments' => 0, 'reactions' => 0, 'shares' => 0];
+                $typeName = mb_strtolower((string) $row->type_name);
+
+                if (str_contains($typeName, 'compart')) {
+                    $countsByProfile[$profileId]['shares'] += (int) $row->total;
+                } elseif (str_contains($typeName, 'reacci') || str_contains($typeName, 'like')) {
+                    $countsByProfile[$profileId]['reactions'] += (int) $row->total;
+                } elseif (str_contains($typeName, 'coment')) {
+                    $countsByProfile[$profileId]['comments'] += (int) $row->total;
+                }
+            }
+        }
+
+        $resolved = [];
+        foreach ($textImports as $import) {
+            $counts = ['comments' => 0, 'reactions' => 0, 'shares' => 0];
+
+            if ($import->status === 'cancelled' || ((int) $import->imported_count === 0 && (int) $import->recognized_count === 0)) {
+                $resolved[$import->id] = $counts;
+
+                continue;
+            }
+
+            if (filled($import->parsed_path) && Storage::disk('local')->exists($import->parsed_path)) {
+                $path = Storage::disk('local')->path($import->parsed_path);
+                if (is_file($path) && is_readable($path) && ($handle = fopen($path, 'rb')) !== false) {
+                    try {
+                        while (($line = fgets($handle)) !== false) {
+                            $record = json_decode($line, true);
+                            if (! is_array($record) || ($record['kind'] ?? null) !== 'evidence') {
+                                continue;
+                            }
+                            $typeKey = (string) ($record['type_key'] ?? '');
+                            if ($typeKey === 'comment') {
+                                $counts['comments']++;
+                            } elseif ($typeKey === 'reaction') {
+                                $counts['reactions']++;
+                            } elseif ($typeKey === 'share') {
+                                $counts['shares']++;
+                            }
+                        }
+                    } finally {
+                        fclose($handle);
+                    }
+                }
+            }
+
+            if ($counts['comments'] + $counts['reactions'] + $counts['shares'] === 0 && filled($import->profile_id)) {
+                $profileId = (int) $import->profile_id;
+                if (isset($countsByProfile[$profileId])) {
+                    $counts = $countsByProfile[$profileId];
+                }
+            }
+
+            if ($counts['comments'] + $counts['reactions'] + $counts['shares'] === 0 && is_array($import->preview_records)) {
+                foreach ($import->preview_records as $record) {
+                    $label = mb_strtolower((string) ($record['type_label'] ?? $record['type_key'] ?? ''));
+                    if (str_contains($label, 'compart') || $label === 'share') {
+                        $counts['shares']++;
+                    } elseif (str_contains($label, 'reacci') || str_contains($label, 'like') || $label === 'reaction') {
+                        $counts['reactions']++;
+                    } elseif (str_contains($label, 'coment') || $label === 'comment') {
+                        $counts['comments']++;
+                    }
+                }
+            }
+
+            $resolved[$import->id] = $counts;
+        }
+
+        return $resolved;
     }
 
     public function render()
@@ -596,6 +750,12 @@ class Index extends Component
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($creatorQuery) => $creatorQuery->where('role', 'admin'));
             });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $emailsQuery->where(function ($accountQuery) use ($monitoredIds) {
+                $accountQuery->where('created_by', auth()->id())
+                    ->orWhereHas('profiles.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+            });
         }
 
         $driveConfigured = filled(config('services.google.drive.client_id'))
@@ -610,6 +770,7 @@ class Index extends Component
         $combinedImports = collect();
         $exportImportRecords = collect();
         $textImportRecords = collect();
+        $textImportActivityCounts = [];
         $detectedImportProfileNames = [];
         if ($this->activityTab === 'recent') {
             $activity = $this->activityQuery()
@@ -632,6 +793,7 @@ class Index extends Component
                 ->whereIn('id', $textImportIds)
                 ->get()
                 ->keyBy('id');
+            $textImportActivityCounts = $this->resolveTextImportActivityCounts($textImportRecords->values());
             $detectedImportProfileNames = app(FacebookImportProfileNameResolver::class)
                 ->resolveMany($exportImportRecords->values());
         } else {
@@ -722,8 +884,8 @@ class Index extends Component
                 ->orderByDesc('profiles.created_at')
                 ->orderByDesc('profiles.id')
                 ->paginate(6),
-            'collaborators' => auth()->user()->isAdmin()
-                ? User::query()->where('role', 'user')->where('is_active', true)->orderBy('name')->get()
+            'collaborators' => auth()->user()->canMonitorCollaborators()
+                ? User::query()->where('role', 'user')->where('is_active', true)->forAdminHierarchy(auth()->user())->orderBy('name')->get()
                 : collect(),
             'emails' => $emailsQuery->orderBy('email')->get(),
             'totalProfiles' => $totalProfilesCount,
@@ -743,6 +905,7 @@ class Index extends Component
             'combinedImports' => $combinedImports,
             'exportImportRecords' => $exportImportRecords,
             'textImportRecords' => $textImportRecords,
+            'textImportActivityCounts' => $textImportActivityCounts,
             'detectedImportProfileNames' => $detectedImportProfileNames,
             'chart' => $chart,
             'chartMax' => $chartMax,

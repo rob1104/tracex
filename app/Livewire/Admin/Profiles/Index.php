@@ -99,6 +99,13 @@ class Index extends Component
                         ->orWhereNull('created_by')
                         ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
                 });
+            } elseif (auth()->user()->isSupervisor()) {
+                $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+                $query->where(function ($q) use ($monitoredIds) {
+                    $q->where('created_by', auth()->id())
+                        ->orWhereIn('created_by', $monitoredIds)
+                        ->orWhereHas('users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
+                });
             }
 
             $this->sourceProfiles = $query->get();
@@ -268,7 +275,10 @@ class Index extends Component
     public function toggleStatus($id)
     {
         $profile = Profile::findOrFail($id);
-        if (! $this->canManageProfile($profile)) {
+        $isAssignedCollaborator = auth()->user()->isUser()
+            && $profile->users()->where('users.id', auth()->id())->exists();
+
+        if (! $this->canManageProfile($profile) && ! $isAssignedCollaborator) {
             abort(403);
         }
         $profile->status = $profile->status === 'active' ? 'suspended' : 'active';
@@ -394,6 +404,13 @@ class Index extends Component
             return true;
         }
 
+        if (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+
+            return in_array((int) $profile->created_by, $monitoredIds, true)
+                || $profile->users()->whereIn('users.id', $monitoredIds)->exists();
+        }
+
         if ($profile->users()->where('users.id', auth()->id())->exists()) {
             return true;
         }
@@ -407,12 +424,12 @@ class Index extends Component
 
     private function authorizeProfileManagement(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
     }
 
     private function authorizeImportManagement(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
     }
 
     private function facebookProfilesQuery()
@@ -429,6 +446,13 @@ class Index extends Component
                     ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $query->where(function ($q) use ($monitoredIds) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereIn('created_by', $monitoredIds)
+                    ->orWhereHas('users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
             });
         }
 
@@ -453,6 +477,18 @@ class Index extends Component
                         });
                     });
             });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $query->where(function ($pendingQuery) use ($monitoredIds) {
+                $pendingQuery->whereNull('profile_id')
+                    ->orWhereHas('profile', function ($profileQuery) use ($monitoredIds) {
+                        $profileQuery->where(function ($q) use ($monitoredIds) {
+                            $q->where('created_by', auth()->id())
+                                ->orWhereIn('created_by', $monitoredIds)
+                                ->orWhereHas('users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
+                        });
+                    });
+            });
         }
 
         return $query;
@@ -472,6 +508,18 @@ class Index extends Component
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
             });
+        } elseif (auth()->user()->canMonitorCollaborators()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds();
+            if ($monitoredIds !== null) {
+                $query->where(function ($q) use ($monitoredIds) {
+                    $q->where('created_by', auth()->id())
+                        ->orWhereIn('created_by', $monitoredIds)
+                        ->orWhereHas('users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                });
+            }
+            if ($this->filter_user_id) {
+                $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', $this->filter_user_id));
+            }
         } elseif ($this->filter_user_id) {
             $query->whereHas('users', fn ($userQuery) => $userQuery->where('users.id', $this->filter_user_id));
         }
@@ -560,7 +608,7 @@ class Index extends Component
 
     private function authorizeExport(): void
     {
-        abort_unless(auth()->user()->isAdmin() || auth()->user()->isCuentas(), 403);
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
     }
 
     public function render()
@@ -582,6 +630,12 @@ class Index extends Component
             if ((clone $emailQuery)->where('status', 'active')->count() === 0) {
                 $emailQuery = EmailAccount::query();
             }
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $emailQuery->where(function ($q) use ($monitoredIds) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereHas('profiles.users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
+            });
         }
 
         if ($this->email_account_id) {
@@ -603,6 +657,13 @@ class Index extends Component
                     ->orWhereHas('users', fn ($uq) => $uq->where('users.id', auth()->id()))
                     ->orWhereNull('created_by')
                     ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+            });
+        } elseif (auth()->user()->isSupervisor()) {
+            $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+            $networksQuery->where(function ($q) use ($monitoredIds) {
+                $q->where('created_by', auth()->id())
+                    ->orWhereIn('created_by', $monitoredIds)
+                    ->orWhereHas('users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
             });
         }
 
@@ -652,8 +713,15 @@ class Index extends Component
             }
         }
 
-        $usersList = auth()->user()->isAdmin() || auth()->user()->isCuentas()
-            ? User::where('is_active', true)->whereIn('role', ['user', 'cuentas'])->orderBy('name')->get()
+        $usersList = auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas()
+            ? User::where('is_active', true)
+                ->whereIn('role', ['user', 'cuentas'])
+                ->when(auth()->user()->isSupervisor(), function ($query) {
+                    $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+                    $query->whereIn('id', $monitoredIds);
+                })
+                ->orderBy('name')
+                ->get()
             : collect();
 
         $pendingImports = $pendingImportsQuery->paginate(10, pageName: 'pendingImportsPage');
@@ -667,7 +735,7 @@ class Index extends Component
             'facebookProfiles' => $this->facebookProfilesQuery()->get(),
             'emails' => $emailQuery->orderBy('email')->get(),
             'networks' => $networksQuery->orderBy('social_network')->pluck('social_network'),
-            'cuentasUsers' => auth()->user()->isAdmin() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
+            'cuentasUsers' => auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas() ? User::whereIn('role', ['admin', 'supervisor', 'cuentas'])->where('is_active', true)->orderBy('name')->get() : [],
             'usersList' => $usersList,
         ])->layout('layouts.app');
     }
