@@ -3,6 +3,8 @@
 namespace App\Jobs;
 
 use App\Models\EvidenceTextImport;
+use App\Models\EvidenceType;
+use App\Services\FacebookTextEvidenceIdentity;
 use App\Services\FacebookTextEvidenceParser;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -19,8 +21,10 @@ class AnalyzeFacebookTextEvidenceImport implements ShouldQueue
 
     public function __construct(public int $importId) {}
 
-    public function handle(FacebookTextEvidenceParser $parser): void
-    {
+    public function handle(
+        FacebookTextEvidenceParser $parser,
+        FacebookTextEvidenceIdentity $identity,
+    ): void {
         $import = EvidenceTextImport::find($this->importId);
 
         if (! $import || $import->status === 'cancelled') {
@@ -36,7 +40,7 @@ class AnalyzeFacebookTextEvidenceImport implements ShouldQueue
         $disk = Storage::disk('local');
         $sourcePath = $import->source_path;
 
-        if (! $sourcePath) {
+        if (! $sourcePath || ! $import->profile_id) {
             throw new \RuntimeException('La importación no tiene texto pendiente de análisis.');
         }
 
@@ -59,9 +63,60 @@ class AnalyzeFacebookTextEvidenceImport implements ShouldQueue
         $unrecognizedCount = 0;
         $previewRecords = [];
         $previewUnparsed = [];
+        $duplicatePreview = [];
+        $seenFingerprints = [];
+        $typeIds = [
+            'reaction' => EvidenceType::query()->where('name', 'like', '%Reacci%')->value('id'),
+            'comment' => EvidenceType::query()->where('name', 'Comentario')->value('id'),
+            'share' => EvidenceType::query()->where('name', 'Compartido')->value('id'),
+        ];
 
         try {
             foreach ($parser->parseFile($disk->path($sourcePath)) as $record) {
+                if ($record['kind'] === 'evidence') {
+                    $typeId = $typeIds[$record['type_key']] ?? null;
+                    $matches = [];
+
+                    if ($typeId !== null) {
+                        $fingerprint = $identity->fingerprint($import->profile_id, (int) $typeId, $record);
+                        $existing = $identity->findExisting($import->profile_id, (int) $typeId, $record);
+
+                        if ($existing) {
+                            $matches['database'] = [
+                                'evidence_id' => $existing->id,
+                                'user_name' => $existing->user?->name ?? 'Colaborador anterior',
+                                'type_name' => $existing->evidenceType?->name ?? $record['type_label'],
+                                'origin' => $existing->origin,
+                                'occurred_at' => $existing->external_published_at?->format('Y-m-d H:i:s'),
+                                'text' => $existing->comment ?? '',
+                            ];
+                        }
+
+                        if (isset($seenFingerprints[$fingerprint])) {
+                            $matches['same_import'] = [
+                                'source_line' => $seenFingerprints[$fingerprint]['source_line'],
+                                'text' => $seenFingerprints[$fingerprint]['text'],
+                            ];
+                        } else {
+                            $seenFingerprints[$fingerprint] = [
+                                'source_line' => $record['source_line'],
+                                'text' => $record['text'],
+                            ];
+                        }
+                    }
+
+                    if ($matches !== []) {
+                        $record['duplicate_matches'] = $matches;
+                        $duplicatePreview[] = [
+                            'source_line' => $record['source_line'],
+                            'type_label' => $record['type_label'],
+                            'occurred_at' => $record['occurred_at'],
+                            'text' => $record['text'],
+                            'matches' => $matches,
+                        ];
+                    }
+                }
+
                 fwrite($output, json_encode($record, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)."\n");
                 $totalEntries++;
 
@@ -109,6 +164,8 @@ class AnalyzeFacebookTextEvidenceImport implements ShouldQueue
             'unrecognized_count' => $unrecognizedCount,
             'preview_records' => $previewRecords,
             'preview_unparsed' => $previewUnparsed,
+            'duplicate_preview' => $duplicatePreview,
+            'duplicate_decisions' => [],
         ]);
 
         $disk->delete($sourcePath);

@@ -74,6 +74,19 @@ class EvidenceTextImport extends Component
             return;
         }
 
+        $decisions = $import->duplicate_decisions ?? [];
+        $hasUnreviewedDuplicates = collect($import->duplicate_preview ?? [])->contains(function (array $duplicate) use ($decisions): bool {
+            $sourceLine = (string) $duplicate['source_line'];
+
+            return ! in_array($decisions[$sourceLine] ?? null, ['skip', 'import', 'replace'], true);
+        });
+
+        if ($hasUnreviewedDuplicates) {
+            $this->addError('duplicateDecisions.'.$importId, 'Elige qué hacer con cada coincidencia antes de confirmar.');
+
+            return;
+        }
+
         $import->update([
             'status' => 'queued',
             'error_message' => null,
@@ -81,6 +94,34 @@ class EvidenceTextImport extends Component
 
         ProcessFacebookTextEvidenceImport::dispatch($import->id)
             ->onConnection('facebook_text_imports');
+    }
+
+    public function setDuplicateDecision(int $importId, int $sourceLine, string $decision): void
+    {
+        $import = EvidenceTextImportRecord::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($importId);
+
+        if ($import->status !== 'awaiting_confirmation') {
+            return;
+        }
+
+        $duplicate = $this->findDuplicateCandidate($import, $sourceLine);
+
+        if ($duplicate === null || ! in_array($decision, ['skip', 'import', 'replace'], true)) {
+            abort(404);
+        }
+
+        if ($decision === 'replace' && ! isset($duplicate['matches']['database']['evidence_id'])) {
+            $this->addError('duplicateDecisions.'.$importId, 'Esta coincidencia solo aparece dentro del texto; no hay una evidencia guardada que reemplazar.');
+
+            return;
+        }
+
+        $decisions = $import->duplicate_decisions ?? [];
+        $decisions[(string) $sourceLine] = $decision;
+        $import->update(['duplicate_decisions' => $decisions]);
+        $this->resetErrorBag('duplicateDecisions.'.$importId);
     }
 
     public function discardImport(int $importId): void
@@ -104,6 +145,8 @@ class EvidenceTextImport extends Component
             'parsed_path' => null,
             'preview_records' => null,
             'preview_unparsed' => null,
+            'duplicate_preview' => null,
+            'duplicate_decisions' => null,
         ]);
     }
 
@@ -130,5 +173,17 @@ class EvidenceTextImport extends Component
         return auth()->user()->assignedProfiles()
             ->where('profiles.status', 'active')
             ->whereRaw('LOWER(profiles.social_network) = ?', ['facebook']);
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findDuplicateCandidate(EvidenceTextImportRecord $import, int $sourceLine): ?array
+    {
+        foreach ($import->duplicate_preview ?? [] as $duplicate) {
+            if ((int) ($duplicate['source_line'] ?? 0) === $sourceLine) {
+                return $duplicate;
+            }
+        }
+
+        return null;
     }
 }
