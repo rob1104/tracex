@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'user_id',
@@ -19,6 +20,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'processed_count',
     'imported_count',
     'duplicate_count',
+    'duplicate_preview',
+    'duplicate_decisions',
+    'replaced_count',
     'preview_records',
     'preview_unparsed',
     'error_message',
@@ -34,6 +38,9 @@ class EvidenceTextImport extends Model
             'processed_count' => 'integer',
             'imported_count' => 'integer',
             'duplicate_count' => 'integer',
+            'duplicate_preview' => 'array',
+            'duplicate_decisions' => 'array',
+            'replaced_count' => 'integer',
             'preview_records' => 'array',
             'preview_unparsed' => 'array',
         ];
@@ -47,5 +54,10 @@ class EvidenceTextImport extends Model
     public function profile(): BelongsTo
     {
         return $this->belongsTo(Profile::class);
+    }
+
+    public function evidences(): HasMany
+    {
+        return $this->hasMany(Evidence::class);
     }
 }

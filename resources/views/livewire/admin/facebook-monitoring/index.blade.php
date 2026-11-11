@@ -24,20 +24,127 @@
                     <div class="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800" role="status">{{ session('status') }}</div>
                 @endif
 
-                <section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3" aria-label="Resumen del sistema">
+                <section class="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Resumen del sistema">
                     <article class="flex h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">♟</span>
-                        <div class="min-w-0"><p class="text-xs text-slate-500">Perfiles registrados</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalProfiles }}</p><p class="mt-1 text-xs text-slate-400">Facebook vinculado</p></div>
+                        <div class="min-w-0"><p class="text-xs text-slate-500">Perfiles asignados</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalProfiles }}</p><p class="mt-1 text-xs text-slate-400">{{ $profilesMissingIdCount > 0 ? $profilesMissingIdCount.' sin ID vinculado' : 'Todos con ID vinculado' }}</p></div>
+                    </article>
+                    <article class="flex h-24 items-center gap-3 rounded-xl border border-emerald-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg font-bold text-emerald-600">&#10003;</span>
+                        <div class="min-w-0"><p class="text-xs text-slate-500">Con actividad</p><p class="mt-0.5 text-xl font-bold text-emerald-700">{{ $profilesWithActivityCount }}</p><p class="mt-1 text-xs text-slate-400">{{ $activityCoveragePercent }}% de cobertura</p></div>
+                    </article>
+                    <article class="flex h-24 items-center gap-3 rounded-xl border border-amber-200 bg-white p-3 shadow-sm sm:p-4">
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-amber-50 text-lg font-bold text-amber-600">!</span>
+                        <div class="min-w-0"><p class="text-xs text-slate-500">Sin actividad</p><p class="mt-0.5 text-xl font-bold text-amber-700">{{ $profilesWithoutActivityCount }}</p><p class="mt-1 text-xs text-slate-400">{{ $totalProfiles > 0 ? (100 - $activityCoveragePercent).'% pendiente' : 'Sin perfiles' }}</p></div>
                     </article>
                     <article class="flex h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
                         <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-blue-50 text-lg text-blue-600">↓</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Importaciones</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $totalImports }}</p><p class="mt-1 text-xs text-slate-400">Exportaciones y textos recibidos</p></div>
                     </article>
                     <article class="flex h-24 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-50 text-lg text-emerald-600">&#10003;</span>
+                        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-indigo-50 text-lg text-indigo-600">⟳</span>
                         <div class="min-w-0"><p class="text-xs text-slate-500">Procesamiento</p><p class="mt-0.5 text-xl font-bold text-slate-900">{{ $processingCount > 0 ? 'En proceso' : 'Al día' }}</p><p class="mt-1 text-xs text-slate-400">{{ $processingCount }} cargas pendientes</p></div>
                     </article>
+                </section>
 
+                <section id="profile-activity-metrics" class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5" aria-label="Métrica de actividad por perfil">
+                    <div class="flex flex-col gap-3 border-b border-slate-100 pb-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <h2 class="text-base font-bold text-slate-900">Métrica de cobertura de actividad en perfiles asignados</h2>
+                            <p class="mt-0.5 text-xs text-slate-500">Identifica qué perfiles asignados ya registran actividad (comentarios, reacciones o compartidos) y cuáles siguen sin actividad.</p>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            @foreach([
+                                'all' => 'Todos ('.$totalProfiles.')',
+                                'with_activity' => 'Con actividad ('.$profilesWithActivityCount.')',
+                                'without_activity' => 'Sin actividad ('.$profilesWithoutActivityCount.')',
+                                'missing_id' => 'Sin ID ('.$profilesMissingIdCount.')',
+                            ] as $filterKey => $filterLabel)
+                                <button type="button" wire:click="setProfileActivityFilter('{{ $filterKey }}')" class="rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition {{ $profileActivityFilter === $filterKey ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
+                                    {{ $filterLabel }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    <div class="mt-4">
+                        <div class="mb-1.5 flex items-center justify-between text-xs">
+                            <span class="font-semibold text-slate-700">{{ $profilesWithActivityCount }} de {{ $totalProfiles }} perfiles han recibido actividad</span>
+                            <span class="font-bold {{ $activityCoveragePercent >= 70 ? 'text-emerald-700' : ($activityCoveragePercent >= 35 ? 'text-amber-700' : 'text-rose-700') }}">{{ $activityCoveragePercent }}%</span>
+                        </div>
+                        <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                            <div class="h-full rounded-full bg-emerald-500 transition-all" style="width: {{ $activityCoveragePercent }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50/40 p-3.5">
+                            <div class="mb-2.5 flex items-center justify-between">
+                                <h3 class="text-xs font-bold uppercase tracking-wide text-emerald-800">Perfiles con actividad ({{ $profilesWithActivityCount }})</h3>
+                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">Activos</span>
+                            </div>
+                            @if($profilesWithActivity->isNotEmpty())
+                                <ul class="max-h-52 space-y-2 overflow-y-auto pr-1">
+                                    @foreach($profilesWithActivity as $activeProfile)
+                                        @php
+                                            $activeComments = (int) ($activeProfile->facebook_comments_count ?? 0) + (int) ($activeProfile->facebook_txt_comments_count ?? 0);
+                                            $activeReactions = (int) ($activeProfile->facebook_reactions_count ?? 0) + (int) ($activeProfile->facebook_txt_reactions_count ?? 0);
+                                            $activeShares = (int) ($activeProfile->facebook_shares_count ?? 0);
+                                        @endphp
+                                        <li wire:key="metric-active-profile-{{ $activeProfile->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-emerald-200/80 bg-white px-3 py-2 text-xs">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="truncate font-semibold text-slate-800">{{ $activeProfile->name }}</p>
+                                                <p class="text-[11px] text-slate-500">
+                                                    {{ $activeComments }} comentarios · {{ $activeReactions }} reacciones · {{ $activeShares }} compartidos
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800">{{ number_format($activeProfile->total_activity_count) }} act.</span>
+                                                <a href="#recent-activity" wire:click="showProfileActivity({{ $activeProfile->id }})" class="font-semibold text-blue-600 hover:underline">Ver</a>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="py-4 text-center text-xs text-slate-500">Ninguno de los perfiles asignados registra actividad todavía.</p>
+                            @endif
+                        </div>
+
+                        <div class="rounded-lg border border-amber-200 bg-amber-50/40 p-3.5">
+                            <div class="mb-2.5 flex items-center justify-between">
+                                <h3 class="text-xs font-bold uppercase tracking-wide text-amber-800">Perfiles sin actividad ({{ $profilesWithoutActivityCount }})</h3>
+                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Pendientes</span>
+                            </div>
+                            @if($profilesWithoutActivity->isNotEmpty())
+                                <ul class="max-h-52 space-y-2 overflow-y-auto pr-1">
+                                    @foreach($profilesWithoutActivity as $inactiveProfile)
+                                        @php
+                                            $hasIdentifier = filled($inactiveProfile->facebook_identifier);
+                                        @endphp
+                                        <li wire:key="metric-inactive-profile-{{ $inactiveProfile->id }}" class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200/80 bg-white px-3 py-2 text-xs">
+                                            <div class="min-w-0 flex-1">
+                                                <p class="truncate font-semibold text-slate-800">{{ $inactiveProfile->name }}</p>
+                                                <p class="text-[11px] {{ $hasIdentifier ? 'text-slate-500' : 'font-medium text-amber-700' }}">
+                                                    {{ $hasIdentifier ? 'ID vinculado · Sin actividad recibida aún' : 'Falta asociar ID de Facebook' }}
+                                                </p>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                @if(! $hasIdentifier)
+                                                    <a href="#monitored-profiles" wire:click="openAssignIdentifier({{ $inactiveProfile->id }})" class="rounded-md bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900 transition hover:bg-amber-200">
+                                                        Asignar ID
+                                                    </a>
+                                                @else
+                                                    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">0 act.</span>
+                                                @endif
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @else
+                                <p class="py-4 text-center text-xs text-emerald-700">¡Todos los perfiles asignados han recibido actividad!</p>
+                            @endif
+                        </div>
+                    </div>
                 </section>
 
                 <div class="mb-5">
@@ -90,12 +197,22 @@
                                 @php
                                     $identifier = (string) $profile->facebook_identifier;
                                     $facebookUrl = str_starts_with($identifier, 'uri:') ? substr($identifier, 4) : (str_starts_with($identifier, 'http') ? $identifier : null);
+                                    $cardActivityCount = (int) ($profile->facebook_comments_count ?? 0)
+                                        + (int) ($profile->facebook_txt_comments_count ?? 0)
+                                        + (int) ($profile->facebook_reactions_count ?? 0)
+                                        + (int) ($profile->facebook_txt_reactions_count ?? 0)
+                                        + (int) ($profile->facebook_shares_count ?? 0);
                                 @endphp
                                 <article wire:key="family-profile-{{ $profile->id }}" class="flex min-w-0 flex-col rounded-lg border border-slate-200 p-3 transition hover:border-blue-200 hover:shadow-sm">
                                     <div class="flex items-start gap-3">
                                         <span class="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 text-lg font-bold text-blue-700">{{ mb_strtoupper(mb_substr($profile->name, 0, 1)) }}</span>
                                         <div class="min-w-0 flex-1">
-                                            <h3 class="truncate text-sm font-bold text-slate-900">{{ $profile->name }}</h3>
+                                            <div class="flex items-start justify-between gap-1.5">
+                                                <h3 class="truncate text-sm font-bold text-slate-900">{{ $profile->name }}</h3>
+                                                <span class="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold {{ $cardActivityCount > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
+                                                    {{ $cardActivityCount > 0 ? 'Con actividad' : 'Sin actividad' }}
+                                                </span>
+                                            </div>
                                             <p class="mt-0.5 truncate text-xs text-slate-500">{{ $profile->emailAccount?->email ?? 'Sin cuenta asociada' }}</p>
                                             @if(auth()->user()->isAdmin())
                                                 <p class="mt-1 break-words text-xs leading-4 text-indigo-700">Colaborador: {{ $profile->users->first()?->name ?? 'Sin asignar' }}</p>
@@ -108,7 +225,36 @@
                                     @elseif($identifier !== '')
                                         <p class="mt-2 truncate text-xs text-slate-500">ID de Facebook: {{ str_starts_with($identifier, 'id:') ? substr($identifier, 3) : $identifier }}</p>
                                     @else
-                                        <p class="mt-2 text-xs text-amber-700">Falta asociar un ID de Facebook</p>
+                                        <div class="mt-2 rounded-md border border-amber-200 bg-amber-50/70 p-2">
+                                            <form wire:submit="assignFacebookIdentifier({{ $profile->id }})" class="space-y-1.5">
+                                                <label for="fb-id-input-{{ $profile->id }}" class="block text-[11px] font-semibold text-amber-900">Asignar ID o enlace de Facebook</label>
+                                                <div class="flex gap-1.5">
+                                                    <input
+                                                        id="fb-id-input-{{ $profile->id }}"
+                                                        type="text"
+                                                        wire:model="profileFacebookIdentifiers.{{ $profile->id }}"
+                                                        placeholder="ID numérico o facebook.com/..."
+                                                        class="min-w-0 flex-1 rounded-md border-amber-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-blue-500 focus:ring-blue-500"
+                                                    >
+                                                    <button
+                                                        type="submit"
+                                                        wire:loading.attr="disabled"
+                                                        wire:target="assignFacebookIdentifier({{ $profile->id }})"
+                                                        class="shrink-0 rounded-md bg-blue-600 px-2.5 py-1 text-[11px] font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
+                                                    >
+                                                        Guardar ID
+                                                    </button>
+                                                </div>
+                                                @error('profileFacebookIdentifiers.'.$profile->id)
+                                                    <p class="text-[11px] text-rose-600">{{ $message }}</p>
+                                                @enderror
+                                                @if($assigningIdentifierProfileId === $profile->id)
+                                                    @error('assigningFacebookIdentifier')
+                                                        <p class="text-[11px] text-rose-600">{{ $message }}</p>
+                                                    @enderror
+                                                @endif
+                                            </form>
+                                        </div>
                                     @endif
                                     <div class="my-2 grid grid-cols-3 gap-1.5 border-y border-slate-100 py-2 text-[11px]">
                                         <div><p class="text-slate-500">Comentarios</p><p class="mt-1 font-bold text-slate-800">{{ number_format(($profile->facebook_comments_count ?? 0) + ($profile->facebook_txt_comments_count ?? 0)) }}</p></div>

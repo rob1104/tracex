@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'evidence_type_id', 'profile_id', 'facebook_import_log_id', 'origin', 'external_published_at', 'source_fingerprint', 'social_network', 'comment', 'ip_address', 'user_agent'])]
+#[Fillable(['user_id', 'evidence_type_id', 'profile_id', 'facebook_import_log_id', 'evidence_text_import_id', 'origin', 'external_published_at', 'source_fingerprint', 'social_network', 'comment', 'ip_address', 'user_agent'])]
 class Evidence extends Model
 {
     protected function casts(): array
@@ -38,5 +39,10 @@ class Evidence extends Model
     public function facebookImportLog()
     {
         return $this->belongsTo(FacebookImportLog::class);
+    }
+
+    public function evidenceTextImport(): BelongsTo
+    {
+        return $this->belongsTo(EvidenceTextImport::class);
     }
 }
