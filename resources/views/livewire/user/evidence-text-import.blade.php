@@ -139,9 +139,15 @@
 
                             @if($duplicatePreviews !== [])
                                 <section class="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                                    <div>
-                                        <h5 class="font-semibold text-amber-950">Coincidencias posibles para revisar ({{ number_format(count($duplicatePreviews)) }})</h5>
-                                        <p class="mt-1 text-sm text-amber-900">Compara el texto completo con el registro existente. Elige una opción para cada actividad antes de confirmar.</p>
+                                    <div class="flex flex-wrap items-start justify-between gap-3">
+                                        <div>
+                                            <h5 class="font-semibold text-amber-950">Coincidencias posibles para revisar ({{ number_format(count($duplicatePreviews)) }})</h5>
+                                            <p class="mt-1 text-sm text-amber-900">Compara el texto completo con el registro existente. Puedes enviar todas de todos modos o elegir una acción para cada actividad.</p>
+                                        </div>
+                                        <button type="button" wire:click="setAllDuplicatesToImport({{ $import->id }})" wire:loading.attr="disabled" wire:target="setAllDuplicatesToImport" class="rounded-md bg-amber-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60">
+                                            <span wire:loading.remove wire:target="setAllDuplicatesToImport">Enviar todas</span>
+                                            <span wire:loading wire:target="setAllDuplicatesToImport">Aplicando a todas…</span>
+                                        </button>
                                     </div>
 
                                     @foreach($duplicatePreviews as $duplicate)
@@ -222,7 +228,7 @@
                             @endif
 
                             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                                <p class="text-xs text-slate-500">Revisa cada coincidencia y elige si omitirla, subirla o reemplazar la evidencia guardada.</p>
+                                <p class="text-xs text-slate-500">Define qué hacer con las coincidencias antes de confirmar la importación.</p>
                                 <div class="flex gap-2">
                                     <button wire:click="discardImport({{ $import->id }})" wire:confirm="¿Descartar esta vista previa y borrar el texto temporal?" class="rounded-md border border-slate-300 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-slate-700 hover:bg-slate-50">Descartar</button>
                                     <button wire:click="confirmImport({{ $import->id }})" @disabled($import->recognized_count < 1 || $hasUnreviewedDuplicates) class="rounded-md bg-emerald-600 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50">Confirmar importación</button>
