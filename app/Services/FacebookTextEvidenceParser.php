@@ -193,7 +193,7 @@ class FacebookTextEvidenceParser
     {
         $firstLine = trim((string) strtok($text, "\r\n"));
 
-        if (preg_match('/^(.+?\b(?:le\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|reaccion[oó])\b[^.]*\.)/iu', $firstLine, $matches) === 1) {
+        if (preg_match('/^(.+?\b(?:le\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|(?:ha\s+)?reaccion(?:ó|o|ado))\b[^.]*\.)/iu', $firstLine, $matches) === 1) {
             return trim($matches[1]);
         }
 
@@ -209,21 +209,21 @@ class FacebookTextEvidenceParser
     {
         $name = "(?:A\\s+)?[\\p{Lu}][\\p{L}\\p{M}'’.-]+(?:\\s+[\\p{Lu}][\\p{L}\\p{M}'’.-]+){1,7}";
 
-        return preg_match('/^'.$name.'\\s+(?:le\\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|reaccion[oó]|coment[oó]|compart(?:ió|io|o))\\b/iu', $line) === 1
+        return preg_match('/^'.$name.'\\s+(?:le\\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|(?:ha\\s+)?reaccion(?:ó|o|ado)|(?:ha\\s+)?coment(?:ó|o|ado)|(?:ha\\s+)?compart(?:ió|io|o|ido))\\b/iu', $line) === 1
             || preg_match('/^'.$name.'\\s+(?:ha\\s+[\\p{L}]+|fue\\s+[\\p{L}]+|[\\p{L}\\p{M}]+(?:ó|ió))\\b/u', $line) === 1;
     }
 
     private function activityType(string $action): ?string
     {
-        if (preg_match('/\\b(?:le\\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|reaccion[oó])\\b/iu', $action) === 1) {
+        if (preg_match('/\\b(?:le\\s+(?:gusta|gust[oó]|encanta|divierte|entristece|enoja|asombra|importa)|(?:ha\\s+)?reaccion(?:ó|o|ado))\\b/iu', $action) === 1) {
             return 'reaction';
         }
 
-        if (preg_match('/\\bcoment[oó]\\b/iu', $action) === 1) {
+        if (preg_match('/\\b(?:ha\\s+)?coment(?:ó|o|ado)\\b/iu', $action) === 1) {
             return 'comment';
         }
 
-        if (preg_match('/\\bcompart(?:ió|io|o)\\b/iu', $action) === 1) {
+        if (preg_match('/\\b(?:ha\\s+)?compart(?:ió|io|o|ido)\\b/iu', $action) === 1) {
             return 'share';
         }
 
@@ -250,11 +250,34 @@ class FacebookTextEvidenceParser
     {
         $line = preg_replace('/[\x{00A0}\x{202F}]/u', ' ', trim($line)) ?? trim($line);
 
-        if (preg_match('/^(\d{1,2}):(\d{2})\s*(am|pm)$/iu', $line, $matches) !== 1) {
-            return null;
+        if (preg_match('/^(\d{1,2}):(\d{2})\s*(am|pm)$/iu', $line, $matches) === 1) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+
+            if ($hour < 1 || $hour > 12 || $minute < 0 || $minute > 59) {
+                return null;
+            }
+
+            return sprintf('%d:%02d %s', $hour, $minute, strtolower($matches[3]));
         }
 
-        return sprintf('%d:%02d %s', (int) $matches[1], (int) $matches[2], strtolower($matches[3]));
+        if (preg_match('/^([01]?\d|2[0-3]):([0-5]\d)$/u', $line, $matches) === 1) {
+            return $this->convert24HourTo12Hour((int) $matches[1], (int) $matches[2]);
+        }
+
+        return null;
+    }
+
+    private function convert24HourTo12Hour(int $hour24, int $minute): string
+    {
+        $period = $hour24 >= 12 ? 'pm' : 'am';
+        $hour12 = $hour24 % 12;
+
+        if ($hour12 === 0) {
+            $hour12 = 12;
+        }
+
+        return sprintf('%d:%02d %s', $hour12, $minute, $period);
     }
 
     private function isSectionHeading(string $line): bool

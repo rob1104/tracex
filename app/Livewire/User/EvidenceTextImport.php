@@ -124,6 +124,35 @@ class EvidenceTextImport extends Component
         $this->resetErrorBag('duplicateDecisions.'.$importId);
     }
 
+    public function importAllDuplicates(int $importId): void
+    {
+        $import = EvidenceTextImportRecord::query()
+            ->where('user_id', auth()->id())
+            ->findOrFail($importId);
+
+        if ($import->status !== 'awaiting_confirmation') {
+            return;
+        }
+
+        $duplicatePreviews = $import->duplicate_preview ?? [];
+
+        if ($duplicatePreviews === []) {
+            return;
+        }
+
+        $decisions = $import->duplicate_decisions ?? [];
+
+        foreach ($duplicatePreviews as $duplicate) {
+            if (isset($duplicate['source_line'])) {
+                $decisions[(string) $duplicate['source_line']] = 'import';
+            }
+        }
+
+        $import->update(['duplicate_decisions' => $decisions]);
+        $this->resetErrorBag('duplicateDecisions.'.$importId);
+        $this->confirmImport($importId);
+    }
+
     public function discardImport(int $importId): void
     {
         $import = EvidenceTextImportRecord::query()
