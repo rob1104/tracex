@@ -232,7 +232,7 @@
                                             <h5 class="font-semibold text-amber-950">Coincidencias posibles para revisar ({{ number_format(count($duplicatePreviews)) }})</h5>
                                             <p class="mt-1 text-sm text-amber-900">Pulsa “Enviar todas” para importar este texto de una vez, o decide qué hacer con cada coincidencia.</p>
                                         </div>
-                                        <button type="button" wire:click="importAllDuplicates({{ $import->id }})" wire:loading.attr="disabled" wire:target="importAllDuplicates" class="rounded-md bg-amber-700 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm hover:bg-amber-800 disabled:cursor-wait disabled:opacity-60">
+                                        <button type="button" wire:click="importAllDuplicates({{ $import->id }})" wire:loading.attr="disabled" wire:target="importAllDuplicates" class="rounded-md bg-indigo-600 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-wait disabled:opacity-60">
                                             <span wire:loading.remove wire:target="importAllDuplicates">Enviar todas</span>
                                             <span wire:loading wire:target="importAllDuplicates">Enviando importación…</span>
                                         </button>
