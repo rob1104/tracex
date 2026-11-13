@@ -124,7 +124,7 @@ class EvidenceTextImport extends Component
         $this->resetErrorBag('duplicateDecisions.'.$importId);
     }
 
-    public function setAllDuplicatesToImport(int $importId): void
+    public function importAllDuplicates(int $importId): void
     {
         $import = EvidenceTextImportRecord::query()
             ->where('user_id', auth()->id())
@@ -150,6 +150,7 @@ class EvidenceTextImport extends Component
 
         $import->update(['duplicate_decisions' => $decisions]);
         $this->resetErrorBag('duplicateDecisions.'.$importId);
+        $this->confirmImport($importId);
     }
 
     public function discardImport(int $importId): void
