@@ -175,7 +175,7 @@ class Index extends Component
     {
         $this->authorizeProfileManagement();
         $this->resetValidation();
-        $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status']);
+        $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status', 'assignedUsers']);
         $this->status = 'active';
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
@@ -184,6 +184,7 @@ class Index extends Component
     public function edit($id)
     {
         $this->resetValidation();
+        $this->assignedUsers = [];
         $profile = Profile::findOrFail($id);
 
         if (! $this->canManageProfile($profile)) {
@@ -216,6 +217,8 @@ class Index extends Component
             'password' => 'nullable|string|max:255',
             'social_network' => 'required|string|max:255',
             'status' => 'required|in:active,suspended,restricted',
+            'assignedUsers' => 'array',
+            'assignedUsers.*' => 'integer|distinct',
         ];
 
         if (auth()->user()->isAdmin()) {
@@ -223,6 +226,28 @@ class Index extends Component
         }
 
         $this->validate($rules);
+
+        $selectedUserIds = collect($this->assignedUsers)
+            ->map(fn ($userId): int => (int) $userId)
+            ->unique()
+            ->values();
+
+        if ($selectedUserIds->isNotEmpty()) {
+            $eligibleUsersQuery = User::query()
+                ->whereIn('id', $selectedUserIds)
+                ->where('is_active', true)
+                ->whereIn('role', ['user', 'cuentas']);
+
+            if (auth()->user()->isSupervisor()) {
+                $eligibleUsersQuery->whereIn('id', auth()->user()->monitoredCollaboratorIds() ?? [0]);
+            }
+
+            if ($eligibleUsersQuery->count() !== $selectedUserIds->count()) {
+                $this->addError('assignedUsers', 'Selecciona colaboradores activos disponibles.');
+
+                return;
+            }
+        }
 
         $rawFacebookIdentifier = trim((string) $this->facebook_identifier);
         $facebookIdentifier = FacebookProfileIdentifier::normalize($rawFacebookIdentifier);
@@ -263,9 +288,13 @@ class Index extends Component
             session()->flash('status', 'Perfil actualizado correctamente.');
         } else {
             $newProfile = Profile::create($data);
+            $collaboratorIds = $selectedUserIds->all();
+
             if (auth()->user()->isCuentas()) {
-                $newProfile->users()->syncWithoutDetaching([auth()->id()]);
+                $collaboratorIds[] = auth()->id();
             }
+
+            $newProfile->users()->sync(array_unique($collaboratorIds));
             session()->flash('status', 'Perfil creado correctamente.');
         }
 
