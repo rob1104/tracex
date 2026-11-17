@@ -6,16 +6,20 @@ use App\Models\EmailAccount;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\BatchAccountProfileImporter;
 use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\ProfileAssignmentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Livewire\Attributes\Validate;
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Throwable;
 
 class Index extends Component
 {
+    use WithFileUploads;
     use WithPagination;
 
     public $showModal = false;
@@ -47,6 +51,8 @@ class Index extends Component
 
     public $created_by = '';
 
+    public string $collaborator_id = '';
+
     public $filter_email_account_id = '';
 
     public $filter_status = '';
@@ -63,6 +69,13 @@ class Index extends Component
     public $assignProfile = null;
 
     public $assignedUsers = [];
+
+    // For Collaborator Profiles View Modal
+    public bool $showColabProfilesModal = false;
+
+    public string $selectedColabViewId = '';
+
+    public $viewingColabProfiles = [];
 
     // For Mass Assignment Modal
     public $showMassAssignModal = false;
@@ -82,6 +95,150 @@ class Index extends Component
     public $claimProfileId = '';
 
     public $claimUserId = '';
+
+    public bool $showBatchImportModal = false;
+
+    public $batchFile = null;
+
+    public string $batchCollaboratorId = '';
+
+    public bool $batchOverrideCollaborator = false;
+
+    public bool $batchCreateMissingCollaborators = true;
+
+    /** @var array<string, mixed>|null */
+    public ?array $batchImportSummary = null;
+
+    public function openColabProfilesModal(): void
+    {
+        $this->authorizeProfileManagement();
+        $this->selectedColabViewId = '';
+        $this->viewingColabProfiles = [];
+        $this->showColabProfilesModal = true;
+    }
+
+    public function updatedSelectedColabViewId($value): void
+    {
+        $this->authorizeProfileManagement();
+
+        if ($value) {
+            $this->viewingColabProfiles = Profile::with('emailAccount')
+                ->whereHas('users', fn ($q) => $q->where('users.id', $value))
+                ->orderBy('name')
+                ->get();
+        } else {
+            $this->viewingColabProfiles = [];
+        }
+    }
+
+    public function updatedEmailAccountId($value): void
+    {
+        if ($value) {
+            $account = EmailAccount::with('profiles.users')->find($value);
+            if ($account) {
+                $existingUserIds = $account->profiles
+                    ->flatMap(fn (Profile $p) => $p->users->pluck('id'))
+                    ->map(fn ($id): int => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+                if ($existingUserIds !== []) {
+                    if ($this->collaborator_id === '') {
+                        $this->collaborator_id = (string) $existingUserIds[0];
+                    }
+                    if ($this->assignedUsers === []) {
+                        $this->assignedUsers = $existingUserIds;
+                    }
+                }
+                if ($this->name === '' && filled($account->alias)) {
+                    $this->name = (string) $account->alias;
+                }
+            }
+        }
+    }
+
+    public function openBatchImportModal(): void
+    {
+        $this->authorizeProfileManagement();
+        $this->resetValidation();
+        $this->reset([
+            'batchFile',
+            'batchCollaboratorId',
+            'batchOverrideCollaborator',
+            'batchImportSummary',
+        ]);
+        $this->batchCreateMissingCollaborators = true;
+        $this->showBatchImportModal = true;
+    }
+
+    public function downloadBatchTemplate()
+    {
+        $this->authorizeProfileManagement();
+
+        return response()->streamDownload(function (): void {
+            $tempPath = tempnam(sys_get_temp_dir(), 'tracex_plantilla_perfiles_').'.xlsx';
+            try {
+                app(BatchAccountProfileImporter::class)->createTemplate($tempPath);
+                readfile($tempPath);
+            } finally {
+                if (is_file($tempPath)) {
+                    @unlink($tempPath);
+                }
+            }
+        }, 'plantilla_importacion_perfiles_facebook.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function importBatchXlsx(): void
+    {
+        $this->authorizeProfileManagement();
+        $this->resetValidation('batchFile');
+
+        $this->validate([
+            'batchFile' => 'required|file|max:20480',
+            'batchCollaboratorId' => 'nullable|integer|exists:users,id',
+        ], [
+            'batchFile.required' => 'Selecciona un archivo .xlsx o .csv para importar.',
+            'batchFile.max' => 'El archivo no debe superar los 20 MB.',
+        ]);
+
+        $originalName = (string) $this->batchFile->getClientOriginalName();
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (! in_array($extension, ['xlsx', 'csv'], true)) {
+            $this->addError('batchFile', 'El archivo debe ser de formato Excel (.xlsx) o CSV (.csv).');
+
+            return;
+        }
+
+        try {
+            $summary = app(BatchAccountProfileImporter::class)->importFromFile(
+                $this->batchFile->getRealPath(),
+                auth()->user(),
+                [
+                    'default_collaborator_id' => $this->batchCollaboratorId !== '' ? (int) $this->batchCollaboratorId : null,
+                    'override_collaborator' => $this->batchOverrideCollaborator,
+                    'create_missing_collaborators' => $this->batchCreateMissingCollaborators,
+                    'created_by' => auth()->id(),
+                ],
+                $extension,
+                $originalName
+            );
+        } catch (Throwable $e) {
+            $this->addError('batchFile', $e->getMessage());
+
+            return;
+        }
+
+        $this->batchImportSummary = $summary;
+        $this->reset('batchFile');
+        $this->resetPage();
+
+        session()->flash(
+            'status',
+            "Importación por lote completada: {$summary['emails_created']} correos nuevos, {$summary['profiles_created']} perfiles creados, {$summary['profiles_updated']} perfiles actualizados y {$summary['collaborator_links']} vínculos con colaboradores."
+        );
+    }
 
     public function updatedSourceColabId($value)
     {
@@ -175,7 +332,18 @@ class Index extends Component
     {
         $this->authorizeProfileManagement();
         $this->resetValidation();
-        $this->reset(['profileId', 'email_account_id', 'name', 'facebook_identifier', 'password', 'social_network', 'status']);
+        $this->reset([
+            'profileId',
+            'email_account_id',
+            'name',
+            'facebook_identifier',
+            'password',
+            'social_network',
+            'status',
+            'collaborator_id',
+            'assignedUsers',
+        ]);
+        $this->social_network = 'Facebook';
         $this->status = 'active';
         $this->created_by = auth()->user()->isAdmin() ? '' : auth()->id();
         $this->showModal = true;
@@ -184,7 +352,8 @@ class Index extends Component
     public function edit($id)
     {
         $this->resetValidation();
-        $profile = Profile::findOrFail($id);
+        $this->assignedUsers = [];
+        $profile = Profile::with('users:id')->findOrFail($id);
 
         if (! $this->canManageProfile($profile)) {
             abort(403);
@@ -196,12 +365,14 @@ class Index extends Component
         $this->facebook_identifier = $profile->facebook_identifier;
         try {
             $this->password = $profile->password;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             $this->password = '';
         }
         $this->social_network = $profile->social_network;
         $this->status = $profile->status ?: 'active';
         $this->created_by = $profile->created_by;
+        $firstUserId = $profile->users->pluck('id')->first();
+        $this->collaborator_id = $firstUserId ? (string) $firstUserId : '';
         $this->showModal = true;
     }
 
@@ -216,6 +387,9 @@ class Index extends Component
             'password' => 'nullable|string|max:255',
             'social_network' => 'required|string|max:255',
             'status' => 'required|in:active,suspended,restricted',
+            'collaborator_id' => 'nullable|integer|exists:users,id',
+            'assignedUsers' => 'array',
+            'assignedUsers.*' => 'integer|distinct',
         ];
 
         if (auth()->user()->isAdmin()) {
@@ -223,6 +397,33 @@ class Index extends Component
         }
 
         $this->validate($rules);
+
+        $selectedUserIds = collect($this->assignedUsers)
+            ->when($this->collaborator_id !== '', fn ($c) => $c->push((int) $this->collaborator_id))
+            ->map(fn ($userId): int => (int) $userId)
+            ->unique()
+            ->values();
+
+        if ($selectedUserIds->isNotEmpty()) {
+            $eligibleUsersQuery = User::query()
+                ->whereIn('id', $selectedUserIds)
+                ->where('is_active', true)
+                ->whereIn('role', ['user', 'cuentas']);
+
+            if (auth()->user()->isSupervisor()) {
+                $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
+                $eligibleUsersQuery->where(function ($subQuery) use ($monitoredIds) {
+                    $subQuery->whereIn('id', $monitoredIds)
+                        ->orWhere(fn ($unassigned) => $unassigned->where('role', 'user')->whereNull('supervisor_id'));
+                });
+            }
+
+            if ($eligibleUsersQuery->count() !== $selectedUserIds->count()) {
+                $this->addError('assignedUsers', 'Selecciona colaboradores activos disponibles.');
+
+                return;
+            }
+        }
 
         $rawFacebookIdentifier = trim((string) $this->facebook_identifier);
         $facebookIdentifier = FacebookProfileIdentifier::normalize($rawFacebookIdentifier);
@@ -254,19 +455,51 @@ class Index extends Component
             $data['created_by'] = auth()->id();
         }
 
+        $collaboratorIdsToAttach = $selectedUserIds->all();
+        if ($collaboratorIdsToAttach !== [] && auth()->user()->isSupervisor()) {
+            User::query()
+                ->whereIn('id', $collaboratorIdsToAttach)
+                ->where('role', 'user')
+                ->whereNull('supervisor_id')
+                ->update(['supervisor_id' => auth()->id()]);
+        } elseif ($collaboratorIdsToAttach === []) {
+            $emailAccount = EmailAccount::with('profiles.users')->find($this->email_account_id);
+            if ($emailAccount) {
+                $collaboratorIdsToAttach = $emailAccount->profiles
+                    ->flatMap(fn (Profile $p) => $p->users->pluck('id'))
+                    ->map(fn ($id): int => (int) $id)
+                    ->unique()
+                    ->values()
+                    ->all();
+            }
+        }
+
         if ($this->profileId) {
             $profile = Profile::find($this->profileId);
             if (! $this->canManageProfile($profile)) {
                 abort(403);
             }
             $profile->update($data);
+            $targetProfile = $profile;
+            if ($collaboratorIdsToAttach !== []) {
+                $targetProfile->users()->syncWithoutDetaching($collaboratorIdsToAttach);
+            }
             session()->flash('status', 'Perfil actualizado correctamente.');
         } else {
-            $newProfile = Profile::create($data);
+            $targetProfile = Profile::create($data);
             if (auth()->user()->isCuentas()) {
-                $newProfile->users()->syncWithoutDetaching([auth()->id()]);
+                $collaboratorIdsToAttach[] = auth()->id();
             }
+            $targetProfile->users()->sync(array_unique($collaboratorIdsToAttach));
             session()->flash('status', 'Perfil creado correctamente.');
+        }
+
+        if ($collaboratorIdsToAttach !== []) {
+            Profile::query()
+                ->where('email_account_id', $this->email_account_id)
+                ->whereKeyNot($targetProfile->id)
+                ->get()
+                ->each(fn (Profile $sibling) => $sibling->users()->syncWithoutDetaching($collaboratorIdsToAttach));
         }
 
         $this->showModal = false;
@@ -315,7 +548,32 @@ class Index extends Component
             if (! $this->canManageProfile($this->assignProfile)) {
                 abort(403);
             }
-            $this->assignProfile->users()->sync($this->assignedUsers);
+
+            $cleanIds = collect($this->assignedUsers)
+                ->filter(fn ($id): bool => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if (auth()->user()->isSupervisor() && $cleanIds !== []) {
+                User::query()
+                    ->where('role', 'user')
+                    ->whereNull('supervisor_id')
+                    ->whereIn('id', $cleanIds)
+                    ->update(['supervisor_id' => auth()->id()]);
+            }
+
+            $this->assignProfile->users()->sync($cleanIds);
+
+            if ($this->assignProfile->email_account_id && $cleanIds !== []) {
+                Profile::query()
+                    ->where('email_account_id', $this->assignProfile->email_account_id)
+                    ->whereKeyNot($this->assignProfile->id)
+                    ->get()
+                    ->each(fn (Profile $sibling) => $sibling->users()->syncWithoutDetaching($cleanIds));
+            }
+
             session()->flash('status', 'Asignaciones guardadas correctamente para: '.$this->assignProfile->name);
         }
         $this->showAssignModal = false;
@@ -407,8 +665,17 @@ class Index extends Component
         if (auth()->user()->isSupervisor()) {
             $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
 
-            return in_array((int) $profile->created_by, $monitoredIds, true)
-                || $profile->users()->whereIn('users.id', $monitoredIds)->exists();
+            if (in_array((int) $profile->created_by, $monitoredIds, true)
+                || $profile->users()->whereIn('users.id', $monitoredIds)->exists()) {
+                return true;
+            }
+
+            if (! $profile->users()->exists()) {
+                return $profile->created_by === null
+                    || (bool) ($profile->creator && $profile->creator->isAdmin());
+            }
+
+            return false;
         }
 
         if ($profile->users()->where('users.id', auth()->id())->exists()) {
@@ -634,8 +901,19 @@ class Index extends Component
             $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
             $emailQuery->where(function ($q) use ($monitoredIds) {
                 $q->where('created_by', auth()->id())
-                    ->orWhereHas('profiles.users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds));
+                    ->orWhereIn('created_by', $monitoredIds)
+                    ->orWhereHas('profiles.users', fn ($uq) => $uq->whereIn('users.id', $monitoredIds))
+                    ->orWhere(function ($unassignedQuery) {
+                        $unassignedQuery->where(function ($ownerQuery) {
+                            $ownerQuery->whereNull('created_by')
+                                ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                        })->whereDoesntHave('profiles.users');
+                    });
             });
+
+            if ((clone $emailQuery)->where('status', 'active')->count() === 0) {
+                $emailQuery = EmailAccount::query()->whereDoesntHave('profiles.users');
+            }
         }
 
         if ($this->email_account_id) {
@@ -718,7 +996,10 @@ class Index extends Component
                 ->whereIn('role', ['user', 'cuentas'])
                 ->when(auth()->user()->isSupervisor(), function ($query) {
                     $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
-                    $query->whereIn('id', $monitoredIds);
+                    $query->where(function ($subQuery) use ($monitoredIds) {
+                        $subQuery->whereIn('id', $monitoredIds)
+                            ->orWhere(fn ($unassigned) => $unassigned->where('role', 'user')->whereNull('supervisor_id'));
+                    });
                 })
                 ->orderBy('name')
                 ->get()

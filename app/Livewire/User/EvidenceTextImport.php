@@ -201,7 +201,7 @@ class EvidenceTextImport extends Component
     {
         return auth()->user()->assignedProfiles()
             ->where('profiles.status', 'active')
-            ->whereRaw('LOWER(profiles.social_network) = ?', ['facebook']);
+            ->whereRaw('LOWER(social_network) = ?', ['facebook']);
     }
 
     /** @return array<string, mixed>|null */

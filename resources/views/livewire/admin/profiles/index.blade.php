@@ -34,7 +34,11 @@
                         <div class="p-4 sm:p-6">
                     <div class="mb-6 flex justify-end">
                         <div class="flex gap-3 flex-wrap justify-end">
-                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
+                                <button wire:click="openBatchImportModal" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                    <span>↑</span> Importar Lote XLSX
+                                </button>
+                                <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
                                 </button>
                             @endif
@@ -568,6 +572,26 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
+                            @if(!$profileId)
+                            <div>
+                                <x-input-label for="assignedUsers" value="Asignar colaborador(es)" />
+                                <p class="mt-1 text-xs text-gray-500">Selecciona quiénes podrán usar este perfil para registrar evidencias (si el correo ya tiene colaborador asignado, se vinculará automáticamente).</p>
+                                <div class="mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-2 space-y-1">
+                                    @forelse($usersList as $user)
+                                        <label for="new-profile-user-{{ $user->id }}" class="flex items-center p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                                            <input id="new-profile-user-{{ $user->id }}" type="checkbox" wire:model="assignedUsers" value="{{ $user->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                            <span class="ml-3">
+                                                <span class="block text-sm font-medium text-gray-700">{{ $user->name }}</span>
+                                                <span class="block text-xs text-gray-500">{{ $user->email }}</span>
+                                            </span>
+                                        </label>
+                                    @empty
+                                        <p class="p-3 text-center text-sm text-gray-500">No hay colaboradores activos disponibles.</p>
+                                    @endforelse
+                                </div>
+                                <x-input-error :messages="$errors->get('assignedUsers')" class="mt-2" />
+                            </div>
+                            @endif
                             @if(auth()->user()->isAdmin())
                             <div>
                                 <x-input-label for="created_by" value="Usuario creador" />
@@ -798,6 +822,103 @@
                                 <span wire:loading.remove wire:target="claimImport">Guardar asignacion</span>
                                 <span wire:loading wire:target="claimImport">Procesando...</span>
                             </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Batch XLSX Import Modal -->
+    @if($showBatchImportModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="batch-xlsx-profiles-modal-title">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showBatchImportModal', false)"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-white" id="batch-xlsx-profiles-modal-title">
+                            Registro por Lote de Perfiles de Facebook y Correos (XLSX)
+                        </h3>
+                        <button type="button" wire:click="$set('showBatchImportModal', false)" class="text-emerald-100 hover:text-white">
+                            <span class="sr-only">Cerrar</span>
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    <form wire:submit="importBatchXlsx">
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                                <div class="text-xs text-emerald-900">
+                                    <p class="font-semibold text-sm">Importa +100 perfiles de Facebook y cuentas de correo en un solo registro</p>
+                                    <p class="mt-1">Cada correo se enlaza a su perfil de Facebook y, al asignarse a un colaborador, el perfil queda vinculado automáticamente al usuario.</p>
+                                </div>
+                                <button type="button" wire:click="downloadBatchTemplate" class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-300 hover:bg-emerald-100">
+                                    <span>↓</span> Descargar Plantilla XLSX
+                                </button>
+                            </div>
+
+                            <div>
+                                <x-input-label for="batchFileProfiles" value="Archivo Excel (.xlsx) o CSV (.csv)" />
+                                <input id="batchFileProfiles" type="file" wire:model="batchFile" accept=".xlsx,.csv" class="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100" required />
+                                <div wire:loading wire:target="batchFile" class="mt-1 text-xs text-emerald-600 font-medium">Cargando archivo...</div>
+                                <x-input-error :messages="$errors->get('batchFile')" class="mt-2" />
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <x-input-label for="batchCollaboratorIdProfiles" value="Colaborador para el lote (Opcional)" />
+                                    <select wire:model="batchCollaboratorId" id="batchCollaboratorIdProfiles" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        <option value="">Usar columna 'Colaborador' del archivo</option>
+                                        @foreach($usersList as $collab)
+                                            <option value="{{ $collab->id }}">{{ $collab->name }} ({{ $collab->email }})</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">Se asignará a los perfiles del archivo que no indiquen colaborador (o a todos si marcas la casilla).</p>
+                                </div>
+                                <div class="space-y-2 pt-2 sm:pt-6">
+                                    <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchOverrideCollaborator" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Asignar el colaborador seleccionado a <strong>todas</strong> las filas del lote</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchCreateMissingCollaborators" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Crear colaborador automáticamente si el nombre en el Excel aún no existe</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            @if($batchImportSummary)
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs space-y-2">
+                                    <p class="font-bold text-slate-900 text-sm">Resumen de la última importación:</p>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Filas leídas</span><span class="font-bold text-slate-900 text-sm">{{ $batchImportSummary['total_rows'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Correos nuevos</span><span class="font-bold text-emerald-700 text-sm">{{ $batchImportSummary['emails_created'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Perfiles FB nuevos</span><span class="font-bold text-blue-700 text-sm">{{ $batchImportSummary['profiles_created'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Perfiles FB actualizados</span><span class="font-bold text-indigo-700 text-sm">{{ $batchImportSummary['profiles_updated'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Vínculos colaborador</span><span class="font-bold text-purple-700 text-sm">{{ $batchImportSummary['collaborator_links'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Filas omitidas</span><span class="font-bold text-amber-700 text-sm">{{ $batchImportSummary['skipped_rows'] }}</span></div>
+                                    </div>
+                                    @if(! empty($batchImportSummary['row_errors']))
+                                        <div class="mt-2 max-h-32 overflow-y-auto rounded bg-amber-50 p-2 text-amber-800 border border-amber-200">
+                                            <p class="font-semibold mb-1">Observaciones:</p>
+                                            <ul class="list-disc pl-4 space-y-0.5">
+                                                @foreach($batchImportSummary['row_errors'] as $err)
+                                                    <li>{{ $err }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="submit" wire:loading.attr="disabled" wire:target="importBatchXlsx,batchFile" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
+                                <span wire:loading.remove wire:target="importBatchXlsx">Procesar Lote XLSX</span>
+                                <span wire:loading wire:target="importBatchXlsx">Importando cuentas y perfiles...</span>
+                            </button>
+                            <button type="button" wire:click="$set('showBatchImportModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cerrar</button>
                         </div>
                     </form>
                 </div>

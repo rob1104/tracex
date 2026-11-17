@@ -579,12 +579,77 @@
                                 <p class="mt-2 text-xs text-amber-700">Primero <a href="{{ route('admin.emails.index') }}" wire:navigate class="font-semibold underline">registra una cuenta de correo</a>.</p>
                             @endif
                         </div>
+                        @if(auth()->user()->canMonitorCollaborators())
+                        <div class="md:col-span-2">
+                            <label for="monitorCollaboratorId" class="mb-1.5 block text-xs font-semibold text-slate-600">Colaborador asignado (Opcional)</label>
+                            <select id="monitorCollaboratorId" wire:model="monitorCollaboratorId" class="w-full rounded-lg border-slate-200 text-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="">Usar colaborador vinculado al correo o dejar sin asignar</option>
+                                @foreach($collaborators as $collabOption)
+                                    <option value="{{ $collabOption->id }}">{{ $collabOption->name }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1 text-xs text-slate-500">Si la cuenta de correo ya tiene un colaborador asignado, el perfil se vinculará automáticamente a ese usuario.</p>
+                            @error('monitorCollaboratorId')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        @endif
                         <div class="md:col-span-2">
                             <button type="submit" wire:loading.attr="disabled" wire:target="registerMonitoredFacebookProfile" @disabled($emails->isEmpty()) class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 md:w-auto">
                                 <span aria-hidden="true">＋</span><span wire:loading.remove wire:target="registerMonitoredFacebookProfile">Registrar usuario</span><span wire:loading wire:target="registerMonitoredFacebookProfile">Guardando…</span>
                             </button>
                         </div>
                     </form>
+
+                    <div class="mt-6 border-t border-slate-200 pt-6">
+                        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 class="font-bold text-slate-900">Registro por lote desde Excel (.xlsx / .csv)</h3>
+                                <p class="mt-1 text-xs text-slate-500">Registra +100 cuentas de correo, sus perfiles de Facebook y su vínculo con el colaborador en una sola operación.</p>
+                            </div>
+                            <button type="button" wire:click="downloadBatchTemplate" class="inline-flex items-center gap-1.5 self-start rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 sm:self-auto">
+                                <span>↓</span> Descargar Plantilla XLSX
+                            </button>
+                        </div>
+
+                        <form wire:submit="importBatchXlsx" class="grid gap-4 md:grid-cols-2">
+                            <div>
+                                <label for="monitorBatchFile" class="mb-1.5 block text-xs font-semibold text-slate-600">Archivo Excel (.xlsx) o CSV</label>
+                                <input id="monitorBatchFile" type="file" wire:model="batchFile" accept=".xlsx,.csv" class="block w-full text-xs text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-xs file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100">
+                                <div wire:loading wire:target="batchFile" class="mt-1 text-xs font-medium text-emerald-600">Cargando archivo...</div>
+                                @error('batchFile')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="monitorBatchCollaboratorId" class="mb-1.5 block text-xs font-semibold text-slate-600">Colaborador por defecto para el lote (Opcional)</label>
+                                <select id="monitorBatchCollaboratorId" wire:model="batchCollaboratorId" class="w-full rounded-lg border-slate-200 text-xs focus:border-emerald-500 focus:ring-emerald-500">
+                                    <option value="">Usar columna 'Colaborador' del archivo</option>
+                                    @foreach($collaborators as $collabOption)
+                                        <option value="{{ $collabOption->id }}">{{ $collabOption->name }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="mt-2 flex flex-wrap gap-4">
+                                    <label class="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchOverrideCollaborator" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Aplicar colaborador a todo el lote</span>
+                                    </label>
+                                    <label class="inline-flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchCreateMissingCollaborators" class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Crear colaboradores nuevos</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="md:col-span-2 flex flex-wrap items-center gap-3">
+                                <button type="submit" wire:loading.attr="disabled" wire:target="importBatchXlsx,batchFile" class="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:opacity-50">
+                                    <span>↑</span>
+                                    <span wire:loading.remove wire:target="importBatchXlsx">Importar lote XLSX</span>
+                                    <span wire:loading wire:target="importBatchXlsx">Importando lote…</span>
+                                </button>
+                                @if($batchImportSummary)
+                                    <span class="text-xs text-emerald-700 font-medium">
+                                        Último lote: {{ $batchImportSummary['emails_created'] }} correos nuevos, {{ $batchImportSummary['profiles_created'] }} perfiles creados, {{ $batchImportSummary['profiles_updated'] }} actualizados, {{ $batchImportSummary['collaborator_links'] }} vínculos.
+                                    </span>
+                                @endif
+                            </div>
+                        </form>
+                    </div>
                 </section>
                 @endif
 

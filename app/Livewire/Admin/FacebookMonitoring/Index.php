@@ -9,6 +9,7 @@ use App\Models\EvidenceTextImport;
 use App\Models\FacebookImportLog;
 use App\Models\Profile;
 use App\Models\User;
+use App\Services\BatchAccountProfileImporter;
 use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\LocalFacebookExportZip;
@@ -41,6 +42,19 @@ class Index extends Component
     public string $monitorFacebookUrl = '';
 
     public string $monitorEmailAccountId = '';
+
+    public string $monitorCollaboratorId = '';
+
+    public $batchFile = null;
+
+    public string $batchCollaboratorId = '';
+
+    public bool $batchOverrideCollaborator = false;
+
+    public bool $batchCreateMissingCollaborators = true;
+
+    /** @var array<string, mixed>|null */
+    public ?array $batchImportSummary = null;
 
     public string $activityTab = 'recent';
 
@@ -276,6 +290,7 @@ class Index extends Component
             'monitorName' => 'required|string|max:255',
             'monitorFacebookUrl' => 'required|string|max:512',
             'monitorEmailAccountId' => 'required|integer|exists:email_accounts,id',
+            'monitorCollaboratorId' => 'nullable|integer|exists:users,id',
         ], [
             'monitorName.required' => 'Escribe el nombre o alias del perfil de Facebook.',
             'monitorFacebookUrl.required' => 'Agrega el enlace del perfil de Facebook.',
@@ -296,6 +311,7 @@ class Index extends Component
         }
 
         $emailAccount = EmailAccount::query()
+            ->with('profiles.users')
             ->where('status', 'active')
             ->when(auth()->user()->isCuentas(), function ($query) {
                 $query->where(function ($accountQuery) {
@@ -315,7 +331,7 @@ class Index extends Component
             return;
         }
 
-        Profile::create([
+        $profile = Profile::create([
             'email_account_id' => $emailAccount->id,
             'name' => trim($this->monitorName),
             'facebook_identifier' => $identifier,
@@ -324,9 +340,102 @@ class Index extends Component
             'created_by' => auth()->id(),
         ]);
 
-        $this->reset(['monitorName', 'monitorFacebookUrl', 'monitorEmailAccountId']);
+        $collaboratorIds = [];
+        if ($this->monitorCollaboratorId !== '') {
+            $collabId = (int) $this->monitorCollaboratorId;
+            $collaboratorIds[] = $collabId;
+            if (auth()->user()->isSupervisor()) {
+                User::query()
+                    ->whereKey($collabId)
+                    ->where('role', 'user')
+                    ->whereNull('supervisor_id')
+                    ->update(['supervisor_id' => auth()->id()]);
+            }
+        } else {
+            $collaboratorIds = $emailAccount->profiles
+                ->flatMap(fn (Profile $p) => $p->users->pluck('id'))
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+        }
+
+        if ($collaboratorIds !== []) {
+            $profile->users()->syncWithoutDetaching($collaboratorIds);
+        }
+
+        $this->reset(['monitorName', 'monitorFacebookUrl', 'monitorEmailAccountId', 'monitorCollaboratorId']);
         $this->resetPage();
         session()->flash('status', 'Usuario de Facebook registrado. TraceX buscará coincidencias en las próximas exportaciones.');
+    }
+
+    public function downloadBatchTemplate()
+    {
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
+
+        return response()->streamDownload(function (): void {
+            $tempPath = tempnam(sys_get_temp_dir(), 'tracex_plantilla_perfiles_').'.xlsx';
+            try {
+                app(BatchAccountProfileImporter::class)->createTemplate($tempPath);
+                readfile($tempPath);
+            } finally {
+                if (is_file($tempPath)) {
+                    @unlink($tempPath);
+                }
+            }
+        }, 'plantilla_importacion_perfiles_facebook.xlsx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    public function importBatchXlsx(): void
+    {
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
+        $this->resetValidation('batchFile');
+
+        $this->validate([
+            'batchFile' => 'required|file|max:20480',
+            'batchCollaboratorId' => 'nullable|integer|exists:users,id',
+        ], [
+            'batchFile.required' => 'Selecciona un archivo .xlsx o .csv para importar.',
+            'batchFile.max' => 'El archivo no debe superar los 20 MB.',
+        ]);
+
+        $originalName = (string) $this->batchFile->getClientOriginalName();
+        $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if (! in_array($extension, ['xlsx', 'csv'], true)) {
+            $this->addError('batchFile', 'El archivo debe ser de formato Excel (.xlsx) o CSV (.csv).');
+
+            return;
+        }
+
+        try {
+            $summary = app(BatchAccountProfileImporter::class)->importFromFile(
+                $this->batchFile->getRealPath(),
+                auth()->user(),
+                [
+                    'default_collaborator_id' => $this->batchCollaboratorId !== '' ? (int) $this->batchCollaboratorId : null,
+                    'override_collaborator' => $this->batchOverrideCollaborator,
+                    'create_missing_collaborators' => $this->batchCreateMissingCollaborators,
+                    'created_by' => auth()->id(),
+                ],
+                $extension,
+                $originalName
+            );
+        } catch (Throwable $e) {
+            $this->addError('batchFile', $e->getMessage());
+
+            return;
+        }
+
+        $this->batchImportSummary = $summary;
+        $this->reset('batchFile');
+        $this->resetPage();
+
+        session()->flash(
+            'status',
+            "Importación por lote completada: {$summary['emails_created']} correos nuevos, {$summary['profiles_created']} perfiles creados, {$summary['profiles_updated']} perfiles actualizados y {$summary['collaborator_links']} vínculos con colaboradores."
+        );
     }
 
     public function setActivityTab(string $tab): void
@@ -599,12 +708,13 @@ class Index extends Component
 
         $countsByProfile = [];
         if ($profileIds->isNotEmpty()) {
+            $prefix = DB::getTablePrefix();
             $rows = Evidence::query()
                 ->join('evidence_types', 'evidence_types.id', '=', 'evidence.evidence_type_id')
                 ->where('evidence.origin', 'facebook_txt')
-                ->whereRaw('LOWER(evidence.social_network) = ?', ['facebook'])
+                ->whereRaw("LOWER({$prefix}evidence.social_network) = ?", ['facebook'])
                 ->whereIn('evidence.profile_id', $profileIds)
-                ->selectRaw('evidence.profile_id, evidence_types.name as type_name, COUNT(*) as total')
+                ->selectRaw("{$prefix}evidence.profile_id, {$prefix}evidence_types.name as type_name, COUNT(*) as total")
                 ->groupBy('evidence.profile_id', 'evidence_types.name')
                 ->get();
 
@@ -754,7 +864,14 @@ class Index extends Component
             $monitoredIds = auth()->user()->monitoredCollaboratorIds() ?? [0];
             $emailsQuery->where(function ($accountQuery) use ($monitoredIds) {
                 $accountQuery->where('created_by', auth()->id())
-                    ->orWhereHas('profiles.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                    ->orWhereIn('created_by', $monitoredIds)
+                    ->orWhereHas('profiles.users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds))
+                    ->orWhere(function ($unassignedQuery) {
+                        $unassignedQuery->where(function ($ownerQuery) {
+                            $ownerQuery->whereNull('created_by')
+                                ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                        })->whereDoesntHave('profiles.users');
+                    });
             });
         }
 
@@ -818,12 +935,13 @@ class Index extends Component
         $periodDays = (int) $this->chartPeriod;
         $chartStart = now()->startOfDay()->subDays($periodDays - 1);
         $chartEnd = now();
-        $dateExpression = 'DATE(COALESCE(evidence.external_published_at, evidence.created_at))';
+        $prefix = DB::getTablePrefix();
+        $dateExpression = "DATE(COALESCE({$prefix}evidence.external_published_at, {$prefix}evidence.created_at))";
         $chartRows = $this->activityQuery()
             ->join('evidence_types', 'evidence_types.id', '=', 'evidence.evidence_type_id')
-            ->whereBetween(DB::raw('COALESCE(evidence.external_published_at, evidence.created_at)'), [$chartStart, $chartEnd])
-            ->selectRaw($dateExpression.' as activity_date, evidence_types.name as activity_type, COUNT(*) as total')
-            ->groupByRaw($dateExpression.', evidence_types.name')
+            ->whereBetween(DB::raw("COALESCE({$prefix}evidence.external_published_at, {$prefix}evidence.created_at)"), [$chartStart, $chartEnd])
+            ->selectRaw("{$dateExpression} as activity_date, {$prefix}evidence_types.name as activity_type, COUNT(*) as total")
+            ->groupByRaw("{$dateExpression}, {$prefix}evidence_types.name")
             ->get();
 
         $chartBuckets = [];

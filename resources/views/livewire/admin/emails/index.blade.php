@@ -9,17 +9,22 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 bg-white border-b border-gray-200">
-                    <div class="flex justify-between items-center mb-6">
-                        <div class="flex-1 w-full sm:w-1/3 mr-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-6">
+                        <div class="flex-1 w-full sm:w-1/3">
                             <x-text-input wire:model.live.debounce.300ms="search" type="search" placeholder="Buscar por correo o alias..." class="w-full" />
                         </div>
-                        <div class="flex gap-3">
-                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas()) <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                        <div class="flex flex-wrap gap-3 justify-end">
+                            @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
+                                <button wire:click="openBatchImportModal" class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-emerald-700 focus:bg-emerald-700 active:bg-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 transition ease-in-out duration-150">
+                                    <span>↑</span> Importar Lote XLSX
+                                </button>
+                                <button wire:click="openMassAssignModal" class="inline-flex items-center px-4 py-2 bg-slate-800 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-slate-700 focus:bg-slate-700 active:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-500 focus:ring-offset-2 transition ease-in-out duration-150">
                                     Asignación Masiva
                                 </button>
                             @endif
                             @if(! auth()->user()->isUser())
-                                <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button> <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button>
+                                <button wire:click="exportCsv" class="inline-flex items-center px-4 py-2 bg-green-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-green-700 active:bg-green-900 focus:outline-none focus:border-green-900 focus:ring ring-green-300 disabled:opacity-25 transition ease-in-out duration-150">Excel</button>
+                                <button wire:click="exportPdf" class="inline-flex items-center px-4 py-2 bg-red-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-red-700 active:bg-red-900 focus:outline-none focus:border-red-900 focus:ring ring-red-300 disabled:opacity-25 transition ease-in-out duration-150">PDF</button>
                             @endif
                             @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
                                 <x-primary-button wire:click="create">Nueva Cuenta</x-primary-button>
@@ -78,26 +83,43 @@
                                 <tr>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alias</th>
                                     <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Correo</th>
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfiles</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Perfil FB / Colaborador</th>
                                     @if(auth()->user()->isAdmin())
                                         <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gestor Asignado</th>
                                     @endif
                                     @if(! auth()->user()->isUser())
                                         <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contraseña</th>
                                     @endif
-                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th> <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha de Creación</th>
+                                    <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estatus</th>
                                     <th scope="col" class="relative px-4 py-2"><span class="sr-only">Acciones</span></th>
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @forelse($accounts as $account)
+                                    @php
+                                        $fbProfile = $account->profiles->first(fn ($p) => strtolower($p->social_network) === 'facebook') ?? $account->profiles->first();
+                                        $assignedCollabs = $account->profiles->flatMap(fn ($p) => $p->users)->unique('id');
+                                    @endphp
                                     <tr class="hover:bg-gray-50 transition-colors">
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm font-medium text-gray-900">{{ $account->alias ?: '-' }}</td>
                                         <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">{{ $account->email }}</td>
-                                        <td class="px-4 py-3 whitespace-nowrap">
-                                            <button wire:click="viewProfiles({{ $account->id }})" class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-colors">
-                                                {{ $account->profiles->count() }} Perfiles
-                                            </button>
+                                        <td class="px-4 py-3 whitespace-normal">
+                                            <div class="flex flex-col items-start gap-1">
+                                                <button wire:click="viewProfiles({{ $account->id }})" class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition-colors">
+                                                    {{ $account->profiles->count() }} Perfiles
+                                                </button>
+                                                @if($fbProfile)
+                                                    <span class="text-xs font-medium text-blue-700">{{ $fbProfile->name }}</span>
+                                                @endif
+                                                @if($assignedCollabs->isNotEmpty())
+                                                    <span class="text-xs text-emerald-700 font-medium">
+                                                        Colaborador: {{ $assignedCollabs->pluck('name')->implode(', ') }}
+                                                    </span>
+                                                @elseif(! auth()->user()->isUser())
+                                                    <span class="text-xs text-amber-600">Sin colaborador</span>
+                                                @endif
+                                            </div>
                                         </td>
                                         @if(auth()->user()->isAdmin())
                                             <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">{{ $account->creator->name ?? 'N/A' }}</td>
@@ -113,7 +135,9 @@
                                             </button>
                                         </td>
                                         @endif
-                                        <td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center space-x-2 text-sm"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><div class="flex flex-col"><span class="font-semibold text-gray-700">{{ $account->created_at->format('d M Y') }}</span><span class="text-xs text-gray-500">{{ $account->created_at->format('h:i A') }}</span></div></div></td> <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">@if($account->status === 'active')
+                                        <td class="px-4 py-3 whitespace-nowrap"><div class="flex items-center space-x-2 text-sm"><svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg><div class="flex flex-col"><span class="font-semibold text-gray-700">{{ $account->created_at->format('d M Y') }}</span><span class="text-xs text-gray-500">{{ $account->created_at->format('h:i A') }}</span></div></div></td>
+                                        <td class="px-4 py-3 whitespace-normal break-words text-sm text-gray-500">
+                                            @if($account->status === 'active')
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-green-50 text-green-700 border-green-200">Activo</span>
                                             @else
                                                 <span class="px-2.5 py-1 text-xs font-bold rounded-full border bg-red-50 text-red-700 border-red-200">Suspendido</span>
@@ -122,6 +146,12 @@
                                         <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
                                             <div class="flex items-center justify-end space-x-2">
                                                 @if(! auth()->user()->isUser())
+                                                <button wire:click="openAssignEmailModal({{ $account->id }})" title="Asignar Perfil de Facebook y Colaborador" class="p-2 text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+                                                    </svg>
+                                                </button>
+
                                                 <button wire:click="edit({{ $account->id }})" title="Editar" class="p-2 text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
                                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
                                                 </button>
@@ -190,6 +220,32 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
+
+                            <div class="border-t border-gray-200 pt-4 space-y-3">
+                                <p class="text-xs font-semibold uppercase tracking-wider text-indigo-600">Perfil de Facebook y Colaborador vinculado (Opcional)</p>
+                                <div>
+                                    <x-input-label for="facebook_profile_name" value="Nombre del Perfil de Facebook" />
+                                    <x-text-input wire:model="facebook_profile_name" id="facebook_profile_name" class="block mt-1 w-full" type="text" placeholder="Ej. Juan Pérez" />
+                                    <x-input-error :messages="$errors->get('facebook_profile_name')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="facebook_identifier" value="Enlace o ID de Facebook" />
+                                    <x-text-input wire:model="facebook_identifier" id="facebook_identifier" class="block mt-1 w-full" type="text" placeholder="https://www.facebook.com/usuario o ID numérico" />
+                                    <x-input-error :messages="$errors->get('facebook_identifier')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="collaborator_id" value="Colaborador Asignado" />
+                                    <select wire:model="collaborator_id" id="collaborator_id" class="border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm block mt-1 w-full">
+                                        <option value="">Sin colaborador asignado</option>
+                                        @foreach($collaboratorsList as $collab)
+                                            <option value="{{ $collab->id }}">{{ $collab->name }} ({{ $collab->email }})</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">Al asignar el correo a un colaborador, el perfil de Facebook enlazado se vinculará automáticamente al usuario.</p>
+                                    <x-input-error :messages="$errors->get('collaborator_id')" class="mt-2" />
+                                </div>
+                            </div>
+
                             @if(auth()->user()->isAdmin())
                             <div>
                                 <x-input-label for="created_by" value="Gestor Asignado" />
@@ -206,6 +262,177 @@
                         <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                             <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar</x-primary-button>
                             <button type="button" wire:click="$set('showModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Assign Email -> Facebook Profile & Collaborator Modal -->
+    @if($showAssignEmailModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="assign-email-modal-title">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showAssignEmailModal', false)"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                    <form wire:submit="saveEmailAssignment">
+                        <div class="bg-blue-600 px-6 py-4 flex justify-between items-center">
+                            <h3 class="text-lg font-bold text-white" id="assign-email-modal-title">
+                                Vincular Perfil de Facebook y Colaborador
+                            </h3>
+                            <button type="button" wire:click="$set('showAssignEmailModal', false)" class="text-blue-100 hover:text-white">
+                                <span class="sr-only">Cerrar</span>
+                                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 space-y-4">
+                            <div class="rounded-md bg-blue-50 p-3 text-xs text-blue-800">
+                                Cuenta de correo: <span class="font-bold">{{ $assigningEmailAddress }}</span><br>
+                                Al vincular esta cuenta de correo con un perfil de Facebook y un colaborador, el perfil quedará asignado automáticamente al usuario.
+                            </div>
+
+                            <div>
+                                <x-input-label for="assignProfileId" value="Perfil de Facebook Existente (o deja en 'Crear / usar vinculado' para nuevo)" />
+                                <select wire:model.live="assignProfileId" id="assignProfileId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                    <option value="">Crear nuevo o usar perfil actual del correo</option>
+                                    @foreach($availableFacebookProfiles as $fbOption)
+                                        <option value="{{ $fbOption->id }}">{{ $fbOption->name }} {{ $fbOption->facebook_identifier ? '('.$fbOption->facebook_identifier.')' : '' }}</option>
+                                    @endforeach
+                                </select>
+                                <x-input-error :messages="$errors->get('assignProfileId')" class="mt-2" />
+                            </div>
+
+                            <div>
+                                <x-input-label for="assignProfileName" value="Nombre del Perfil de Facebook" />
+                                <x-text-input wire:model="assignProfileName" id="assignProfileName" type="text" class="mt-1 block w-full text-sm" placeholder="Ej. Sofía García" />
+                                <x-input-error :messages="$errors->get('assignProfileName')" class="mt-2" />
+                            </div>
+
+                            <div>
+                                <x-input-label for="assignFacebookIdentifier" value="Enlace o ID de Facebook (Opcional)" />
+                                <x-text-input wire:model="assignFacebookIdentifier" id="assignFacebookIdentifier" type="text" class="mt-1 block w-full text-sm" placeholder="https://www.facebook.com/usuario o id:1000..." />
+                                <x-input-error :messages="$errors->get('assignFacebookIdentifier')" class="mt-2" />
+                            </div>
+
+                            <div>
+                                <x-input-label value="Colaboradores Asignados" />
+                                <div class="mt-1 max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-2 space-y-1">
+                                    @forelse($collaboratorsList as $user)
+                                        <label class="flex items-center p-2 hover:bg-white rounded cursor-pointer transition-colors">
+                                            <input type="checkbox" wire:model="assignCollaboratorIds" value="{{ $user->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                            <div class="ml-3">
+                                                <span class="block text-sm font-medium text-gray-700">{{ $user->name }}</span>
+                                                <span class="block text-xs text-gray-500">{{ $user->email }}</span>
+                                            </div>
+                                        </label>
+                                    @empty
+                                        <p class="text-xs text-gray-500 text-center py-2">No hay colaboradores disponibles.</p>
+                                    @endforelse
+                                </div>
+                                <x-input-error :messages="$errors->get('assignCollaboratorIds')" class="mt-2" />
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <x-primary-button type="submit" class="w-full sm:w-auto sm:ml-3">Guardar Vínculo</x-primary-button>
+                            <button type="button" wire:click="$set('showAssignEmailModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cancelar</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <!-- Batch XLSX Import Modal -->
+    @if($showBatchImportModal)
+        <div class="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="batch-xlsx-modal-title">
+            <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                <div class="fixed inset-0 bg-gray-500/75 transition-opacity" aria-hidden="true" wire:click="$set('showBatchImportModal', false)"></div>
+                <span class="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+                <div class="relative z-10 inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+                    <div class="bg-emerald-600 px-6 py-4 flex justify-between items-center">
+                        <h3 class="text-lg font-bold text-white" id="batch-xlsx-modal-title">
+                            Registro por Lote de Cuentas y Perfiles (XLSX)
+                        </h3>
+                        <button type="button" wire:click="$set('showBatchImportModal', false)" class="text-emerald-100 hover:text-white">
+                            <span class="sr-only">Cerrar</span>
+                            <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    <form wire:submit="importBatchXlsx">
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 space-y-4">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                                <div class="text-xs text-emerald-900">
+                                    <p class="font-semibold text-sm">Importa +100 cuentas de correo y perfiles de Facebook en un solo paso</p>
+                                    <p class="mt-1">Columnas soportadas: <strong>Correo, Contraseña Correo, Nombre del Perfil, Enlace o ID de Facebook, Contraseña Facebook, Colaborador</strong>.</p>
+                                </div>
+                                <button type="button" wire:click="downloadBatchTemplate" class="shrink-0 inline-flex items-center gap-1.5 rounded-md bg-white px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-300 hover:bg-emerald-100">
+                                    <span>↓</span> Descargar Plantilla XLSX
+                                </button>
+                            </div>
+
+                            <div>
+                                <x-input-label for="batchFile" value="Archivo Excel (.xlsx) o CSV (.csv)" />
+                                <input id="batchFile" type="file" wire:model="batchFile" accept=".xlsx,.csv" class="mt-1 block w-full text-sm text-gray-700 file:mr-4 file:rounded-md file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100" required />
+                                <div wire:loading wire:target="batchFile" class="mt-1 text-xs text-emerald-600 font-medium">Cargando archivo...</div>
+                                <x-input-error :messages="$errors->get('batchFile')" class="mt-2" />
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <x-input-label for="batchCollaboratorId" value="Colaborador para el lote (Opcional)" />
+                                    <select wire:model="batchCollaboratorId" id="batchCollaboratorId" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-emerald-500 focus:ring-emerald-500 text-sm">
+                                        <option value="">Usar columna 'Colaborador' del archivo</option>
+                                        @foreach($collaboratorsList as $collab)
+                                            <option value="{{ $collab->id }}">{{ $collab->name }} ({{ $collab->email }})</option>
+                                        @endforeach
+                                    </select>
+                                    <p class="mt-1 text-xs text-gray-500">Se asignará a los perfiles del archivo que no indiquen colaborador (o a todos si marcas la casilla).</p>
+                                </div>
+                                <div class="space-y-2 pt-2 sm:pt-6">
+                                    <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchOverrideCollaborator" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Asignar el colaborador seleccionado a <strong>todas</strong> las filas del lote</span>
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs text-gray-700 cursor-pointer">
+                                        <input type="checkbox" wire:model="batchCreateMissingCollaborators" class="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500">
+                                        <span>Crear colaborador automáticamente si el nombre en el Excel aún no existe</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            @if($batchImportSummary)
+                                <div class="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs space-y-2">
+                                    <p class="font-bold text-slate-900 text-sm">Resumen de la última importación:</p>
+                                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Filas leídas</span><span class="font-bold text-slate-900 text-sm">{{ $batchImportSummary['total_rows'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Correos nuevos</span><span class="font-bold text-emerald-700 text-sm">{{ $batchImportSummary['emails_created'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Perfiles FB nuevos</span><span class="font-bold text-blue-700 text-sm">{{ $batchImportSummary['profiles_created'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Perfiles FB actualizados</span><span class="font-bold text-indigo-700 text-sm">{{ $batchImportSummary['profiles_updated'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Vínculos colaborador</span><span class="font-bold text-purple-700 text-sm">{{ $batchImportSummary['collaborator_links'] }}</span></div>
+                                        <div class="bg-white p-2 rounded border border-slate-200"><span class="text-slate-500 block">Filas omitidas</span><span class="font-bold text-amber-700 text-sm">{{ $batchImportSummary['skipped_rows'] }}</span></div>
+                                    </div>
+                                    @if(! empty($batchImportSummary['row_errors']))
+                                        <div class="mt-2 max-h-32 overflow-y-auto rounded bg-amber-50 p-2 text-amber-800 border border-amber-200">
+                                            <p class="font-semibold mb-1">Observaciones:</p>
+                                            <ul class="list-disc pl-4 space-y-0.5">
+                                                @foreach($batchImportSummary['row_errors'] as $err)
+                                                    <li>{{ $err }}</li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endif
+                        </div>
+
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="submit" wire:loading.attr="disabled" wire:target="importBatchXlsx,batchFile" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-emerald-600 text-base font-medium text-white hover:bg-emerald-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50">
+                                <span wire:loading.remove wire:target="importBatchXlsx">Procesar Lote XLSX</span>
+                                <span wire:loading wire:target="importBatchXlsx">Importando cuentas y perfiles...</span>
+                            </button>
+                            <button type="button" wire:click="$set('showBatchImportModal', false)" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">Cerrar</button>
                         </div>
                     </form>
                 </div>
@@ -265,7 +492,10 @@
                                         <li class="py-4 flex justify-between items-center">
                                             <div>
                                                 <p class="text-sm font-medium text-gray-900">{{ $p->name }}</p>
-                                                <p class="text-sm text-gray-500">{{ $p->social_network }}</p>
+                                                <p class="text-sm text-gray-500">{{ $p->social_network }} {{ $p->facebook_identifier ? '· '.$p->facebook_identifier : '' }}</p>
+                                                @if($p->users->isNotEmpty())
+                                                    <p class="text-xs text-emerald-700 font-medium mt-0.5">Colaborador: {{ $p->users->pluck('name')->implode(', ') }}</p>
+                                                @endif
                                             </div>
                                             <div>
                                                 <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full {{ $p->status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
@@ -312,10 +542,6 @@
 
                         <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                             <p class="text-sm text-gray-500 mb-6">Transfiere de forma masiva todas o algunas de las cuentas (y sus perfiles) de un Gestor a otro.</p>
-
-                            @php
-                                $gestores = \App\Models\User::whereIn('role', ['admin', 'cuentas'])->where('is_active', true)->get();
-                            @endphp
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                 <div>
@@ -397,7 +623,3 @@
         </div>
     @endif
 </div>
-
-
-
-
