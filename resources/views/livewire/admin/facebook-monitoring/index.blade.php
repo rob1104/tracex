@@ -471,44 +471,57 @@
                         @endif
                     </section>
 
-                    <section class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-                        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                            <div><h2 class="font-bold text-slate-900">Resumen de actividad</h2><p class="mt-1 text-xs text-slate-500">{{ $chartRangeLabel }} · agrupado {{ $chartGroupingLabel }}</p></div>
-                            <div class="flex gap-2">
-                                <label class="sr-only" for="chartPeriod">Periodo</label>
-                                <select id="chartPeriod" wire:model.live="chartPeriod" class="rounded-md border-slate-200 py-1.5 pl-2 pr-7 text-[11px] text-slate-600 focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="7">7 días</option>
-                                    <option value="14">14 días</option>
-                                    <option value="30">30 días</option>
-                                </select>
-                                <label class="sr-only" for="chartGrouping">Agrupar</label>
-                                <select id="chartGrouping" wire:model.live="chartGrouping" class="rounded-md border-slate-200 py-1.5 pl-2 pr-7 text-[11px] text-slate-600 focus:border-blue-500 focus:ring-blue-500">
-                                    <option value="day">Por día</option>
-                                    <option value="week">Por semana</option>
-                                </select>
+                    <section class="flex h-full min-w-0 flex-col rounded-2xl border border-slate-200 bg-gradient-to-br from-white via-white to-slate-50 p-4 shadow-sm sm:p-6">
+                        <div>
+                            <p class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-600"><span class="h-1.5 w-1.5 rounded-full bg-blue-600"></span>Monitoreo de Facebook</p>
+                            <h2 class="mt-1 text-lg font-bold leading-tight tracking-tight text-slate-900 sm:text-xl">Resumen de actividad</h2>
+                            <p class="mt-1 text-xs text-slate-500">{{ $chartRangeLabel }} · agrupado {{ $chartGroupingLabel }}</p>
+                        </div>
+                        <div class="mt-4 grid grid-cols-2 gap-2">
+                            <div class="{{ auth()->user()->canMonitorCollaborators() ? '' : 'col-span-2' }} flex min-w-0 items-center justify-between gap-2 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-2">
+                                <p class="text-[9px] font-semibold uppercase tracking-wide text-blue-600">Actividad total</p>
+                                <p class="text-sm font-bold tabular-nums text-blue-900">{{ number_format($chart->sum(fn ($bucket) => $bucket['comments'] + $bucket['reactions'] + $bucket['shares'])) }}</p>
                             </div>
+                            @if(auth()->user()->canMonitorCollaborators())
+                                <button type="button" wire:click="exportCollaboratorsPdf" wire:loading.attr="disabled" wire:target="exportCollaboratorsPdf" class="inline-flex min-w-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-600 px-2 py-2 text-[11px] font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-60">
+                                    <span wire:loading.remove wire:target="exportCollaboratorsPdf">PDF colaboradores</span>
+                                    <span wire:loading wire:target="exportCollaboratorsPdf">Preparando PDF…</span>
+                                </button>
+                            @endif
+                            <label class="sr-only" for="chartPeriod">Periodo</label>
+                            <select id="chartPeriod" wire:model.live="chartPeriod" class="w-full rounded-lg border-slate-200 bg-white py-2 pl-3 pr-8 text-xs font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="7">7 días</option>
+                                <option value="14">14 días</option>
+                                <option value="30">30 días</option>
+                            </select>
+                            <label class="sr-only" for="chartGrouping">Agrupar</label>
+                            <select id="chartGrouping" wire:model.live="chartGrouping" class="w-full rounded-lg border-slate-200 bg-white py-2 pl-3 pr-8 text-xs font-medium text-slate-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                                <option value="day">Por día</option>
+                                <option value="week">Por semana</option>
+                            </select>
                         </div>
                         @if($chartHasActivity)
-                            <div class="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-[10px] text-slate-500">
+                            <div class="mt-5 flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-slate-500">
                                 <span class="inline-flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-blue-500"></i>Comentarios</span>
                                 <span class="inline-flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-rose-500"></i>Reacciones</span>
                                 <span class="inline-flex items-center gap-1.5"><i class="h-2 w-2 rounded-full bg-emerald-500"></i>Compartidos</span>
                             </div>
-                            <div class="mt-4 flex h-44 items-end justify-between gap-0.5 border-b border-l border-slate-200 px-1 pb-0 pt-2 sm:gap-1 sm:px-2">
+                            <div class="mt-4 flex min-h-56 min-w-0 flex-1 overflow-x-auto rounded-xl border border-slate-100 bg-slate-50/70 px-2 pt-3 sm:px-4">
+                                <div class="flex min-h-[224px] flex-1 items-end justify-between gap-0.5 border-b border-l border-slate-200 px-1 pb-0 sm:gap-1 sm:px-2 {{ $chartPeriod === '30' && $chartGrouping === 'day' ? 'min-w-[520px]' : 'min-w-full' }}">
                                 @foreach($chart as $bucket)
                                     <div wire:key="activity-chart-{{ $bucket['key'] }}" class="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
                                         <div class="flex h-full w-full items-end justify-center gap-px sm:gap-1">
-                                            <span title="{{ $bucket['label'] }}: {{ $bucket['comments'] }} comentarios" class="w-1.5 rounded-t bg-blue-500 sm:w-3" style="height: {{ max(1, (int) round(($bucket['comments'] / $chartMax) * 100)) }}%"></span>
-                                            <span title="{{ $bucket['label'] }}: {{ $bucket['reactions'] }} reacciones" class="w-1.5 rounded-t bg-rose-500 sm:w-3" style="height: {{ max(1, (int) round(($bucket['reactions'] / $chartMax) * 100)) }}%"></span>
-                                            <span title="{{ $bucket['label'] }}: {{ $bucket['shares'] }} compartidos" class="w-1.5 rounded-t bg-emerald-500 sm:w-3" style="height: {{ max(1, (int) round(($bucket['shares'] / $chartMax) * 100)) }}%"></span>
+                                            <span title="{{ $bucket['label'] }}: {{ $bucket['comments'] }} comentarios" class="block {{ $chartPeriod === '30' ? 'w-1 sm:w-1.5' : 'w-2 sm:w-3' }} rounded-t-full bg-blue-500 shadow-sm transition-opacity hover:opacity-75" style="height: {{ max(1, (int) round(($bucket['comments'] / $chartMax) * 100)) }}%"></span>
+                                            <span title="{{ $bucket['label'] }}: {{ $bucket['reactions'] }} reacciones" class="block {{ $chartPeriod === '30' ? 'w-1 sm:w-1.5' : 'w-2 sm:w-3' }} rounded-t-full bg-rose-500 shadow-sm transition-opacity hover:opacity-75" style="height: {{ max(1, (int) round(($bucket['reactions'] / $chartMax) * 100)) }}%"></span>
+                                            <span title="{{ $bucket['label'] }}: {{ $bucket['shares'] }} compartidos" class="block {{ $chartPeriod === '30' ? 'w-1 sm:w-1.5' : 'w-2 sm:w-3' }} rounded-t-full bg-emerald-500 shadow-sm transition-opacity hover:opacity-75" style="height: {{ max(1, (int) round(($bucket['shares'] / $chartMax) * 100)) }}%"></span>
                                         </div>
-                                        <span class="mt-2 whitespace-nowrap text-[8px] text-slate-400 sm:text-[9px]">{{ $bucket['label'] }}</span>
+                                        <span class="mt-2 whitespace-nowrap text-[9px] font-medium text-slate-400">{{ $bucket['label'] }}</span>
                                     </div>
                                 @endforeach
+                                </div>
                             </div>
-                            <p class="mt-3 text-[10px] text-slate-400">El gráfico cuenta evidencias asignadas a perfiles. Las exportaciones pendientes aparecen en sus pestañas.</p>
                         @else
-                            <div class="mt-5 flex min-h-44 flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/70 px-5 py-6 text-center">
+                            <div class="mt-5 flex min-h-56 flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-5 py-6 text-center">
                                 <span class="grid h-10 w-10 place-items-center rounded-full bg-white text-lg text-slate-400 shadow-sm" aria-hidden="true">◷</span>
                                 <p class="mt-3 text-sm font-semibold text-slate-700">No hay actividad en {{ mb_strtolower($chartRangeLabel) }}</p>
                                 @if($totalImports === 0)
