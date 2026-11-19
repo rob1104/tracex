@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\FacebookImportProfileNameResolver;
 use App\Services\FacebookProfileIdentifier;
 use App\Services\LocalFacebookExportZip;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Carbon;
@@ -23,6 +24,7 @@ use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class Index extends Component
@@ -393,7 +395,7 @@ class Index extends Component
     private function facebookProfilesQuery()
     {
         $query = $this->filterProfilesByCollaborator($this->restrictToManageableProfiles(Profile::query()
-            ->with(['emailAccount.creator', 'users'])
+            ->with(['emailAccount.creator', 'users', 'creator'])
             ->whereRaw('LOWER(social_network) = ?', ['facebook'])));
 
         if ($this->search !== '') {
@@ -503,7 +505,7 @@ class Index extends Component
             ->orderByDesc('source_id');
     }
 
-    private function activityQuery()
+    private function activityQuery(bool $applyCollaboratorFilter = true): Builder
     {
         $query = Evidence::query()
             ->whereIn('origin', ['google_drive', 'local_upload', 'facebook_txt'])
@@ -526,7 +528,7 @@ class Index extends Component
             }
         }
 
-        if (auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
+        if ($applyCollaboratorFilter && auth()->user()->canMonitorCollaborators() && $this->collaboratorId !== '') {
             $query->where('user_id', (int) $this->collaboratorId);
         }
 
@@ -578,6 +580,250 @@ class Index extends Component
         $evidencesCount = (int) ($profile->facebook_evidences_count ?? 0);
 
         return max($commentsCount + $reactionsCount + $sharesCount, $evidencesCount);
+    }
+
+    /**
+     * @return array{
+     *     charts: Collection<int, array{collaborator: User, profileCount: int, activeProfileCount: int, accountEmails: array<int, string>, buckets: array<string, array{key: string, label: string, comments: int, reactions: int, shares: int}>, max: int, totals: array{comments: int, reactions: int, shares: int, activity: int}}>,
+     *     activeAccountsCount: int,
+     *     totalAccountsCount: int,
+     *     activityCoveragePercent: int,
+     *     totals: array{profiles: int, collaborators: int, comments: int, reactions: int, shares: int, activity: int},
+     *     rangeLabel: string,
+     *     groupingLabel: string
+     * }
+     */
+    private function buildCollaboratorActivityReport(Collection $profiles, ?User $selectedCollaborator): array
+    {
+        $periodDays = in_array($this->chartPeriod, ['7', '14', '30'], true) ? (int) $this->chartPeriod : 7;
+        $grouping = in_array($this->chartGrouping, ['day', 'week'], true) ? $this->chartGrouping : 'day';
+        $chartStart = now()->startOfDay()->subDays($periodDays - 1);
+        $today = now()->startOfDay();
+        $dateExpression = 'DATE(COALESCE(evidence.external_published_at, evidence.created_at))';
+        $profileIds = $profiles->pluck('id')->map(fn ($id): int => (int) $id)->values();
+        $profileCollaborators = [];
+        $collaborators = [];
+
+        foreach ($profiles as $profile) {
+            $profileCollaborators[$profile->id] = [];
+
+            foreach ($profile->users as $user) {
+                if ($user->role !== 'user') {
+                    continue;
+                }
+
+                $collaborators[$user->id] ??= ['user' => $user, 'profileIds' => [], 'accountEmails' => []];
+                $collaborators[$user->id]['profileIds'][$profile->id] = true;
+                $profileCollaborators[$profile->id][$user->id] = true;
+            }
+
+            $creator = $profile->creator;
+            if ($creator?->role === 'user') {
+                $collaborators[$creator->id] ??= ['user' => $creator, 'profileIds' => [], 'accountEmails' => []];
+                $collaborators[$creator->id]['profileIds'][$profile->id] = true;
+                $profileCollaborators[$profile->id][$creator->id] = true;
+            }
+
+            $accountEmail = trim((string) $profile->emailAccount?->email);
+            if ($accountEmail !== '') {
+                foreach (array_keys($profileCollaborators[$profile->id]) as $collaboratorId) {
+                    $collaborators[$collaboratorId]['accountEmails'][$accountEmail] = true;
+                }
+            }
+        }
+
+        if ($selectedCollaborator !== null) {
+            $collaborators[$selectedCollaborator->id] ??= ['user' => $selectedCollaborator, 'profileIds' => [], 'accountEmails' => []];
+        }
+
+        $chartBuckets = [];
+        $cursor = $chartStart->copy();
+        while ($cursor->lessThanOrEqualTo($today)) {
+            $bucketStart = $grouping === 'week' ? $cursor->copy()->startOfWeek() : $cursor->copy();
+            $bucketKey = $bucketStart->toDateString();
+
+            if (! isset($chartBuckets[$bucketKey])) {
+                if ($grouping === 'week') {
+                    $visibleStart = $bucketStart->greaterThan($chartStart) ? $bucketStart : $chartStart;
+                    $weekEnd = $bucketStart->copy()->endOfWeek();
+                    $visibleEnd = $weekEnd->lessThan($today) ? $weekEnd : $today;
+                    $label = $visibleStart->format('d').'–'.$visibleEnd->format('d M');
+                } else {
+                    $label = $cursor->format('d/m');
+                }
+
+                $chartBuckets[$bucketKey] = [
+                    'key' => $bucketKey,
+                    'label' => $label,
+                    'comments' => 0,
+                    'reactions' => 0,
+                    'shares' => 0,
+                ];
+            }
+
+            $cursor->addDay();
+        }
+
+        $charts = [];
+        foreach ($collaborators as $collaboratorId => $collaborator) {
+            $charts[$collaboratorId] = [
+                'collaborator' => $collaborator['user'],
+                'profileCount' => count($collaborator['profileIds']),
+                'activeProfileCount' => 0,
+                'accountEmails' => array_keys($collaborator['accountEmails']),
+                'buckets' => $chartBuckets,
+                'max' => 1,
+                'totals' => ['comments' => 0, 'reactions' => 0, 'shares' => 0, 'activity' => 0],
+            ];
+        }
+
+        $collaboratorIds = array_map('intval', array_keys($collaborators));
+        $activityRows = $collaboratorIds !== []
+            ? $this->activityQuery(applyCollaboratorFilter: false)
+                ->join('evidence_types', 'evidence_types.id', '=', 'evidence.evidence_type_id')
+                ->where(function (Builder $query) use ($profileIds, $collaboratorIds): void {
+                    $query->whereIn('evidence.profile_id', $profileIds->isNotEmpty() ? $profileIds : [0]);
+                    $query->orWhere(function (Builder $userQuery) use ($collaboratorIds): void {
+                        $userQuery->whereNull('evidence.profile_id')
+                            ->whereIn('evidence.user_id', $collaboratorIds);
+                    });
+                })
+                ->whereBetween(DB::raw('COALESCE(evidence.external_published_at, evidence.created_at)'), [$chartStart, now()])
+                ->selectRaw($dateExpression.' as activity_date, evidence.profile_id, evidence.user_id, evidence_types.name as activity_type, COUNT(*) as total')
+                ->groupByRaw($dateExpression.', evidence.profile_id, evidence.user_id, evidence_types.name')
+                ->get()
+            : collect();
+
+        $activeProfileIds = [];
+        $activeProfileIdsByCollaborator = [];
+        $totals = ['comments' => 0, 'reactions' => 0, 'shares' => 0, 'activity' => 0];
+
+        foreach ($activityRows as $row) {
+            $activityDate = Carbon::parse($row->activity_date);
+            $bucketKey = ($grouping === 'week' ? $activityDate->copy()->startOfWeek() : $activityDate)->toDateString();
+            if (! isset($chartBuckets[$bucketKey])) {
+                continue;
+            }
+
+            $typeName = mb_strtolower((string) $row->activity_type);
+            $activityType = null;
+            if (str_contains($typeName, 'compart')) {
+                $activityType = 'shares';
+            } elseif (str_contains($typeName, 'reacci') || str_contains($typeName, 'like')) {
+                $activityType = 'reactions';
+            } elseif (str_contains($typeName, 'coment')) {
+                $activityType = 'comments';
+            }
+
+            if ($activityType === null) {
+                continue;
+            }
+
+            $activityCount = (int) $row->total;
+            $profileId = (int) $row->profile_id;
+            if ($profileId > 0 && isset($profileCollaborators[$profileId])) {
+                $activeProfileIds[$profileId] = true;
+            }
+            $totals[$activityType] += $activityCount;
+            $totals['activity'] += $activityCount;
+
+            $activityCollaborators = $profileCollaborators[$profileId] ?? [];
+            $activityUserId = (int) $row->user_id;
+            if (isset($charts[$activityUserId])) {
+                $activityCollaborators[$activityUserId] = true;
+            }
+
+            foreach (array_keys($activityCollaborators) as $collaboratorId) {
+                $charts[$collaboratorId]['buckets'][$bucketKey][$activityType] += $activityCount;
+                $charts[$collaboratorId]['totals'][$activityType] += $activityCount;
+                $charts[$collaboratorId]['totals']['activity'] += $activityCount;
+
+                if ($profileId > 0 && isset($collaborators[$collaboratorId]['profileIds'][$profileId])) {
+                    $activeProfileIdsByCollaborator[$collaboratorId][$profileId] = true;
+                }
+            }
+        }
+
+        foreach ($charts as &$chart) {
+            $chart['activeProfileCount'] = count($activeProfileIdsByCollaborator[$chart['collaborator']->id] ?? []);
+            $chart['max'] = max(1, (int) collect($chart['buckets'])
+                ->flatMap(fn (array $bucket): array => [$bucket['comments'], $bucket['reactions'], $bucket['shares']])
+                ->max());
+        }
+        unset($chart);
+
+        $totalAccountsCount = $profiles->count();
+        $activeAccountsCount = count($activeProfileIds);
+
+        return [
+            'charts' => collect(array_values($charts)),
+            'activeAccountsCount' => $activeAccountsCount,
+            'totalAccountsCount' => $totalAccountsCount,
+            'activityCoveragePercent' => $totalAccountsCount > 0 ? (int) round(($activeAccountsCount / $totalAccountsCount) * 100) : 0,
+            'totals' => [
+                'profiles' => $totalAccountsCount,
+                'collaborators' => count($charts),
+                ...$totals,
+            ],
+            'rangeLabel' => 'Últimos '.$periodDays.' días',
+            'groupingLabel' => $grouping === 'day' ? 'por día' : 'por semana',
+        ];
+    }
+
+    public function exportCollaboratorsPdf(): StreamedResponse
+    {
+        abort_unless(auth()->user()->canMonitorCollaborators(), 403);
+
+        $profiles = $this->withProfileActivityMetrics($this->facebookProfilesQuery())
+            ->orderBy('name')
+            ->get()
+            ->each(function (Profile $profile): void {
+                $profile->setAttribute('total_activity_count', $this->profileTotalActivityCount($profile));
+            });
+
+        if ($this->profileActivityFilter === 'with_activity') {
+            $profiles = $profiles->filter(fn (Profile $profile): bool => (int) $profile->total_activity_count > 0)->values();
+        } elseif ($this->profileActivityFilter === 'without_activity') {
+            $profiles = $profiles->filter(fn (Profile $profile): bool => (int) $profile->total_activity_count === 0)->values();
+        } elseif ($this->profileActivityFilter === 'missing_id') {
+            $profiles = $profiles->filter(fn (Profile $profile): bool => blank($profile->facebook_identifier))->values();
+        }
+
+        $collaborator = $this->collaboratorId !== ''
+            ? User::query()
+                ->where('role', 'user')
+                ->where('is_active', true)
+                ->forAdminHierarchy(auth()->user())
+                ->find((int) $this->collaboratorId)
+            : null;
+
+        $activityReport = $this->buildCollaboratorActivityReport($profiles, $collaborator);
+
+        $activityFilterLabel = match ($this->profileActivityFilter) {
+            'with_activity' => 'Con actividad',
+            'without_activity' => 'Sin actividad',
+            'missing_id' => 'Sin ID vinculado',
+            default => 'Todos',
+        };
+
+        $pdf = Pdf::loadView('pdf.facebook-collaborators', [
+            'profiles' => $profiles,
+            'totals' => $activityReport['totals'],
+            'activeAccountsCount' => $activityReport['activeAccountsCount'],
+            'totalAccountsCount' => $activityReport['totalAccountsCount'],
+            'activityCoveragePercent' => $activityReport['activityCoveragePercent'],
+            'collaboratorCharts' => $activityReport['charts'],
+            'chartRangeLabel' => $activityReport['rangeLabel'],
+            'chartGroupingLabel' => $activityReport['groupingLabel'],
+            'collaboratorName' => $collaborator?->name ?? ($this->collaboratorId !== '' ? 'Colaborador seleccionado' : 'Todos los colaboradores'),
+            'activityFilterLabel' => $activityFilterLabel,
+            'search' => $this->search,
+            'generator' => auth()->user(),
+        ])->setPaper('letter', 'landscape');
+
+        return response()->streamDownload(function () use ($pdf): void {
+            echo $pdf->stream();
+        }, 'colaboradores_'.now()->format('Y-m-d').'.pdf');
     }
 
     /**

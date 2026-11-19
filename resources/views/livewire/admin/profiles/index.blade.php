@@ -568,6 +568,26 @@
                                 </select>
                                 <x-input-error :messages="$errors->get('status')" class="mt-2" />
                             </div>
+                            @if(!$profileId)
+                            <div>
+                                <x-input-label for="assignedUsers" value="Asignar colaborador(es)" />
+                                <p class="mt-1 text-xs text-gray-500">Selecciona quiénes podrán usar este perfil para registrar evidencias.</p>
+                                <div class="mt-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md bg-gray-50 p-2 space-y-1">
+                                    @forelse($usersList as $user)
+                                        <label for="new-profile-user-{{ $user->id }}" class="flex items-center p-2 hover:bg-white rounded cursor-pointer transition-colors border border-transparent hover:border-gray-200">
+                                            <input id="new-profile-user-{{ $user->id }}" type="checkbox" wire:model="assignedUsers" value="{{ $user->id }}" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500">
+                                            <span class="ml-3">
+                                                <span class="block text-sm font-medium text-gray-700">{{ $user->name }}</span>
+                                                <span class="block text-xs text-gray-500">{{ $user->email }}</span>
+                                            </span>
+                                        </label>
+                                    @empty
+                                        <p class="p-3 text-center text-sm text-gray-500">No hay colaboradores activos disponibles.</p>
+                                    @endforelse
+                                </div>
+                                <x-input-error :messages="$errors->get('assignedUsers')" class="mt-2" />
+                            </div>
+                            @endif
                             @if(auth()->user()->isAdmin())
                             <div>
                                 <x-input-label for="created_by" value="Usuario creador" />
