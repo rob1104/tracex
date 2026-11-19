@@ -346,4 +346,125 @@ class AdminProfileCrudTest extends TestCase
             ->get(route('admin.evidence_types.index'))
             ->assertForbidden();
     }
+
+    public function test_admin_can_filter_unassigned_profiles_from_status_filter(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $collaborator = User::factory()->create(['role' => 'user', 'is_active' => true]);
+
+        $email = EmailAccount::create([
+            'email' => 'filter-status@example.com',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        $assignedActive = Profile::create([
+            'name' => 'Perfil Asignado Activo',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+        $assignedActive->users()->attach($collaborator->id);
+
+        Profile::create([
+            'name' => 'Perfil Sin Asignar Activo',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        Profile::create([
+            'name' => 'Perfil Sin Asignar Suspendido',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'suspended',
+            'created_by' => $admin->id,
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(Index::class)
+            ->assertSeeHtml('<option value="unassigned">Sin asignar</option>')
+            ->set('filter_user_id', (string) $collaborator->id)
+            ->assertSee('Perfil Asignado Activo')
+            ->assertDontSee('Perfil Sin Asignar Activo')
+            ->set('filter_status', 'unassigned')
+            ->assertSet('filter_user_id', '')
+            ->assertSee('Perfil Sin Asignar Activo')
+            ->assertSee('Perfil Sin Asignar Suspendido')
+            ->assertDontSee('Perfil Asignado Activo')
+            ->set('filter_user_id', (string) $collaborator->id)
+            ->assertSet('filter_status', '')
+            ->assertSee('Perfil Asignado Activo')
+            ->assertDontSee('Perfil Sin Asignar Activo');
+    }
+
+    public function test_supervisor_can_filter_unassigned_profiles_and_collaborator_does_not_see_unassigned_option(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'is_active' => true]);
+        $supervisor = User::factory()->create(['role' => 'supervisor', 'is_active' => true]);
+        $otherSupervisor = User::factory()->create(['role' => 'supervisor', 'is_active' => true]);
+        $collaborator = User::factory()->create([
+            'role' => 'user',
+            'supervisor_id' => $supervisor->id,
+            'is_active' => true,
+        ]);
+
+        $email = EmailAccount::create([
+            'email' => 'supervisor-unassigned@example.com',
+            'password' => 'secret123',
+            'status' => 'active',
+            'created_by' => $admin->id,
+        ]);
+
+        $assignedProfile = Profile::create([
+            'name' => 'Perfil Asignado Equipo',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $supervisor->id,
+        ]);
+        $assignedProfile->users()->attach($collaborator->id);
+
+        Profile::create([
+            'name' => 'Perfil Sin Asignar Propio',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $supervisor->id,
+        ]);
+
+        $adminUnassignedProfile = Profile::create([
+            'name' => 'Perfil Sin Asignar Admin',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'restricted',
+            'created_by' => $admin->id,
+        ]);
+
+        Profile::create([
+            'name' => 'Perfil Sin Asignar Otro Supervisor',
+            'email_account_id' => $email->id,
+            'social_network' => 'Facebook',
+            'status' => 'active',
+            'created_by' => $otherSupervisor->id,
+        ]);
+
+        Livewire::actingAs($supervisor)
+            ->test(Index::class)
+            ->assertSeeHtml('<option value="unassigned">Sin asignar</option>')
+            ->set('filter_status', 'unassigned')
+            ->assertSee('Perfil Sin Asignar Propio')
+            ->assertSee('Perfil Sin Asignar Admin')
+            ->assertDontSee('Perfil Asignado Equipo')
+            ->assertDontSee('Perfil Sin Asignar Otro Supervisor')
+            ->call('openAssignModal', $adminUnassignedProfile->id)
+            ->assertSet('showAssignModal', true);
+
+        Livewire::actingAs($collaborator)
+            ->test(Index::class)
+            ->assertDontSeeHtml('<option value="unassigned">Sin asignar</option>');
+    }
 }
