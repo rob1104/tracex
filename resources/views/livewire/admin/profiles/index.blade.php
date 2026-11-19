@@ -172,6 +172,9 @@
                                 <option value="active">Activa</option>
                                 <option value="restricted">Restringida</option>
                                 <option value="suspended">Suspendida</option>
+                                @if(! auth()->user()->isUser())
+                                    <option value="unassigned">Sin asignar</option>
+                                @endif
                             </select>
                         </div>
                         <div class="w-full">

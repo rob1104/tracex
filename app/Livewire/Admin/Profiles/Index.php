@@ -579,13 +579,21 @@ class Index extends Component
         $this->showAssignModal = false;
     }
 
-    public function updatingFilterStatus()
+    public function updatingFilterStatus($value)
     {
+        if ($value === 'unassigned') {
+            $this->filter_user_id = '';
+        }
+
         $this->resetPage();
     }
 
-    public function updatingFilterUserId()
+    public function updatingFilterUserId($value)
     {
+        if ($value !== '' && $this->filter_status === 'unassigned') {
+            $this->filter_status = '';
+        }
+
         $this->resetPage();
     }
 
@@ -781,7 +789,13 @@ class Index extends Component
                 $query->where(function ($q) use ($monitoredIds) {
                     $q->where('created_by', auth()->id())
                         ->orWhereIn('created_by', $monitoredIds)
-                        ->orWhereHas('users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds));
+                        ->orWhereHas('users', fn ($userQuery) => $userQuery->whereIn('users.id', $monitoredIds))
+                        ->orWhere(function ($unassignedQuery) {
+                            $unassignedQuery->where(function ($ownerQuery) {
+                                $ownerQuery->whereNull('created_by')
+                                    ->orWhereHas('creator', fn ($cq) => $cq->where('role', 'admin'));
+                            })->whereDoesntHave('users');
+                        });
                 });
             }
             if ($this->filter_user_id) {
@@ -795,7 +809,9 @@ class Index extends Component
             $query->where('email_account_id', $this->filter_email_account_id);
         }
 
-        if ($this->filter_status) {
+        if ($this->filter_status === 'unassigned') {
+            $query->whereDoesntHave('users');
+        } elseif ($this->filter_status) {
             $query->where('status', $this->filter_status);
         }
 
@@ -845,7 +861,13 @@ class Index extends Component
         $profiles = $this->buildQuery()->get();
 
         $filters = [
-            'status' => $this->filter_status ?: 'Todos',
+            'status' => match ($this->filter_status) {
+                'active' => 'Activa',
+                'restricted' => 'Restringida',
+                'suspended' => 'Suspendida',
+                'unassigned' => 'Sin asignar',
+                default => 'Todos',
+            },
             'network' => $this->filter_network ?: 'Todas',
             'filterDateFrom' => $this->filterDateFrom,
             'filterDateTo' => $this->filterDateTo,
