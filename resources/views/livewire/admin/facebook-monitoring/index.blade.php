@@ -203,6 +203,17 @@
                                         >
                                             {{ $profile->status === 'active' ? 'Desactivar' : 'Activar' }}
                                         </button>
+                                        @if(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas())
+                                            <button
+                                                type="button"
+                                                wire:click="deleteFacebookProfile({{ $profile->id }})"
+                                                wire:confirm="¿Eliminar el perfil de Facebook {{ $profile->name }}? La actividad importada se conservará sin asociar a este perfil."
+                                                class="shrink-0 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[11px] font-semibold text-red-700 transition hover:bg-red-100"
+                                                title="Eliminar perfil"
+                                            >
+                                                Eliminar
+                                            </button>
+                                        @endif
                                     </div>
                                 </article>
                             @empty

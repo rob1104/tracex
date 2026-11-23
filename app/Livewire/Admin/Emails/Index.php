@@ -240,6 +240,20 @@ class Index extends Component
         $account->save();
     }
 
+    public function delete(int $id): void
+    {
+        $this->authorizeAccountManagement();
+
+        $account = EmailAccount::findOrFail($id);
+        if (! $this->canManageEmail($account)) {
+            abort(403);
+        }
+
+        $account->delete();
+
+        session()->flash('status', 'Cuenta de correo eliminada correctamente.');
+    }
+
     public function revealPassword($id)
     {
         $account = EmailAccount::findOrFail($id);

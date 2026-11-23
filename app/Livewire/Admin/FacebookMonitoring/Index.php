@@ -171,6 +171,28 @@ class Index extends Component
         session()->flash('status', "El perfil {$profile->name} fue {$statusLabel} correctamente.");
     }
 
+    public function deleteFacebookProfile(int $profileId): void
+    {
+        abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
+
+        $profile = $this->restrictToManageableProfiles(
+            Profile::query()->whereRaw('LOWER(social_network) = ?', ['facebook'])
+        )->findOrFail($profileId);
+
+        $profile->delete();
+
+        if ($this->activityProfileId === (string) $profile->id) {
+            $this->activityProfileId = '';
+        }
+
+        unset($this->profileFacebookIdentifiers[$profile->id]);
+        $this->resetPage();
+        $this->resetPage('activityPage');
+        $this->resetPage('importsPage');
+
+        session()->flash('status', "El perfil de Facebook {$profile->name} fue eliminado correctamente.");
+    }
+
     public function importLocalZip(): void
     {
         abort_unless(auth()->user()->canMonitorCollaborators() || auth()->user()->isCuentas(), 403);
